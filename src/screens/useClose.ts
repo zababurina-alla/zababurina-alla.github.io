@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import gsap from 'gsap';
 import { useStore } from '../data/store';
-import { TODAY, addDays, fmtDate, fmtDue } from '../lib/dates';
+import { TODAY, addDays, fmtDate, fmtDue, daysBetween, plural } from '../lib/dates';
 import { play } from '../lib/sound';
 import { reducedMotion } from '../ui/kit';
 import { useToast } from '../ui/toast';
@@ -11,11 +11,15 @@ import { burst, flyToCounter } from './closeFx';
 import { canWrite } from '../config';
 import { roMessage } from '../ui/readonly';
 
+const FAR_DAYS = 30;
+
 export function useCloseDeadline(rowSelector = '[data-row]') {
   const store = useStore();
   const toast = useToast();
   const [closing, setClosing] = useState<string | null>(null);
   const [warn, setWarn] = useState<Record<string, string>>({});
+  // Срок далеко (> 30 дней): первое нажатие — переспросить в строке, второе — закрыть. Окна у сервера нет (решение «Мамы CRM»).
+  const [armed, setArmed] = useState<string | null>(null);
 
   function close(id: string) {
     const d = store.deadlines.find((x) => x.id === id);
@@ -31,6 +35,15 @@ export function useCloseDeadline(rowSelector = '[data-row]') {
       play('attention');
       return;
     }
+    const ahead = daysBetween(TODAY, d.due);
+    if (ahead > FAR_DAYS && armed !== id) {
+      setArmed(id);
+      setWarn((w) => ({ ...w, [id]: `До срока ещё ${ahead} ${plural(ahead, 'день', 'дня', 'дней')} — нажмите галочку ещё раз, если уже сдано и оплачено` }));
+      play('attention');
+      return;
+    }
+    setArmed(null);
+    setWarn((w) => Object.fromEntries(Object.entries(w).filter(([k]) => k !== id)));
     setClosing(id);
     const row = document.querySelector<HTMLElement>(`${rowSelector}[data-id="${id}"]`);
     const animate = Boolean(row) && !reducedMotion();
