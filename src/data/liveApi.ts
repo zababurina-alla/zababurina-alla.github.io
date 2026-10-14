@@ -3,7 +3,7 @@
 import { ApiError, call } from './transport';
 import type { Envelope } from './transport';
 import type { CabinetApi, Change, Entity, ErrorCode, Snapshot, WriteOp, WriteResult } from './api';
-import type { Activity, Client, Deadline, Payment, Task } from './types';
+import type { Activity, Client, Deadline, Payment, Question, Task } from './types';
 
 /** Откуда брать сеанс и как тихо войти заново (auth.ts). */
 export interface SessionProvider {
@@ -54,7 +54,7 @@ export class LiveApi implements CabinetApi {
   }
 
   async snapshot(): Promise<Snapshot> {
-    const env = await this.rpc<{ clients: unknown[]; deadlines: Deadline[]; payments: Payment[]; tasks: Task[]; activity: Activity[]; cursor: number }>('sync.snapshot', {});
+    const env = await this.rpc<{ clients: unknown[]; deadlines: Deadline[]; payments: Payment[]; tasks: Task[]; activity: Activity[]; questions?: Question[]; cursor: number }>('sync.snapshot', {});
     const d = env.data;
     return {
       clients: d.clients.map(normClient),
@@ -62,6 +62,7 @@ export class LiveApi implements CabinetApi {
       payments: d.payments,
       tasks: d.tasks,
       activity: d.activity,
+      questions: d.questions ?? [],
       cursor: d.cursor ?? env.cursor,
     };
   }

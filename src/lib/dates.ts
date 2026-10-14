@@ -1,10 +1,19 @@
 // Даты: внутри — ISO «2026-10-14», на экране — «14.10.2026» (стиль таблиц, п. 5).
 import type { Status } from '../data/types';
+import { isLive } from '../config';
 
-/** «Сегодня» прототипа. На этапе 4 — дата с сервера (часы браузера не источник правды). */
-export const TODAY = '2026-10-14';
+/** Сегодня по Киеву (часовой пояс таблицы), независимо от пояса компьютера. */
+export function kyivToday(now = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Kyiv', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+}
+
+/** «Сегодня»: на живых данных — по Киеву; на выдуманных — 14.10.2026, под них написаны данные и корпуса. */
+export const TODAY = isLive() ? kyivToday() : '2026-10-14';
 
 const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+const MONTHS_NOM = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+const MONTHS_DAT = ['январю', 'февралю', 'марту', 'апрелю', 'маю', 'июню', 'июлю', 'августу', 'сентябрю', 'октябрю', 'ноябрю', 'декабрю'];
+const MONTHS_PREP = ['январе', 'феврале', 'марте', 'апреле', 'мае', 'июне', 'июле', 'августе', 'сентябре', 'октябре', 'ноябре', 'декабре'];
 const MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 const WEEKDAYS = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
 
@@ -33,6 +42,31 @@ export function daysBetween(fromIso: string, toIso: string): number {
 export function fmtDate(iso: string): string {
   const [y, m, d] = parts(iso);
   return `${String(d).padStart(2, '0')}.${String(m).padStart(2, '0')}.${y}`;
+}
+
+/** «2026-10» — ключ месяца для фильтра платежей. */
+export function monthKey(iso: string): string {
+  return iso.slice(0, 7);
+}
+
+/** Ключ прошлого месяца: «2026-10» → «2026-09», «2026-01» → «2025-12». */
+export function prevMonthKey(key: string): string {
+  const [y, m] = key.split('-').map(Number);
+  const yy = m === 1 ? (y ?? 1970) - 1 : (y ?? 1970);
+  const mm = m === 1 ? 12 : (m ?? 1) - 1;
+  return `${yy}-${String(mm).padStart(2, '0')}`;
+}
+
+/** Месяц словами: nom — «Октябрь», prep — «октябре» (в октябре), gen — «октября», dat — «октябрю» (к октябрю). */
+export function monthName(key: string, form: 'nom' | 'prep' | 'gen' | 'dat'): string {
+  const m = Number(key.slice(5, 7)) - 1;
+  const table = { nom: MONTHS_NOM, prep: MONTHS_PREP, gen: MONTHS_GEN, dat: MONTHS_DAT }[form];
+  return table[m] ?? '';
+}
+
+export function daysInMonth(key: string): number {
+  const [y, m] = key.split('-').map(Number);
+  return new Date(Date.UTC(y ?? 1970, m ?? 1, 0)).getUTCDate();
 }
 
 export function fmtDayMonth(iso: string): string {

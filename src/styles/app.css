@@ -745,6 +745,14 @@ body {
   font-weight: var(--weight-semibold);
 }
 
+.down {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--st-red-ink);
+  font-weight: var(--weight-semibold);
+}
+
 .chart {
   width: 100%;
   height: 5.5rem;

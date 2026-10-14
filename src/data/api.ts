@@ -1,6 +1,6 @@
 // Интерфейс данных кабинета — тот же, что будет у JSON-API в Apps Script (контракт: docs/api-contract.md, этап 3).
 // Сейчас его реализует fakeServer.ts (выдуманная «таблица»); на этапе 4 — живой адаптер. Экраны знают только это.
-import type { Activity, Client, Deadline, Payment, Task } from './types';
+import type { Activity, Client, Deadline, Payment, Question, Task } from './types';
 
 /** Снимок данных при открытии кабинета. cursor — номер последнего изменения в таблице (выдаёт сервер, не часы браузера). */
 export interface Snapshot {
@@ -9,6 +9,8 @@ export interface Snapshot {
   payments: Payment[];
   activity: Activity[];
   tasks: Task[];
+  /** Открытые вопросы маме (контракт v2.1, у. 6). */
+  questions: Question[];
   cursor: number;
 }
 

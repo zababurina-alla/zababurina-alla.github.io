@@ -11,7 +11,7 @@ import { Outbox } from './outbox';
 import type { Counters, OutboxEvent, OutboxItem } from './outbox';
 import { newRequestId } from './api';
 import type { CabinetApi, Change, WriteOp } from './api';
-import type { Activity, Client, Deadline, Payment, SaveState, Task } from './types';
+import type { Activity, Client, Deadline, Payment, Question, SaveState, Task } from './types';
 import { TODAY, addDays, fmtDate } from '../lib/dates';
 import { play } from '../lib/sound';
 
@@ -43,6 +43,7 @@ interface Store {
   payments: Payment[];
   activity: Activity[];
   tasks: Task[];
+  questions: Question[];
   closed: ClosedEntry[];
   fresh: string[];
   pending: OutboxItem[];
@@ -90,6 +91,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [activity, setActivity] = useState<Activity[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [closed, setClosed] = useState<ClosedEntry[]>([]);
   const [fresh, setFresh] = useState<string[]>([]);
   const [pending, setPending] = useState<OutboxItem[]>([]);
@@ -233,7 +235,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       try {
         const snap = await api.snapshot();
         if (!alive) return;
-        setClients(snap.clients); setPayments(snap.payments); setActivity(snap.activity); setTasks(snap.tasks);
+        setClients(snap.clients); setPayments(snap.payments); setActivity(snap.activity); setTasks(snap.tasks); setQuestions(snap.questions);
         setDeadlines(snap.deadlines.filter((d) => d.status !== 'done'));
         setClosed(snap.deadlines.filter((d) => d.status === 'done' && d.closedAt === TODAY)
           .map((d) => ({ deadline: d, next: null, save: 'saved', requestId: `snap-${d.id}`, by: 'бот' })));
@@ -384,10 +386,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const setMaintenance = useCallback((on: boolean) => { fakeServer.maintenance = on; if (!on) void outboxRef.current?.kick(true); }, []);
 
   const value = useMemo<Store>(() => ({
-    loaded, online, clients, deadlines, payments, activity, tasks, closed, fresh, pending, counters, cursor, conflict,
+    loaded, online, clients, deadlines, payments, activity, tasks, questions, closed, fresh, pending, counters, cursor, conflict,
     client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, addTask, toggleTask, resolveConflict,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance,
-  }), [loaded, online, clients, deadlines, payments, activity, tasks, closed, fresh, pending, counters, cursor, conflict,
+  }), [loaded, online, clients, deadlines, payments, activity, tasks, questions, closed, fresh, pending, counters, cursor, conflict,
     client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, addTask, toggleTask, resolveConflict,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance]);
 

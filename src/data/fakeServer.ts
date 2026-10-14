@@ -2,7 +2,7 @@
 // — запись подтверждается с задержкой; — автоцикл создаёт следующий период; — проверка «период закончился»;
 // — версии записей и ошибка CONFLICT; — журнал изменений с курсором; — повтор того же requestId не создаёт дубль.
 // Рычаги отладки (обрыв связи, отказ, правка извне) — для кнопок в режиме отладки.
-import { ACTIVITY, CLIENTS, DEADLINES, PAYMENTS, TASKS } from './fake';
+import { ACTIVITY, CLIENTS, DEADLINES, PAYMENTS, QUESTIONS, TASKS } from './fake';
 import type { CabinetApi, Change, Entity, Snapshot, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Deadline, Payment, Task } from './types';
 import { TODAY, addDays, endOfMonth, fmtDate } from '../lib/dates';
@@ -81,6 +81,7 @@ class FakeServer implements CabinetApi {
       payments: [...this.payments.values()].map((p) => ({ ...p })),
       activity: this.activity.map((a) => ({ ...a })),
       tasks: [...this.tasks.values()].map((t) => ({ ...t })),
+      questions: QUESTIONS.map((q) => ({ ...q, options: [...q.options] })),
       cursor: this.cursor,
     };
   }

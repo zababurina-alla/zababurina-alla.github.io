@@ -2,9 +2,9 @@
 import { useRef, useState } from 'react';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
-import { OCTOBER_CUMULATIVE, QUESTIONS, SEPTEMBER_TOTAL } from '../data/fake';
 import { useStore } from '../data/store';
-import { TODAY, daysBetween, daysLabel, fmtDate, plural, statusByDays, weekday, fmtDayMonth } from '../lib/dates';
+import { TODAY, daysBetween, daysInMonth, daysLabel, fmtDate, monthName, plural, statusByDays, weekday, fmtDayMonth } from '../lib/dates';
+import { monthStats } from '../lib/monthStats';
 import { formatMoney } from '../lib/money';
 import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
@@ -14,11 +14,13 @@ import { DeadlineTable } from './DeadlineTable';
 
 type Filter = 'all' | 'overdue' | 'burning' | 'week';
 
-function AreaChart() {
+/** Нарастающий итог месяца по дням (копейки), ось — все дни месяца: видно, сколько месяца ещё впереди. */
+function AreaChart({ cumulative, month }: { cumulative: number[]; month: string }) {
   const ref = useRef<SVGSVGElement>(null);
   const [hover, setHover] = useState<number | null>(null);
-  const max = 24;
-  const pts = OCTOBER_CUMULATIVE.map((v, i) => [(i / 30) * 600, 96 - (v / max) * 86] as const);
+  const span = daysInMonth(month) - 1;
+  const max = Math.max(1, (cumulative.at(-1) ?? 0) * 1.15);
+  const pts = cumulative.map((v, i) => [(i / span) * 600, 96 - (v / max) * 86] as const);
   const line = pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join(' ');
   const last = pts[pts.length - 1] ?? [0, 0];
   // Линия прорисовывается слева направо при открытии (один раз, 900 мс).
@@ -33,13 +35,13 @@ function AreaChart() {
   const hp = hover === null ? null : pts[hover];
   const onMove = (e: React.PointerEvent<SVGSVGElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
-    const day = Math.round(((e.clientX - r.left) / r.width) * 30);
+    const day = Math.round(((e.clientX - r.left) / r.width) * span);
     setHover(day >= 0 && day < pts.length ? day : null);
   };
   return (
     <div className="chart-wrap">
       <svg ref={ref} className="chart" viewBox="0 0 600 100" preserveAspectRatio="none" role="img"
-        aria-label={`Поступления в октябре нарастающим итогом, сейчас ${OCTOBER_CUMULATIVE.at(-1)} тыс. ₴`}
+        aria-label={`Поступления в ${monthName(month, 'prep')} нарастающим итогом, сейчас ${formatMoney(cumulative.at(-1) ?? 0)}`}
         onPointerMove={onMove} onPointerLeave={() => setHover(null)}>
         {[25, 50, 75].map((y) => <line key={y} x1="0" x2="600" y1={y} y2={y} className="chart__grid" />)}
         <path className="chart__area" d={`${line} L${last[0]} 100 L0 100 Z`} />
@@ -51,7 +53,7 @@ function AreaChart() {
         <>
           <span className="chart__hdot" style={{ left: `${(hp[0] / 600) * 100}%`, top: `${hp[1]}%` }} aria-hidden="true" />
           <span className="chart__tip" style={{ left: `${(hp[0] / 600) * 100}%` }} aria-hidden="true">
-            {hover + 1} октября<strong className="num">{formatMoney(Math.round((OCTOBER_CUMULATIVE[hover] ?? 0) * 100_000))}</strong>
+            {hover + 1} {monthName(month, 'gen')}<strong className="num">{formatMoney(cumulative[hover] ?? 0)}</strong>
           </span>
         </>
       )}
@@ -73,8 +75,7 @@ export function Today() {
   const week = withDays.filter((x) => x.days <= 7);
   const keys = store.clients.filter((c) => c.keyUntil && daysBetween(TODAY, c.keyUntil) <= 14)
     .sort((a, b) => (a.keyUntil ?? '').localeCompare(b.keyUntil ?? ''));
-  const received = store.payments.filter((p) => p.date.startsWith('2026-10')).reduce((s, p) => s + p.kopecks, 0);
-  const growth = Math.round((received / 100 / SEPTEMBER_TOTAL - 1) * 100);
+  const month = monthStats(store.payments, TODAY);
 
   const list = (filter === 'overdue' ? overdue : filter === 'burning' ? burning : filter === 'week' ? week : withDays.filter((x) => x.days <= 30))
     .sort((a, b) => a.days - b.days).map((x) => x.d);
@@ -102,7 +103,7 @@ export function Today() {
       <header className="page__head reveal">
         <div>
           <h1 className="page__title">{hello}</h1>
-          <p className="page__sub">{weekdayCap}, {fmtDayMonth(TODAY)} 2026</p>
+          <p className="page__sub">{weekdayCap}, {fmtDayMonth(TODAY)} {TODAY.slice(0, 4)}</p>
         </div>
         <div className="page__actions">
           <span className="closed-chip" data-closed-counter title="Закрыто сегодня">
@@ -116,10 +117,13 @@ export function Today() {
 
       <section className="kpis reveal" aria-label="Сводка дня">
         <div className="kpi kpi--wide" onPointerMove={spotlight}>
-          <p className="kpi__label">Получено от клиентов в октябре</p>
-          <p className="kpi__value"><RollingNumber value={received} format={(n) => formatMoney(n)} /></p>
-          <p className="kpi__note">в сентябре {formatMoney(SEPTEMBER_TOTAL * 100)} <span className="up"><Icon name="arrowUp" size={14} />{growth}{' '}% к{' '}сентябрю</span></p>
-          <AreaChart />
+          <p className="kpi__label">Получено от клиентов в {monthName(month.key, 'prep')}</p>
+          <p className="kpi__value"><RollingNumber value={month.total} format={(n) => formatMoney(n)} /></p>
+          <p className="kpi__note">в {monthName(month.prevKey, 'prep')} {formatMoney(month.prevTotal)}
+            {month.growth !== null && month.growth !== 0 && (
+              <> <span className={month.growth > 0 ? 'up' : 'down'}><Icon name={month.growth > 0 ? 'arrowUp' : 'arrowDown'} size={14} />{Math.abs(month.growth)}{' '}% к{' '}{monthName(month.prevKey, 'dat')}</span></>
+            )}</p>
+          <AreaChart cumulative={month.cumulative} month={month.key} />
         </div>
         <button type="button" className="kpi kpi--btn" onPointerMove={spotlight} onClick={() => setFilter('overdue')}>
           <span className="kpi__label">Просрочено</span>
@@ -171,15 +175,18 @@ export function Today() {
             </ul>
           </section>
 
+          {store.questions.length > 0 && (
           <section className="panel reveal" aria-labelledby="t-q">
-            <header className="panel__head"><h2 id="t-q" className="panel__title">Вопрос от Дмитрия</h2></header>
-            {QUESTIONS.map((q) => (
+            <header className="panel__head"><h2 id="t-q" className="panel__title">{store.questions.length === 1 ? 'Вопрос' : `Вопросы: ${store.questions.length}`}</h2></header>
+            {store.questions.map((q) => (
               <div key={q.id} className="question">
                 <p>{q.text}</p>
-                <div className="question__foot"><span className="sub">{fmtDayMonth(q.askedAt.slice(0, 10))}, {q.askedAt.slice(11, 16)}</span><span className="sub">Ответить — в боте; на сайте появится с живыми данными</span></div>
+                {q.type === 'choice' && q.options.length > 0 && <p className="sub">Варианты: {q.options.join(', ')}</p>}
+                <div className="question__foot"><span className="sub">{fmtDayMonth(q.askedAt.slice(0, 10))}, {q.askedAt.slice(11, 16)}</span><span className="sub">Ответить — в Telegram-боте</span></div>
               </div>
             ))}
           </section>
+          )}
 
           <section className="panel reveal" aria-labelledby="t-act">
             <header className="panel__head"><h2 id="t-act" className="panel__title">Что изменилось</h2></header>

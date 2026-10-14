@@ -9,6 +9,7 @@ export const PAIRS: Pair[] = [
   { fg: 'ink-2', bg: 'canvas', where: 'подпись на фоне страницы', kind: 'text' },
   { fg: 'ink-2', bg: 'surface-sunk', where: 'шапка таблицы, строка под курсором', kind: 'text' },
   { fg: 'positive', bg: 'surface', where: '«+12 % к сентябрю»', kind: 'text' },
+  { fg: 'st-red-ink', bg: 'surface', where: '«−8 % к сентябрю» (падение)', kind: 'text' },
   { fg: 'accent', bg: 'surface', where: 'ссылка, активный пункт', kind: 'text' },
   { fg: 'accent', bg: 'canvas', where: 'ссылка на фоне', kind: 'text' },
   { fg: 'on-accent', bg: 'accent', where: 'текст на главной кнопке', kind: 'text' },

@@ -60,11 +60,13 @@ export const PAYMENTS: Payment[] = [
   { id: 'p6', version: 1, clientId: 'c3', kopecks: 100000, period: 'Октябрь 2026', method: 'cash', date: '2026-10-05', source: 'сайт' },
   { id: 'p7', version: 1, clientId: 'c12', kopecks: 250000, period: 'III квартал 2026', method: 'mono', date: '2026-10-03', source: 'сайт' },
   { id: 'p8', version: 1, clientId: 'c10', kopecks: 500000, period: 'Октябрь 2026', method: 'bank', date: '2026-10-02', source: 'таблица' },
+  // Сентябрь: для сравнения «в сентябре» (всего 18 500,00 ₴).
+  { id: 'p9', version: 1, clientId: 'c1', kopecks: 500000, period: 'Сентябрь 2026', method: 'bank', date: '2026-09-29', source: 'бот' },
+  { id: 'p10', version: 1, clientId: 'c2', kopecks: 420000, period: 'Сентябрь 2026', method: 'cash', date: '2026-09-22', source: 'сайт' },
+  { id: 'p11', version: 1, clientId: 'c4', kopecks: 600000, period: 'Сентябрь 2026', method: 'bank', date: '2026-09-15', source: 'таблица' },
+  { id: 'p12', version: 1, clientId: 'c6', kopecks: 330000, period: 'Сентябрь 2026', method: 'mono', date: '2026-09-05', source: 'сайт' },
 ];
 
-/** Поступления по дням октября, нарастающим итогом, тыс. ₴ — для графика. */
-export const OCTOBER_CUMULATIVE = [0, 5, 7.5, 7.5, 8.5, 8.5, 8.5, 11.5, 13, 13, 13, 15, 19.2, 20.7];
-export const SEPTEMBER_TOTAL = 18_500;
 
 export const ACTIVITY: Activity[] = [
   { id: 'a1', when: '2026-10-14T09:12', source: 'бот', text: 'Платёж 1 500,00 ₴ от Ромашко Олены записан' },

@@ -205,6 +205,7 @@ export const ICONS = {
   soundOff: { cat: 'Оболочка', label: 'Звук выключен', el: <path d="M4 9v6h4l5 4V5L8 9H4ZM17 9.5l5 5M22 9.5l-5 5" /> },
   userPlus: { cat: 'Оболочка', label: 'Добавить клиента', el: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M19 8v6M16 11h6" /></> },
   arrowUp: { cat: 'Оболочка', label: 'Рост', el: <path d="M7 17 17 7M9 7h8v8" /> },
+  arrowDown: { cat: 'Оболочка', label: 'Падение', el: <path d="M7 7l10 10M17 9v8H9" /> },
   clock: { cat: 'Оболочка', label: 'Время', el: <><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></> },
 } satisfies Record<string, IconDef>;
 

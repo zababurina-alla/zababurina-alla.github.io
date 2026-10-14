@@ -1,0 +1,36 @@
+import { describe, expect, it } from 'vitest';
+import { PAYMENTS } from '../data/fake';
+import { monthStats } from './monthStats';
+import { daysInMonth, kyivToday, monthName, prevMonthKey } from './dates';
+
+describe('суммы за месяц', () => {
+  it('октябрь и сентябрь на выдуманных данных — как было на экране (20 700 и 18 500 ₴)', () => {
+    const s = monthStats(PAYMENTS, '2026-10-14');
+    expect(s.total).toBe(2_070_000);
+    expect(s.prevTotal).toBe(1_850_000);
+    expect(s.count).toBe(8);
+    expect(s.growth).toBe(12);
+    expect(s.cumulative).toHaveLength(14);
+    expect(s.cumulative[0]).toBe(0);
+    expect(s.cumulative[1]).toBe(500_000);
+    expect(s.cumulative.at(-1)).toBe(2_070_000);
+  });
+
+  it('январь сравнивается с декабрём прошлого года; пустой прошлый месяц — без процента', () => {
+    const s = monthStats([{ kopecks: 100, date: '2027-01-02' }, { kopecks: 50, date: '2026-12-31' }], '2027-01-05');
+    expect([s.key, s.prevKey, s.total, s.prevTotal]).toEqual(['2027-01', '2026-12', 100, 50]);
+    expect(monthStats([{ kopecks: 100, date: '2027-01-02' }], '2027-01-05').growth).toBeNull();
+  });
+
+  it('месяцы словами и число дней', () => {
+    expect([monthName('2026-10', 'nom'), monthName('2026-10', 'prep'), monthName('2026-09', 'gen')]).toEqual(['Октябрь', 'октябре', 'сентября']);
+    expect([prevMonthKey('2026-01'), daysInMonth('2026-02'), daysInMonth('2028-02'), daysInMonth('2026-10')]).toEqual(['2025-12', 28, 29, 31]);
+  });
+
+  it('сегодня — по Киеву, а не по часам компьютера', () => {
+    // 21:30 UTC 14.10 — в Киеве (UTC+3) уже 15.10.
+    expect(kyivToday(new Date('2026-10-14T21:30:00Z'))).toBe('2026-10-15');
+    // Зимнее время (UTC+2): 22:30 UTC 31.12 — в Киеве 01.01.
+    expect(kyivToday(new Date('2026-12-31T22:30:00Z'))).toBe('2027-01-01');
+  });
+});
