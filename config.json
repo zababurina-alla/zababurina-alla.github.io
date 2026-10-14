@@ -1,0 +1,4 @@
+{
+  "apiUrl": "",
+  "writes": ["payments", "tasks", "questions", "deadlines", "clients"]
+}
