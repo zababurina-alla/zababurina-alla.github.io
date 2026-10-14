@@ -45,16 +45,13 @@ function parseVars(body: string): Tokens {
 /**
  * Читает цвета из tokens.css. Светлая тема — блок `:root {`, тёмная — `:root[data-theme='dark'] {`.
  * Блок внутри `@media (prefers-color-scheme: dark)` обязан совпадать с тёмным (проверяет тест).
- * Направление «графит» — блок `:root[data-direction='graphite'] {` (и тёмный вариант) поверх основного.
  */
 export function readThemes(css: string) {
   const light = parseVars(blockBody(css, ':root {'));
   const dark = { ...light, ...parseVars(blockBody(css, ":root[data-theme='dark'] {")) };
   const mediaAt = css.indexOf('@media (prefers-color-scheme: dark)');
   const mediaDark = { ...light, ...parseVars(blockBody(css, ":root:not([data-theme='light']) {", mediaAt)) };
-  const gLight = { ...light, ...parseVars(blockBody(css, ":root[data-direction='graphite'] {")) };
-  const gDark = { ...dark, ...parseVars(blockBody(css, ":root[data-theme='dark'][data-direction='graphite'] {")) };
-  return { light, dark, mediaDark, graphiteLight: gLight, graphiteDark: gDark };
+  return { light, dark, mediaDark };
 }
 
 export interface Pair {

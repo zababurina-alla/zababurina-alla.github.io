@@ -1,0 +1,137 @@
+// Оболочка: левое меню на ноутбуке; верхняя полоса, нижние вкладки и кнопка «+» на телефоне.
+import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useStore } from '../data/store';
+import { TODAY, daysBetween } from '../lib/dates';
+import { soundSettings } from '../lib/sound';
+import { Icon } from '../ui/Icon';
+import type { IconName } from '../ui/Icon';
+import type { RouteName } from '../router';
+import { toHash } from '../router';
+import { useUi } from './ui-context';
+
+const NAV: { id: RouteName; label: string; icon: IconName; group: 'work' | 'ref' }[] = [
+  { id: 'today', label: 'Сегодня', icon: 'today', group: 'work' },
+  { id: 'clients', label: 'Клиенты', icon: 'clients', group: 'work' },
+  { id: 'deadlines', label: 'Сроки', icon: 'calendar', group: 'work' },
+  { id: 'payments', label: 'Платежи', icon: 'wallet', group: 'work' },
+  { id: 'tasks', label: 'Задачи', icon: 'tasks', group: 'work' },
+  { id: 'keys', label: 'Ключи ЭЦП', icon: 'key', group: 'ref' },
+  { id: 'reference', label: 'Справочник', icon: 'book', group: 'ref' },
+];
+const PHONE_NAV: RouteName[] = ['today', 'clients', 'deadlines', 'payments'];
+
+function useTheme(): [string, () => void] {
+  const [theme, setTheme] = useState(() => document.documentElement.dataset.theme ?? 'light');
+  const toggle = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    try { window.localStorage.setItem('sverka.theme', next); } catch { /* не запомнится — не страшно */ }
+    setTheme(next);
+  };
+  return [theme, toggle];
+}
+
+function SyncStatus() {
+  const { saving } = useStore();
+  const pending = Object.values(saving).filter((s) => s === 'saving').length;
+  return (
+    <p className={`sync${pending ? ' is-saving' : ''}`} role="status">
+      <span className="sync__dot" aria-hidden="true" />
+      <span className="sync__text">{pending ? `Сохраняется в таблицу: ${pending}` : 'Всё сохранено в таблице'}</span>
+    </p>
+  );
+}
+
+export function Shell({ route, children }: { route: RouteName; children: ReactNode }) {
+  const { deadlines } = useStore();
+  const ui = useUi();
+  const [theme, toggleTheme] = useTheme();
+  const [soundOn, setSoundOn] = useState(soundSettings.on);
+  const overdue = deadlines.filter((d) => daysBetween(TODAY, d.due) < 0).length;
+
+  // Горячие клавиши (ноутбук): Alt+N — платёж, Ctrl+K или «/» — поиск клиента. Без анимации: действие частое.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const typing = e.target instanceof HTMLElement && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName);
+      if (e.altKey && (e.code === 'KeyN')) { e.preventDefault(); ui.openPayment(); }
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyK') { e.preventDefault(); window.location.hash = '#/clients/search'; }
+      if (!typing && e.key === '/') { e.preventDefault(); window.location.hash = '#/clients/search'; }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [ui]);
+
+  const navLink = (n: (typeof NAV)[number]) => (
+    <a key={n.id} href={toHash({ name: n.id, params: [] })} className="nav__item" aria-current={route === n.id ? 'page' : undefined}>
+      <Icon name={n.icon} />
+      <span>{n.label}</span>
+      {n.id === 'deadlines' && overdue > 0 && <span className="nav__badge num" aria-label={`просрочено ${overdue}`}>{overdue}</span>}
+    </a>
+  );
+
+  return (
+    <div className="shell">
+      <aside className="rail" aria-label="Меню">
+        <a href="#/today" className="brand" aria-label="Сверка — на главную">
+          <span className="brand__mark" aria-hidden="true">С</span>
+          <span className="brand__name">Сверка</span>
+        </a>
+        <button type="button" className="btn btn--primary rail__cta" onClick={() => ui.openPayment()} aria-keyshortcuts="Alt+N">
+          <Icon name="plus" />Записать платёж<kbd className="kbd kbd--on-accent">Alt N</kbd>
+        </button>
+        <nav className="nav" aria-label="Разделы">
+          {NAV.filter((n) => n.group === 'work').map(navLink)}
+          <p className="nav__group">Справка</p>
+          {NAV.filter((n) => n.group === 'ref').map(navLink)}
+        </nav>
+        <div className="rail__foot">
+          <SyncStatus />
+          <div className="rail__tools">
+            <button type="button" className="icon-btn" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}>
+              <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
+            </button>
+            <button type="button" className="icon-btn" aria-pressed={soundOn}
+              onClick={() => { soundSettings.on = !soundOn; setSoundOn(!soundOn); }} aria-label={soundOn ? 'Выключить звуки' : 'Включить звуки'}>
+              <Icon name={soundOn ? 'sound' : 'soundOff'} />
+            </button>
+            <span className="me"><span className="avatar avatar--sm" aria-hidden="true">АЕ</span><span className="me__text">Вход через Google</span></span>
+          </div>
+        </div>
+      </aside>
+
+      <header className="topbar">
+        <a href="#/today" className="brand"><span className="brand__mark" aria-hidden="true">С</span><span className="brand__name">Сверка</span></a>
+        <div className="topbar__tools">
+          <SyncStatus />
+          <a href="#/clients/search" className="icon-btn" aria-label="Поиск клиента"><Icon name="search" /></a>
+          <button type="button" className="icon-btn" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}>
+            <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
+          </button>
+        </div>
+      </header>
+
+      <main className="main" id="main">
+        <div key={route} className="screen">{children}</div>
+      </main>
+
+      <button type="button" className="fab" onClick={() => ui.openPayment()} aria-label="Записать платёж"><Icon name="plus" size={26} /></button>
+
+      <nav className="tabbar" aria-label="Разделы">
+        {PHONE_NAV.map((id) => {
+          const n = NAV.find((x) => x.id === id);
+          if (!n) return null;
+          return (
+            <a key={id} href={toHash({ name: id, params: [] })} className="tabbar__item" aria-current={route === id ? 'page' : undefined}>
+              <span className="tabbar__icon"><Icon name={n.icon} />{id === 'deadlines' && overdue > 0 && <span className="tabbar__badge" aria-hidden="true" />}</span>
+              <span>{n.label}</span>
+            </a>
+          );
+        })}
+        <a href="#/more" className="tabbar__item" aria-current={route === 'more' || route === 'keys' || route === 'reference' || route === 'tasks' ? 'page' : undefined}>
+          <span className="tabbar__icon"><Icon name="more" /></span><span>Ещё</span>
+        </a>
+      </nav>
+    </div>
+  );
+}

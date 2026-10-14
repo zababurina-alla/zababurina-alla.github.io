@@ -7,10 +7,8 @@ import { PAIRS } from './contrast-pairs.ts';
 const css = readFileSync(new URL('../src/styles/tokens.css', import.meta.url), 'utf8');
 const t = readThemes(css);
 const themes = [
-  ['Штемпель · светлая', t.light],
-  ['Штемпель · тёмная', t.dark],
-  ['Графит · светлая', t.graphiteLight],
-  ['Графит · тёмная', t.graphiteDark],
+  ['Светлая', t.light],
+  ['Тёмная', t.dark],
 ] as const;
 
 const fmt = (n: number) => n.toFixed(2).replace('.', ',');
@@ -20,7 +18,7 @@ const lines: string[] = [
   '# Контраст цветов кабинета',
   '',
   'Создано `npm run contrast` из `src/styles/tokens.css`. Формула — WCAG 2.2. Порог: текст ≥ 4,5 : 1;',
-  'рамки полей, кольцо фокуса, оттиск штампа ≥ 3 : 1 (WCAG 1.4.11, не текст).',
+  'рамки полей, кольцо фокуса, точки статуса ≥ 3 : 1 (WCAG 1.4.11, не текст).',
   '',
   `| Где | Текст / элемент | Фон | ${themes.map(([n]) => n).join(' | ')} |`,
   `|---|---|---|${themes.map(() => '---:').join('|')}|`,

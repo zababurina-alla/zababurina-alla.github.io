@@ -1,0 +1,188 @@
+// Окно «Записать платёж»: клиент (подсказки), сумма (любой ввод → «1 234,56 ₴»), период, способ, дата.
+// Проверка на месте простыми словами. После записи — уведомление с «Отменить» и честный статус в списке.
+import { useEffect, useId, useRef, useState } from 'react';
+import { useStore } from '../data/store';
+import { TODAY, addDays, endOfMonth, fmtDate } from '../lib/dates';
+import { formatMoney, parseMoney } from '../lib/money';
+import { search } from '../lib/search';
+import { play } from '../lib/sound';
+import { Icon } from '../ui/Icon';
+import { Avatar } from '../ui/kit';
+import { Modal } from '../ui/Modal';
+import { useToast } from '../ui/toast';
+
+const PERIODS = ['Октябрь 2026', 'Сентябрь 2026', 'III квартал 2026'];
+const METHODS = ['на счёт', 'наличными', 'на карту'];
+
+function Segmented({ options, value, onChange, label }: { options: string[]; value: string; onChange: (v: string) => void; label: string }) {
+  return (
+    <div className="seg" role="radiogroup" aria-label={label}>
+      {options.map((o) => (
+        <button key={o} type="button" role="radio" aria-checked={value === o} className="seg__opt" onClick={() => onChange(o)}>{o}</button>
+      ))}
+    </div>
+  );
+}
+
+function parseDate(s: string): string | null {
+  const m = /^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/.exec(s.trim());
+  if (!m) return null;
+  const iso = `${m[3]}-${m[2]?.padStart(2, '0')}-${m[1]?.padStart(2, '0')}`;
+  return Number.isNaN(Date.parse(iso)) ? null : iso;
+}
+
+export function PaymentDialog({ open, clientId, onClose }: { open: boolean; clientId: string | null; onClose: () => void }) {
+  const store = useStore();
+  const toast = useToast();
+  const ids = useId();
+  const [who, setWho] = useState<string | null>(clientId);
+  const [q, setQ] = useState('');
+  const [active, setActive] = useState(0);
+  const [amount, setAmount] = useState('');
+  const [period, setPeriod] = useState(PERIODS[0] ?? '');
+  const [method, setMethod] = useState(METHODS[0] ?? '');
+  const [date, setDate] = useState(fmtDate(TODAY));
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const amountRef = useRef<HTMLInputElement>(null);
+  const clientRef = useRef<HTMLInputElement>(null);
+
+  // Открыли окно — свежая форма; клиент подставлен, если окно открыто из карточки.
+  const [lastOpen, setLastOpen] = useState(false);
+  if (open !== lastOpen) {
+    setLastOpen(open);
+    if (open) {
+      setWho(clientId); setQ(''); setAmount(''); setPeriod(PERIODS[0] ?? ''); setMethod(METHODS[0] ?? '');
+      setDate(fmtDate(TODAY)); setTouched({}); setActive(0);
+    }
+  }
+  useEffect(() => {
+    if (!open) return;
+    const t = window.setTimeout(() => (clientId ? amountRef : clientRef).current?.focus(), 60);
+    return () => window.clearTimeout(t);
+  }, [open, clientId]);
+
+  const client = who ? store.client(who) : undefined;
+  // Фокус в сумму — сразу, в том же нажатии: иначе первая набранная цифра теряется («4200» → «200»).
+  function pick(id: string) {
+    amountRef.current?.focus();
+    setWho(id);
+  }
+  const recent = [...new Set(store.payments.map((p) => p.clientId))].slice(0, 5).map((id) => store.client(id)).filter(Boolean);
+  const suggestions = (q ? search(store.clients.map((c) => ({ ...c, extra: [c.phone] })), q) : recent).slice(0, 5);
+  const money = parseMoney(amount);
+  const dateIso = parseDate(date);
+  const errors = {
+    client: client ? '' : 'Выберите клиента',
+    amount: money.ok ? '' : money.error,
+    date: dateIso ? '' : 'Дата — в виде 14.10.2026',
+  };
+  const lastPay = client ? store.payments.find((p) => p.clientId === client.id) : undefined;
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setTouched({ client: true, amount: true, date: true });
+    if (errors.client || errors.amount || errors.date || !client || !money.ok || !dateIso) {
+      play('attention');
+      return;
+    }
+    const short = client.name.split(' ').slice(0, 2).join(' ');
+    const sum = formatMoney(money.kopecks);
+    // Пока сервер не подтвердил — в списке платежей «сохраняется…», в меню «Сохраняется в таблицу: 1».
+    const id = store.addPayment({ clientId: client.id, kopecks: money.kopecks, period, method, date: dateIso }, () => {
+      play('saved');
+      toast({ text: `Платёж ${sum} записан в таблицу — ${short}`, action: { label: 'Отменить', run: () => store.removePayment(id) } });
+    });
+    onClose();
+  }
+
+  const quick: [string, string][] = [
+    ['сегодня', TODAY], ['завтра', addDays(TODAY, 1)], ['конец месяца', endOfMonth(TODAY)], ['20 число', '2026-10-20'],
+  ];
+
+  return (
+    <Modal open={open} onClose={onClose} title="Записать платёж" footer={
+      <>
+        <button type="button" className="btn btn--secondary" onClick={onClose}>Отмена</button>
+        <button type="submit" form={`${ids}-form`} className="btn btn--primary btn--grow">Записать платёж</button>
+      </>
+    }>
+      <form id={`${ids}-form`} className="form" onSubmit={submit} noValidate>
+        <div className="field">
+          <label className="field__label" htmlFor={`${ids}-client`}>Клиент</label>
+          {client ? (
+            <div className="picked">
+              <Avatar name={client.name} size="sm" />
+              <span className="picked__name">{client.name}</span>
+              <button type="button" className="link" onClick={() => { setWho(null); setTimeout(() => clientRef.current?.focus(), 0); }}>Другой</button>
+            </div>
+          ) : (
+            <div className="combo">
+              <span className="combo__icon"><Icon name="search" /></span>
+              <input id={`${ids}-client`} ref={clientRef} className="input input--icon" value={q} autoComplete="off"
+                role="combobox" aria-expanded="true" aria-controls={`${ids}-list`} aria-activedescendant={`${ids}-opt-${active}`}
+                placeholder="Начните фамилию — в любом падеже"
+                onChange={(e) => { setQ(e.target.value); setActive(0); }}
+                onBlur={() => setTouched((t) => ({ ...t, client: true }))}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => Math.min(a + 1, suggestions.length - 1)); }
+                  if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)); }
+                  if (e.key === 'Enter') { e.preventDefault(); const s = suggestions[active]; if (s) pick(s.id); }
+                }} />
+              <ul id={`${ids}-list`} className="combo__list" role="listbox" aria-label={q ? 'Найденные клиенты' : 'Недавние клиенты'}>
+                {!q && <li className="combo__hint sub" role="presentation">Недавние</li>}
+                {suggestions.map((s, i) => s && (
+                  <li key={s.id} id={`${ids}-opt-${i}`} role="option" aria-selected={i === active}
+                    className="combo__opt" onMouseDown={(e) => { e.preventDefault(); pick(s.id); }}>
+                    <Avatar name={s.name} size="sm" />{s.name}
+                  </li>
+                ))}
+                {q && suggestions.length === 0 && <li className="combo__hint sub" role="presentation">Никого не нашли</li>}
+              </ul>
+            </div>
+          )}
+          {touched.client && errors.client && <p className="field__error" role="alert">{errors.client}</p>}
+        </div>
+
+        <div className="field">
+          <label className="field__label" htmlFor={`${ids}-amount`}>Сумма</label>
+          <div className="money">
+            <input id={`${ids}-amount`} ref={amountRef} className="input input--money num" inputMode="decimal" value={amount}
+              placeholder="0,00" autoComplete="off" aria-invalid={Boolean(touched.amount && errors.amount)}
+              onChange={(e) => setAmount(e.target.value)}
+              onBlur={() => { setTouched((t) => ({ ...t, amount: true })); if (money.ok) setAmount(formatMoney(money.kopecks, false)); }} />
+            <span className="money__sign" aria-hidden="true">₴</span>
+          </div>
+          {touched.amount && errors.amount
+            ? <p className="field__error" role="alert">{errors.amount}</p>
+            : <p className="field__hint">{money.ok ? <>Будет записано: <strong className="num">{formatMoney(money.kopecks)}</strong></> : 'Можно писать 1234.5 или 1 234,50 — покажем одинаково'}</p>}
+          {lastPay && <p className="field__hint">Прошлый платёж: {formatMoney(lastPay.kopecks)} за {lastPay.period.toLowerCase()}</p>}
+        </div>
+
+        <div className="field">
+          <span className="field__label" id={`${ids}-period`}>За какой период</span>
+          <Segmented label="За какой период" options={PERIODS} value={period} onChange={setPeriod} />
+        </div>
+
+        <div className="field">
+          <span className="field__label">Способ</span>
+          <Segmented label="Способ оплаты" options={METHODS} value={method} onChange={setMethod} />
+        </div>
+
+        <div className="field">
+          <label className="field__label" htmlFor={`${ids}-date`}>Дата оплаты</label>
+          <div className="date-row">
+            <input id={`${ids}-date`} className="input input--date num" value={date} inputMode="numeric"
+              aria-invalid={Boolean(touched.date && errors.date)}
+              onChange={(e) => setDate(e.target.value)} onBlur={() => setTouched((t) => ({ ...t, date: true }))} />
+            <div className="chips">
+              {quick.map(([label, iso]) => (
+                <button key={label} type="button" className="chip" aria-pressed={dateIso === iso} onClick={() => setDate(fmtDate(iso))}>{label}</button>
+              ))}
+            </div>
+          </div>
+          {touched.date && errors.date && <p className="field__error" role="alert">{errors.date}</p>}
+        </div>
+      </form>
+    </Modal>
+  );
+}

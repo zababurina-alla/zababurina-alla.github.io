@@ -3,7 +3,7 @@ dist/
 .env*
 !.env.example
 *.xlsx
-data/
+/data/
 *.log
 .DS_Store
 Thumbs.db
