@@ -3397,3 +3397,45 @@ body {
 .prio--critical { color: var(--dot-red); }
 .prio--high { color: var(--dot-orange); }
 .prio--low { color: var(--ink-2); }
+
+/* ═════════ Окошко настроек звука ═════════ */
+.pop-wrap {
+  position: relative;
+}
+
+.pop {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + var(--space-2));
+  z-index: 40;
+  display: grid;
+  gap: var(--space-3);
+  width: 15rem;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  transform-origin: 0 100%;
+  transition: transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
+
+  @starting-style {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+}
+
+.pop__range {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.pop__range span {
+  display: flex;
+  justify-content: space-between;
+}
+
+.pop__range input {
+  width: 100%;
+  accent-color: var(--accent);
+  min-height: var(--tap);
+}

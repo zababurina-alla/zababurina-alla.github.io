@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useStore } from '../data/store';
 import { TODAY, daysBetween } from '../lib/dates';
-import { soundSettings } from '../lib/sound';
+import { play, soundSettings } from '../lib/sound';
 import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
 import type { RouteName } from '../router';
@@ -30,6 +30,44 @@ function useTheme(): [string, () => void] {
     setTheme(next);
   };
   return [theme, toggle];
+}
+
+/** Звук: переключатель, громкость, «Проверить». Настройка — удобство этого браузера (localStorage). */
+function SoundSettings({ on, setOn }: { on: boolean; setOn: (v: boolean) => void }) {
+  const [open, setOpen] = useState(false);
+  const [vol, setVol] = useState(Math.round(soundSettings.volume * 100));
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent | KeyboardEvent) => {
+      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', close);
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', close); };
+  }, [open]);
+  return (
+    <div ref={ref} className="pop-wrap">
+      <button type="button" className="icon-btn" aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen(!open)}
+        aria-label={`Звук: ${on ? `включён, ${vol} %` : 'выключен'}`}>
+        <Icon name={on ? 'sound' : 'soundOff'} />
+      </button>
+      {open && (
+        <div className="pop" role="dialog" aria-label="Звук">
+          <label className="check">
+            <input type="checkbox" checked={on} onChange={(e) => { soundSettings.on = e.target.checked; setOn(e.target.checked); }} />
+            Звуки включены
+          </label>
+          <label className="pop__range">
+            <span>Громкость <strong className="num">{vol} %</strong></span>
+            <input type="range" min={0} max={100} step={5} value={vol} disabled={!on}
+              onChange={(e) => { const v = Number(e.target.value); setVol(v); soundSettings.volume = v / 100; }} />
+          </label>
+          <button type="button" className="btn btn--secondary btn--sm" disabled={!on} onClick={() => play('saved')}>Проверить звук</button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** Честный статус связи с таблицей: сколько записей ещё не в таблице и почему. */
@@ -119,10 +157,7 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
             <button type="button" className="icon-btn" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}>
               <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
             </button>
-            <button type="button" className="icon-btn" aria-pressed={soundOn}
-              onClick={() => { soundSettings.on = !soundOn; setSoundOn(!soundOn); }} aria-label={soundOn ? 'Выключить звуки' : 'Включить звуки'}>
-              <Icon name={soundOn ? 'sound' : 'soundOff'} />
-            </button>
+            <SoundSettings on={soundOn} setOn={setSoundOn} />
             <span className="me"><span className="avatar avatar--sm" aria-hidden="true">АЕ</span><span className="me__text">Вход через Google</span></span>
           </div>
         </div>
