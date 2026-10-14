@@ -1,0 +1,294 @@
+/* Ключи ЭЦП, Справочник, Задачи, «Ещё». */
+
+/* ═════════ Ключи ЭЦП ═════════ */
+.keys,
+.tasks {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--space-2) var(--space-2);
+}
+
+.keys__row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 4.25rem;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  text-align: left;
+  transition: background-color var(--dur-fast) ease;
+}
+
+.keys li + li .keys__row::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 6rem;
+  right: var(--space-3);
+  height: 1px;
+  background: var(--line);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .keys__row:hover {
+    background: var(--surface-sunk);
+  }
+}
+
+.keys__who {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+}
+
+.keys__who strong {
+  font-weight: var(--weight-semibold);
+  line-height: 1.3;
+}
+
+.keys__when {
+  display: grid;
+  justify-items: end;
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (max-width: 559px) {
+  .keys__row .avatar {
+    display: none;
+  }
+
+  .keys li + li .keys__row::before {
+    left: 3rem;
+  }
+}
+
+/* ═════════ Справочник ═════════ */
+.rates {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13.5rem, 1fr));
+  gap: var(--space-3);
+}
+
+.rate {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--edge), 0 0 0 1px var(--line), var(--shadow-1);
+}
+
+.rate__icon {
+  margin-bottom: var(--space-2);
+  color: var(--accent);
+}
+
+.rate__name {
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.rate__value {
+  font-size: 2rem;
+  line-height: 1.15;
+}
+
+.kved--table {
+  padding: 0 var(--space-5) var(--space-3);
+}
+
+.kved--table li {
+  display: grid;
+  grid-template-columns: 4.25rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+}
+
+.kved--table li + li {
+  box-shadow: inset 0 1px 0 var(--line);
+}
+
+@media (max-width: 559px) {
+  .kved--table li {
+    grid-template-columns: 4.25rem minmax(0, 1fr);
+  }
+
+  .kved--table .tag {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+/* ═════════ Задачи ═════════ */
+.quick {
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
+  display: grid;
+  gap: var(--space-2);
+  border-radius: var(--radius-lg);
+  transition: box-shadow var(--dur-fast) ease;
+}
+
+.quick__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--ink-2);
+}
+
+.quick__plus {
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.quick__row input {
+  flex: 1;
+  min-width: 0;
+  min-height: 3.25rem;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--text-lg);
+}
+
+.quick__row input::placeholder {
+  color: var(--ink-2);
+}
+
+.quick:focus-within {
+  box-shadow: inset 0 0 0 2px var(--focus), 0 0 0 4px color-mix(in srgb, var(--focus) 15%, transparent), var(--shadow-1);
+}
+
+.quick__parsed {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding: 0 0 var(--space-2) calc(var(--tap) + var(--space-3));
+  animation: warn-in var(--dur-pop) var(--spring-pop);
+}
+
+.quick input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tasks__row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 3.75rem;
+  padding: var(--space-1) var(--space-3) var(--space-1) 0;
+  border-radius: var(--radius-md);
+  transition: background-color var(--dur-fast) ease;
+}
+
+.tasks__row + .tasks__row::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 2.75rem;
+  right: var(--space-3);
+  height: 1px;
+  background: var(--line);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .tasks__row:hover {
+    background: var(--surface-sunk);
+  }
+}
+
+/* Сделано — та же круглая галочка, что у сроков, залитая зелёным */
+.tasks__row.is-done .check-btn__ring {
+  background: var(--dot-green);
+  box-shadow: inset 0 0 0 2px var(--dot-green);
+  color: var(--surface);
+  animation: check-pop var(--dur-pop) var(--spring-pop);
+}
+
+.tasks__row.is-done .check-btn__ring path {
+  stroke-dasharray: 24;
+  stroke-width: 2.5;
+  animation: draw 300ms var(--ease-out) both;
+}
+
+.tasks__text {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  transition: color var(--dur-base) ease;
+}
+
+.tasks__row.is-done .tasks__text > span {
+  color: var(--ink-2);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--ink-2) 55%, transparent);
+}
+
+.tasks__client {
+  min-height: 0;
+  font-size: var(--text-sm);
+}
+
+.tasks__when {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.prio--critical { color: var(--dot-red); }
+.prio--high { color: var(--dot-orange); }
+.prio--low { color: var(--ink-2); }
+
+/* ═════════ «Ещё» (телефон) ═════════ */
+.more {
+  display: grid;
+  padding: var(--space-2);
+}
+
+.more__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 4.25rem;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.more__item + .more__item {
+  box-shadow: inset 0 1px 0 var(--line);
+}
+
+.more__text {
+  flex: 1;
+  display: grid;
+}
+
+.more__text strong {
+  font-weight: var(--weight-semibold);
+}
+
+.more__item > .icon:last-child {
+  color: var(--ink-2);
+}

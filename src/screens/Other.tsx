@@ -2,58 +2,96 @@
 import { useState } from 'react';
 import { canWrite } from '../config';
 import { useStore } from '../data/store';
-import { TODAY, addDays, daysBetween, daysLabel, fmtDate, statusByDays } from '../lib/dates';
+import { TODAY, addDays, daysBetween, daysLabel, fmtDate, plural, statusByDays } from '../lib/dates';
 import { parseQuickTask } from '../lib/quickTask';
-import type { Priority, Task } from '../data/types';
+import type { Client, Priority, Status, Task } from '../data/types';
 import { formatMoney } from '../lib/money';
 import { fold } from '../lib/search';
 import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
-import { Avatar, SaveBadge, StatusPill } from '../ui/kit';
+import { Avatar, Money, SaveBadge } from '../ui/kit';
+import { Empty } from '../ui/Empty';
+import { shortName } from '../ui/names';
 import { useUi } from '../app/ui-context';
+import { URGENCY_ICON } from './DeadlineTable';
+
+// Группы ключей — шкала словаря (п. 1): просрочен, горит 0–7, скоро 8–30, в порядке; «нет ключа» — ⚪ (п. 3, № 79).
+const KEY_GROUPS: { st: Status; title: string }[] = [
+  { st: 'red', title: 'Ключ закончился' },
+  { st: 'orange', title: 'Горят — 0–7 дней' },
+  { st: 'yellow', title: 'Скоро — 8–30 дней' },
+  { st: 'green', title: 'В порядке' },
+];
+
+function KeyRow({ c }: { c: Client }) {
+  const ui = useUi();
+  const days = c.keyUntil ? daysBetween(TODAY, c.keyUntil) : null;
+  const st: Status = days === null ? 'grey' : statusByDays(days);
+  return (
+    <li>
+      <button type="button" className="keys__row" onClick={() => ui.openClient(c.id)}>
+        <Icon name={URGENCY_ICON[st]} size={20} className={`urgency--${st}`} />
+        <Avatar name={c.name} />
+        <span className="keys__who"><strong>{c.name}</strong><span className="sub">{c.keyIssuer || <span className="nil">где выпущен — не указано</span>}</span></span>
+        {days === null
+          ? <span className="keys__when"><span className="nil">ключа нет в таблице</span></span>
+          : <span className="keys__when"><span className={`due--${st}`}>{daysLabel(days).replace('через ', 'ещё ')}</span><span className="sub num">до {fmtDate(c.keyUntil ?? '')}</span></span>}
+      </button>
+    </li>
+  );
+}
 
 export function Keys() {
   const store = useStore();
-  const ui = useUi();
-  const list = store.clients.filter((c) => c.keyUntil).sort((a, b) => (a.keyUntil ?? '').localeCompare(b.keyUntil ?? ''));
+  const withKey = store.clients.filter((c) => c.keyUntil).sort((a, b) => (a.keyUntil ?? '').localeCompare(b.keyUntil ?? ''));
+  const noKey = store.clients.filter((c) => !c.keyUntil);
+  const soon = withKey.filter((c) => daysBetween(TODAY, c.keyUntil ?? TODAY) <= 14).length;
   return (
     <div className="page">
-      <header className="page__head"><div><h1 className="page__title">Ключи ЭЦП</h1><p className="page__sub">По дате окончания. Продлить лучше за 14 дней.</p></div></header>
+      <header className="page__head">
+        <div>
+          <h1 className="page__title">Ключи ЭЦП <em>{soon ? `${soon} продлить в ближайшие 14 дней` : 'продлевать пока нечего'}</em></h1>
+          <p className="page__sub">По дате окончания. Продлить лучше за 14 дней — бот напомнит.</p>
+        </div>
+      </header>
       <section className="panel" aria-label="Ключи">
-        <ul className="keys">
-          {list.map((c) => {
-            const days = daysBetween(TODAY, c.keyUntil ?? TODAY);
-            return (
-              <li key={c.id}>
-                <button type="button" className="keys__row" onClick={() => ui.openClient(c.id)}>
-                  <Avatar name={c.name} />
-                  <span className="keys__who"><strong>{c.name}</strong><span className="sub num">до {fmtDate(c.keyUntil ?? '')}</span></span>
-                  <StatusPill status={statusByDays(days)}>{daysLabel(days)}</StatusPill>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        {KEY_GROUPS.map(({ st, title }) => {
+          const list = withKey.filter((c) => statusByDays(daysBetween(TODAY, c.keyUntil ?? TODAY)) === st);
+          if (!list.length) return null;
+          return (
+            <div key={st} className={`dgroup${st === 'red' ? ' dgroup--overdue' : ''}`}>
+              <h2 className="dgroup__title"><span>{title}</span><span className="dgroup__count num">{list.length}</span></h2>
+              <ul className="keys">{list.map((c) => <KeyRow key={c.id} c={c} />)}</ul>
+            </div>
+          );
+        })}
+        {noKey.length > 0 && (
+          <div className="dgroup">
+            <h2 className="dgroup__title"><span>Ключа нет в таблице</span><span className="dgroup__count num">{noKey.length}</span></h2>
+            <ul className="keys">{noKey.map((c) => <KeyRow key={c.id} c={c} />)}</ul>
+          </div>
+        )}
+        {store.clients.length === 0 && <Empty pic="keys" title="Клиентов пока нет" />}
       </section>
     </div>
   );
 }
 
 // Ставки 2026 — из брифа (МЗП 8 647, ПМ 3 328, ЄСВ 1 902,34). На живых данных — из справочника API, не из кода.
-const RATES: [string, number, string][] = [
-  ['Минимальная зарплата (МЗП)', 864700, 'с 1 января 2026'],
-  ['Прожиточный минимум (ПМ)', 332800, 'для трудоспособных'],
-  ['ЄСВ в месяц', 190234, '22 % МЗП'],
-  ['ЄП 1 группа в месяц', 33280, 'до 10 % ПМ'],
-  ['ЄП 2 группа в месяц', 172940, 'до 20 % МЗП'],
+const RATES: [string, number, string, IconName][] = [
+  ['Минимальная зарплата (МЗП)', 864700, 'с 1 января 2026', 'salary'],
+  ['Прожиточный минимум (ПМ)', 332800, 'для трудоспособных', 'person'],
+  ['ЄСВ в месяц', 190234, '22 % МЗП', 'esv'],
+  ['ЄП 1 группа в месяц', 33280, 'до 10 % ПМ', 'taxEp'],
+  ['ЄП 2 группа в месяц', 172940, 'до 20 % МЗП', 'taxEp'],
 ];
 
 const KVED_RATES: [string, string, string][] = [
-  ['96.02', 'Перукарні та салони краси', '2 гр. — 20 % МЗП'],
-  ['47.91', 'Торгівля через інтернет', '2 гр. — 20 % МЗП'],
-  ['47.81', 'Торгівля з лотків продуктами', '1 гр. — 10 % ПМ'],
-  ['56.10', 'Ресторани', '2 гр. — 20 % МЗП'],
-  ['45.20', 'Ремонт автомобілів', '2 гр. — 20 % МЗП'],
+  ['96.02', 'Перукарні та салони краси', '2 гр. — 20 % МЗП'],
+  ['47.91', 'Торгівля через інтернет', '2 гр. — 20 % МЗП'],
+  ['47.81', 'Торгівля з лотків продуктами', '1 гр. — 10 % ПМ'],
+  ['56.10', 'Ресторани', '2 гр. — 20 % МЗП'],
+  ['45.20', 'Ремонт автомобілів', '2 гр. — 20 % МЗП'],
 ];
 
 export function Reference() {
@@ -61,17 +99,24 @@ export function Reference() {
   const kv = KVED_RATES.filter(([code, title]) => !q || code.startsWith(q) || fold(title).includes(fold(q)));
   return (
     <div className="page">
-      <header className="page__head"><div><h1 className="page__title">Справочник</h1><p className="page__sub">Ставки 2026 года. Обновлено в таблице 02.01.2026 (пример).</p></div></header>
+      <header className="page__head"><div><h1 className="page__title">Справочник <em>ставки 2026</em></h1><p className="page__sub">Обновлено в таблице 02.01.2026 (пример).</p></div></header>
       <section className="rates" aria-label="Ставки">
-        {RATES.map(([name, k, note]) => (
-          <div key={name} className="panel panel--pad rate"><p className="kpi__label">{name}</p><p className="kpi__value kpi__value--md num">{formatMoney(k)}</p><p className="sub">{note}</p></div>
+        {RATES.map(([name, k, note, icon]) => (
+          <div key={name} className="rate">
+            <Icon name={icon} size={22} className="rate__icon" />
+            <p className="rate__name">{name}</p>
+            <p className="rate__value display"><Money text={formatMoney(k)} /></p>
+            <p className="sub">{note}</p>
+          </div>
         ))}
       </section>
       <section className="panel" aria-labelledby="kv-title">
         <header className="panel__head"><h2 id="kv-title" className="panel__title">КВЕД и ставка ЄП</h2></header>
         <div className="toolbar"><label className="search-input"><Icon name="search" /><span className="visually-hidden">Поиск КВЕД</span>
-          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Код или слово…" autoComplete="off" spellCheck={false} /></label></div>
-        <ul className="kved kved--table">{kv.map(([code, title, rate]) => <li key={code}><span className="num kved__code">{code}</span><span>{title}</span><span className="sub">{rate}</span></li>)}</ul>
+          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Код или слово" autoComplete="off" spellCheck={false} /></label></div>
+        {kv.length ? (
+          <ul className="kved kved--table">{kv.map(([code, title, rate]) => <li key={code}><span className="num kved__code">{code}</span><span>{title}</span><span className="tag">{rate}</span></li>)}</ul>
+        ) : <Empty pic="search" title={`КВЕД «${q}» в примерах нет`}>Полный список придёт из таблицы.</Empty>}
         <p className="sub panel__note">Ставки по рішенню Миколаївської міськради придут из таблицы через API — здесь примеры.</p>
       </section>
     </div>
@@ -107,43 +152,51 @@ export function Tasks() {
 
   return (
     <div className="page">
-      <header className="page__head"><div><h1 className="page__title">Задачи</h1><p className="page__sub">Звонки, первичка, ключи. Пишите как удобно — клиента и дату пойму сам.</p></div></header>
+      <header className="page__head"><div>
+        <h1 className="page__title">Задачи <em>{open.length ? `${open.length} ${plural(open.length, 'открыта', 'открыты', 'открыто')}` : 'всё сделано'}</em></h1>
+        <p className="page__sub">Звонки, первичка, ключи. Пишите как удобно — клиента и дату пойму сам.</p>
+      </div></header>
       <form className="panel quick" onSubmit={submit}>
         <label className="quick__row">
-          <Icon name="plus" />
+          <span className="quick__plus" aria-hidden="true"><Icon name="plus" /></span>
           <span className="visually-hidden">Новая задача</span>
           <input value={line} onChange={(e) => setLine(e.target.value)} autoComplete="off"
-            disabled={!canWrite('tasks')} placeholder={canWrite('tasks') ? 'Например: Позвонить Ромашко завтра' : 'Задачи пока — в таблице'} />
+            disabled={!canWrite('tasks')} placeholder={canWrite('tasks') ? 'Например: позвонить Ромашко завтра' : 'Задачи пока — в таблице'} />
           <button type="submit" className="btn btn--primary btn--sm" disabled={!parsed?.text}>Добавить</button>
         </label>
         {parsed && (
           <p className="quick__parsed" aria-live="polite">
             <span className="sub">Понял так:</span>
             <span className="tag">{parsed.text || '…'}</span>
-            {client && <span className="tag"><Icon name="fop" size={14} />{client.name.split(' ').slice(0, 2).join(' ')}</span>}
+            {client && <span className="tag"><Icon name="fop" size={14} />{shortName(client.name)}</span>}
             {parsed.due && <span className="tag"><Icon name="date" size={14} />{fmtDate(parsed.due)}</span>}
             {parsed.priority !== 'medium' && <span className="tag"><Icon name={PRIORITY_ICON[parsed.priority]} size={14} />{PRIORITY_LABEL[parsed.priority]}</span>}
           </p>
         )}
       </form>
       <section className="panel" aria-label="Список задач">
+        {store.tasks.length === 0 && <Empty pic="tasks" title="Задач пока нет">Напишите первую строкой выше.</Empty>}
         {groups.filter(([, xs]) => xs.length).map(([title, xs]) => (
-          <div key={title} className="dgroup">
-            <h2 className={`dgroup__title${title === 'Просрочено' ? ' is-overdue' : ''}`}>{title}<span className="sub">{xs.length}</span></h2>
+          <div key={title} className={`dgroup${title === 'Просрочено' ? ' dgroup--overdue' : ''}${title === 'Сегодня' ? ' dgroup--today' : ''}`}>
+            <h2 className="dgroup__title"><span>{title}</span><span className="dgroup__count num">{xs.length}</span></h2>
             <ul className="tasks">
               {xs.map((t) => {
                 const c = t.clientId ? store.client(t.clientId) : undefined;
                 const saving = store.pending.some((p) => (p.op.kind === 'createTask' && p.op.task.id === t.id) || (p.op.kind === 'completeTask' && p.op.id === t.id));
+                const st = t.due ? statusByDays(daysBetween(TODAY, t.due)) : null;
                 return (
                   <li key={t.id} className={`tasks__row${t.done ? ' is-done' : ''}${store.fresh.includes(t.id) ? ' is-fresh' : ''}`}>
-                    <button type="button" className="tasks__check" aria-pressed={t.done} aria-label={`Сделано: ${t.text}`}
-                      onClick={() => store.toggleTask(t.id, !t.done)}><Icon name="check" size={16} /></button>
+                    <button type="button" className="check-btn tasks__check" aria-pressed={t.done} aria-label={`Сделано: ${t.text}`}
+                      onClick={() => store.toggleTask(t.id, !t.done)}>
+                      <span className="check-btn__ring" aria-hidden="true"><Icon name="check" size={16} /></span>
+                    </button>
                     <span className="tasks__text">
-                      {t.priority !== 'medium' && !t.done && <Icon name={PRIORITY_ICON[t.priority]} size={16} className={`prio prio--${t.priority}`} label={PRIORITY_LABEL[t.priority]} />}
-                      {t.text}
-                      {c && <button type="button" className="link tasks__client" onClick={() => ui.openClient(c.id)}>{c.name.split(' ').slice(0, 2).join(' ')}</button>}
+                      {t.priority !== 'medium' && !t.done && <Icon name={PRIORITY_ICON[t.priority]} size={18} className={`prio prio--${t.priority}`} label={PRIORITY_LABEL[t.priority]} />}
+                      <span>{t.text}</span>
+                      {c && <button type="button" className="link tasks__client" onClick={() => ui.openClient(c.id)}>{shortName(c.name)}</button>}
                     </span>
-                    {saving ? <SaveBadge state="saving" offline={!store.online} /> : t.due && !t.done && <span className={`sub due--${statusByDays(daysBetween(TODAY, t.due))}`}>{daysLabel(daysBetween(TODAY, t.due))}</span>}
+                    {saving ? <SaveBadge state="saving" offline={!store.online} />
+                      : t.due && !t.done && st && <span className={`tasks__when due--${st}`}><Icon name={URGENCY_ICON[st]} size={16} className={`urgency--${st}`} />{daysLabel(daysBetween(TODAY, t.due))}</span>}
                   </li>
                 );
               })}
@@ -155,8 +208,10 @@ export function Tasks() {
   );
 }
 
-const MORE: [string, IconName, string][] = [
-  ['#/tasks', 'tasks', 'Задачи'], ['#/keys', 'key', 'Ключи ЭЦП'], ['#/reference', 'book', 'Справочник'],
+const MORE: [string, IconName, string, string][] = [
+  ['#/tasks', 'tasks', 'Задачи', 'звонки, первичка, ключи'],
+  ['#/keys', 'key', 'Ключи ЭЦП', 'у кого заканчиваются'],
+  ['#/reference', 'book', 'Справочник', 'ставки, КВЕД'],
 ];
 
 export function More() {
@@ -164,7 +219,13 @@ export function More() {
     <div className="page">
       <header className="page__head"><h1 className="page__title">Ещё</h1></header>
       <nav className="panel more" aria-label="Другие разделы">
-        {MORE.map(([href, icon, label]) => <a key={href} href={href} className="more__item"><Icon name={icon} /><span>{label}</span><Icon name="chevronRight" /></a>)}
+        {MORE.map(([href, icon, label, hint]) => (
+          <a key={href} href={href} className="more__item">
+            <Icon name={icon} tile="accent" />
+            <span className="more__text"><strong>{label}</strong><span className="sub">{hint}</span></span>
+            <Icon name="chevronRight" />
+          </a>
+        ))}
       </nav>
     </div>
   );

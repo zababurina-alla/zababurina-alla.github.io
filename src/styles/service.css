@@ -1,0 +1,313 @@
+/* Служебное: заготовка при загрузке, отладка, связь с таблицей (нет связи, конфликт, черновик), вход, «таблица не отвечает». */
+
+/* ═════════ Заготовка при загрузке ═════════ */
+.sk {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: var(--radius-s);
+  background: var(--surface-sunk);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.sk::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.55), transparent);
+  transform: translateX(-100%);
+  animation: shimmer 1.3s ease-in-out infinite;
+}
+
+:root[data-theme='dark'] .sk::after {
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.06), transparent);
+}
+
+@keyframes shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.sk-stack {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.sk--title { width: min(26rem, 80%); height: 3rem; border-radius: var(--radius-md); }
+.sk--line { height: 1rem; }
+.sk--short { width: 6rem; margin-left: auto; }
+.sk--kpi { height: 7.25rem; border-radius: var(--radius-lg); }
+.sk--avatar { width: 2.25rem; height: 2.25rem; border-radius: 50%; flex: none; }
+
+.sk-note {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink-2);
+}
+
+.sk-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--space-3);
+}
+
+.sk-rows {
+  display: grid;
+}
+
+.sk-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sk::after {
+    animation: none;
+  }
+}
+
+/* ═════════ Отладка ═════════ */
+.debug {
+  position: fixed;
+  left: calc(var(--rail-w) + var(--space-4));
+  bottom: var(--space-4);
+  z-index: 55;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-l);
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--line), var(--shadow-3);
+}
+
+.debug__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink-2);
+  font-size: 0.875rem;
+  font-weight: var(--weight-semibold);
+}
+
+@media (max-width: 1023px) {
+  .debug {
+    left: var(--space-3);
+    bottom: calc(4rem + var(--space-3));
+  }
+}
+
+/* ═════════ Связь с таблицей: статусы, «нет связи», конфликт ═════════ */
+
+.topbar .sync.is-offline .sync__text,
+.topbar .sync.is-failed .sync__text {
+  position: static;
+  width: auto;
+  height: auto;
+  clip-path: none;
+}
+
+/* «Нет связи» — оранжевая плашка над экраном: выезжает пружиной, записи ждут в очереди */
+.offline {
+  max-width: var(--content-max);
+  margin: 0 auto var(--space-4);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-l);
+  background: var(--st-orange-bg);
+  color: var(--st-orange-ink);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--st-orange-ink) 18%, transparent);
+  font-weight: var(--weight-medium);
+  animation: rise-in var(--dur-spring) var(--spring);
+}
+
+.conflict {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.conflict__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.conflict__cell {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border-radius: var(--radius-l);
+  background: var(--surface-sunk);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.conflict__cell--mine {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.conflict__cell dt {
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.conflict__cell dd {
+  margin: 0;
+  font-family: var(--display);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+}
+
+.debug {
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  width: 15.5rem;
+}
+
+.debug__h {
+  margin-top: var(--space-2);
+  color: var(--ink-2);
+  font-size: 0.8125rem;
+  font-weight: var(--weight-semibold);
+}
+
+.debug__counters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px var(--space-3);
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.debug__counters div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.debug__counters dt {
+  color: var(--ink-2);
+}
+
+.debug__counters dd {
+  margin: 0;
+  font-weight: var(--weight-semibold);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .offline {
+    animation: none;
+  }
+}
+
+.draft-note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--wheat-soft);
+  color: var(--wheat-ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.draft-note .link {
+  margin-left: auto;
+}
+
+.checks {
+  display: grid;
+  gap: 0;
+}
+
+/* Экран входа (живые данные): карточка по центру, кнопка Google, понятная ошибка. */
+.login {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: var(--space-4);
+}
+
+.login__card {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-4);
+  width: min(100%, 30rem);
+  padding: var(--space-7) var(--space-6);
+  text-align: center;
+}
+
+.login__mark {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: var(--radius-l);
+  font-size: var(--text-xl);
+}
+
+.login__title {
+  margin: 0;
+  font-family: var(--display);
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.025em;
+  line-height: var(--leading-tight);
+}
+
+.login__title em {
+  display: block;
+  font-style: italic;
+  font-weight: var(--weight-regular);
+  color: var(--ink-2);
+}
+
+.login__text {
+  margin: 0;
+  color: var(--ink-2);
+  max-width: 32ch;
+}
+
+.login__button {
+  min-height: 44px;
+}
+
+.login__error {
+  margin: 0;
+  color: var(--st-red-ink);
+}
+
+/* Только просмотр (config.json → writes): нейтральная плашка вместо оранжевой «нет связи». */
+.offline--info {
+  background: var(--surface-sunk);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+/* Таблица не отдала данные при открытии — вместо пустых экранов. */
+.server-down {
+  max-width: 40rem;
+  margin: var(--space-6) auto;
+  display: grid;
+  justify-items: start;
+  gap: var(--space-4);
+}
+
+.server-down p {
+  margin: 0;
+}
+
+/* Кнопка записи в разделе «только просмотр»: видна, но неактивна; подпись — в title. */
+.btn[aria-disabled='true'],
+.fab[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

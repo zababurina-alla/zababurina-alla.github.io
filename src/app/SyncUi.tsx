@@ -86,7 +86,7 @@ export function ReadOnlyBanner() {
 /** Таблица не отдала данные при открытии: честно сказать и дать повторить, а не показывать пустые экраны. */
 export function ServerDown({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <section className="panel panel--pad down" role="alert" aria-labelledby="down-title">
+    <section className="panel panel--pad server-down" role="alert" aria-labelledby="down-title">
       <h1 id="down-title" className="page__title">Таблица сейчас не отвечает сайту</h1>
       <p>{message}</p>
       <p className="sub">Работать можно прямо в таблице или через бота — ничего не потеряется. Сайт подхватит всё, когда связь вернётся.</p>
