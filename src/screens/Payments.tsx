@@ -6,7 +6,7 @@ import { useStore } from '../data/store';
 import { METHOD_LABEL, PAY_STATUS_LABEL } from '../data/types';
 import { TODAY, daysInMonth, fmtDate, fmtDayMonth, monthName, plural, weekday } from '../lib/dates';
 import { monthStats } from '../lib/monthStats';
-import { formatMoney } from '../lib/money';
+import { formatMoney, formatPayMoney } from '../lib/money';
 import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
 import { Avatar, RollingNumber, SaveBadge, reducedMotion } from '../ui/kit';
@@ -27,7 +27,7 @@ export function Payments() {
   const today = Number(TODAY.slice(8, 10));
   const byDay = new Map<string, typeof inMonth>();
   for (const p of [...inMonth].sort((a, b) => b.date.localeCompare(a.date))) byDay.set(p.date, [...(byDay.get(p.date) ?? []), p]);
-  const maxDay = Math.max(1, ...[...byDay.values()].map((xs) => xs.reduce((s, p) => s + p.kopecks, 0)));
+  const maxDay = Math.max(1, ...[...byDay.values()].map((xs) => xs.reduce((s, p) => s + (p.kopecks ?? 0), 0)));
 
   useGSAP(() => {
     if (reducedMotion()) return;
@@ -51,7 +51,7 @@ export function Payments() {
         <div className="bars" role="img" aria-label={`Поступления по дням ${monthName(stats.key, 'gen')}: всего ${formatMoney(total)}, самый большой день — ${formatMoney(maxDay)}`}>
           {Array.from({ length: daysInMonth(stats.key) }, (_, i) => {
             const iso = `${stats.key}-${String(i + 1).padStart(2, '0')}`;
-            const sum = (byDay.get(iso) ?? []).reduce((s, p) => s + p.kopecks, 0);
+            const sum = (byDay.get(iso) ?? []).reduce((s, p) => s + (p.kopecks ?? 0), 0);
             return <span key={iso} className={`bars__bar${sum ? '' : ' is-empty'}${i + 1 > today ? ' is-future' : ''}`}
               style={{ height: `${sum ? Math.max(8, (sum / maxDay) * 100) : 4}%` }} title={sum ? `${fmtDayMonth(iso)}: ${formatMoney(sum)}` : undefined} />;
           })}
@@ -62,7 +62,7 @@ export function Payments() {
         {[...byDay.entries()].map(([day, list]) => (
           <div key={day} className="dgroup">
             <h2 className="dgroup__title">{weekday(day).replace(/^./, (s) => s.toUpperCase())}, {fmtDayMonth(day)}
-              <span className="sub num">{formatMoney(list.reduce((s, p) => s + p.kopecks, 0))}</span></h2>
+              <span className="sub num">{formatMoney(list.reduce((s, p) => s + (p.kopecks ?? 0), 0))}</span></h2>
             <ul className="paylist">
               {list.map((p) => {
                 const c = store.client(p.clientId);
@@ -74,7 +74,7 @@ export function Payments() {
                     </button>
                     <span className="paylist__src sub"><Icon name={src.icon} size={16} />{src.text}</span>
                     {p.save ? <SaveBadge state={p.save} offline={!store.online} onRetry={() => store.retry(p.id)} /> : <span className="sub num">{fmtDate(p.date)}</span>}
-                    <span className="paylist__sum num">{formatMoney(p.kopecks)}</span>
+                    <span className="paylist__sum num">{formatPayMoney(p.kopecks)}</span>
                   </li>
                 );
               })}

@@ -16,7 +16,8 @@ import { Outbox } from './outbox';
 import type { Counters, OutboxEvent, OutboxItem } from './outbox';
 import { newRequestId } from './api';
 import type { Change, Snapshot, WriteOp } from './api';
-import type { Activity, Client, Deadline, Payment, Question, SaveState, Task } from './types';
+import type { Activity, Client, DatedDeadline, Deadline, Payment, Question, SaveState, Task } from './types';
+import { isDated } from './types';
 import { TODAY, addDays, fmtDate } from '../lib/dates';
 import { play } from '../lib/sound';
 
@@ -44,7 +45,10 @@ interface Store {
   loaded: boolean;
   online: boolean;
   clients: Client[];
-  deadlines: Deadline[];
+  /** Открытые сроки с датой — раскладываются по дням. */
+  deadlines: DatedDeadline[];
+  /** Открытые сроки без даты (пусто в таблице) — показываются отдельно: «проверьте в таблице». */
+  undated: Deadline[];
   payments: Payment[];
   activity: Activity[];
   tasks: Task[];
@@ -106,7 +110,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [loaded, setLoaded] = useState(false);
   const [online, setOnlineState] = useState(true);
   const [clients, setClients] = useState<Client[]>([]);
-  const [deadlines, setDeadlines] = useState<Deadline[]>([]);
+  const [deadlines, setDeadlines] = useState<DatedDeadline[]>([]);
+  const [undated, setUndated] = useState<Deadline[]>([]);
+  /** Открытый срок — в нужный список: с датой или без. */
+  const putOpen = useCallback((d: Deadline) => {
+    if (isDated(d)) { setDeadlines((xs) => upsert(xs, d)); setUndated((xs) => xs.filter((x) => x.id !== d.id)); }
+    else { setUndated((xs) => upsert(xs, d)); setDeadlines((xs) => xs.filter((x) => x.id !== d.id)); }
+  }, []);
+  const dropOpen = useCallback((id: string) => {
+    setDeadlines((xs) => xs.filter((x) => x.id !== id));
+    setUndated((xs) => xs.filter((x) => x.id !== id));
+  }, []);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [activity, setActivity] = useState<Activity[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -152,19 +166,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       } else if (ch.entity === 'deadline') {
         const rec = ch.record as Deadline | undefined;
         if (ch.op === 'delete') {
-          // Ушёл в архив (ночью, когда со срока прошло > 3 дней) — из открытых убрать; «Закрыто сегодня» не трогаем.
-          setDeadlines((xs) => xs.filter((x) => x.id !== ch.id));
+          // Ушёл из окна снимка или строку удалили — из открытых убрать; «Закрыто сегодня» не трогаем.
+          dropOpen(ch.id);
         } else if (rec?.status === 'done') {
           // Закрыт (с сайта, в таблице или ботом): из открытых — в «Закрыто сегодня». Срок, закрытый раньше
           // (например, ушёл в архив — сервер шлёт его upsert'ом), в «Закрыто сегодня» не попадает.
-          setDeadlines((xs) => xs.filter((x) => x.id !== ch.id));
+          dropOpen(ch.id);
           if (!own && rec.closedAt !== TODAY) continue;
           setClosed((cs) => (cs.some((c) => c.deadline.id === ch.id)
             ? cs.map((c) => (c.deadline.id === ch.id ? { ...c, save: 'saved' } : c))
             : [{ deadline: rec, next: null, save: 'saved', requestId: own ? ch.origin : `${ch.origin}-${ch.cursor}`, by: own ? 'сайт' : 'бот' }, ...cs]));
         } else if (rec) {
           // Открытый срок: новый, изменённый или возвращённый после отмены закрытия.
-          setDeadlines((xs) => upsert(xs, rec));
+          putOpen(rec);
           setClosed((cs) => cs.filter((c) => c.deadline.id !== ch.id));
         }
       } else if (ch.entity === 'payment') {
@@ -189,7 +203,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const last = changes.at(-1);
     if (advance && last && last.cursor > cursorRef.current) { cursorRef.current = last.cursor; setCursor(last.cursor); }
     if (foreign.length) { markFresh(foreign); play('incoming'); }
-  }, [markFresh]);
+  }, [markFresh, putOpen, dropOpen]);
 
   /** Показать запись сразу — с пометкой, что она ещё не в таблице. */
   const applyOptimistic = useCallback((op: WriteOp) => {
@@ -251,7 +265,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (op.kind === 'closeDeadline') {
         setClosed((cs) => {
           const entry = cs.find((c) => c.requestId === op.requestId);
-          if (entry && final) setDeadlines((xs) => upsert(xs, entry.deadline));
+          if (entry && final) putOpen(entry.deadline);
           return final ? cs.filter((c) => c.requestId !== op.requestId) : cs.map((c) => (c.requestId === op.requestId ? { ...c, save: 'failed' } : c));
         });
       }
@@ -275,12 +289,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       play('attention');
     };
-  }, [applyChanges]);
+  }, [applyChanges, putOpen]);
 
   // Загрузка: снимок таблицы, затем очередь, оставшаяся с прошлого раза (показываем её поверх снимка).
   const applySnapshot = useCallback((snap: Snapshot) => {
     setClients(snap.clients); setPayments(snap.payments); setActivity(snap.activity); setTasks(snap.tasks); setQuestions(snap.questions);
-    setDeadlines(snap.deadlines.filter((d) => d.status !== 'done'));
+    const open = snap.deadlines.filter((d) => d.status !== 'done');
+    setDeadlines(open.filter(isDated));
+    setUndated(open.filter((d) => !isDated(d)));
     setClosed(snap.deadlines.filter((d) => d.status === 'done' && d.closedAt === TODAY)
       .map((d) => ({ deadline: d, next: null, save: 'saved', requestId: `snap-${d.id}`, by: 'бот' })));
     cursorRef.current = snap.cursor; setCursor(snap.cursor);
@@ -331,8 +347,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           return;
         } catch { /* ниже — «нет связи» */ }
       }
-      // Вход не удался — экран входа покажет App; это не обрыв связи.
-      if (e instanceof ApiError && (e.code === 'AUTH_REQUIRED' || e.code === 'FORBIDDEN')) return;
+      // Вход не удался — экран входа покажет App; ночное обслуживание — данные на экране верны, ждём. Это не обрыв связи.
+      if (e instanceof ApiError && (e.code === 'AUTH_REQUIRED' || e.code === 'FORBIDDEN' || e.code === 'MAINTENANCE')) return;
       setOnlineState(false);
     }
   }, [applyChanges, applySnapshot, applyOptimistic]);
@@ -387,11 +403,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const entry = closed.find((c) => c.deadline.id === id);
     if (!entry) return;
     setClosed((cs) => cs.filter((c) => c !== entry));
-    setDeadlines((xs) => upsert(xs.filter((x) => x.id !== entry.next?.id), entry.deadline));
+    setDeadlines((xs) => xs.filter((x) => x.id !== entry.next?.id));
+    putOpen(entry.deadline);
     // Отмена — тоже запись в таблицу; если закрытие ещё в очереди — просто убираем его оттуда.
     if (outboxRef.current?.has(entry.requestId)) { void outboxRef.current.discard(entry.requestId); return; }
     send({ kind: 'reopenDeadline', requestId: newRequestId(), id, undoOf: entry.requestId }, `Отменить закрытие «${entry.deadline.what}»`);
-  }, [closed, send]);
+  }, [closed, send, putOpen]);
 
   const addPayment = useCallback((p: Omit<Payment, 'id' | 'version' | 'source' | 'save'>, onSaved?: () => void) => {
     const requestId = newRequestId();
@@ -477,10 +494,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const setMaintenance = useCallback((on: boolean) => { fakeServer.maintenance = on; if (!on) void outboxRef.current?.kick(true); }, []);
 
   const value = useMemo<Store>(() => ({
-    loaded, online, clients, deadlines, payments, activity, tasks, questions, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
+    loaded, online, clients, deadlines, undated, payments, activity, tasks, questions, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
     client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance,
-  }), [loaded, online, clients, deadlines, payments, activity, tasks, questions, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
+  }), [loaded, online, clients, deadlines, undated, payments, activity, tasks, questions, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
     client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance]);
 

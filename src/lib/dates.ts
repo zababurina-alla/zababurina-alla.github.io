@@ -69,6 +69,11 @@ export function daysInMonth(key: string): number {
   return new Date(Date.UTC(y ?? 1970, m ?? 1, 0)).getUTCDate();
 }
 
+/** Дата срока на экран; null — «без даты». */
+export function fmtDue(iso: string | null): string {
+  return iso ? fmtDate(iso) : 'без даты';
+}
+
 export function fmtDayMonth(iso: string): string {
   const [, m, d] = parts(iso);
   return `${d} ${MONTHS_GEN[m - 1]}`;

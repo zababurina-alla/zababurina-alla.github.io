@@ -6,7 +6,7 @@ import { kindLabel } from '../data/fake';
 import { useStore } from '../data/store';
 import { MARK_LABEL, METHOD_LABEL } from '../data/types';
 import { TODAY, daysBetween, daysLabel, fmtDate, statusByDays } from '../lib/dates';
-import { formatMoney } from '../lib/money';
+import { formatMoney, formatPayMoney } from '../lib/money';
 import { Icon } from '../ui/Icon';
 import { Avatar, SaveBadge, StatusPill, Tabs, reducedMotion } from '../ui/kit';
 import { Modal } from '../ui/Modal';
@@ -183,7 +183,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
             {tab === 'deadlines' && <DeadlineTable items={own} showClient={false} empty="Открытых сроков нет" />}
             {tab === 'payments' && (pays.length ? (
               <ul className="plist">{pays.map((p) => (
-                <li key={p.id} className="plist__row"><span><strong className="num">{formatMoney(p.kopecks)}</strong><span className="sub">{p.period}, {METHOD_LABEL[p.method]}</span></span><span className="num sub">{fmtDate(p.date)}</span></li>
+                <li key={p.id} className="plist__row"><span><strong className="num">{formatPayMoney(p.kopecks)}</strong><span className="sub">{p.period}, {METHOD_LABEL[p.method]}</span></span><span className="num sub">{fmtDate(p.date)}</span></li>
               ))}</ul>
             ) : <p className="empty">Платежей пока нет</p>)}
             {tab === 'history' && (history.length ? (

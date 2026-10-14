@@ -29,6 +29,10 @@ export interface Client {
   monthly: { name: string; kopecks: number | null; note: string }[];
 }
 
+/** Срок с датой — такие раскладываются по дням (экраны «Сегодня», «Сроки», карточка). */
+export type DatedDeadline = Deadline & { due: string };
+export const isDated = (d: Deadline): d is DatedDeadline => d.due !== null;
+
 export type DeadlineStatus = 'new' | 'inProgress' | 'waiting' | 'postponed' | 'done';
 
 export interface Deadline {
@@ -38,7 +42,8 @@ export interface Deadline {
   /** Текст обязательства + метка периода («ЄСВ за III квартал»). */
   what: string;
   periodicity: 'once' | 'month' | 'quarter' | 'year';
-  due: string; // ISO
+  /** null — дата срока в таблице пустая: такой срок показываем отдельно («проверьте в таблице»). */
+  due: string | null; // ISO
   /** [п. 22] ПОСЛЕДНИЙ день отчётного периода; закрыть можно с periodEnd + 1. */
   periodEnd: string | null;
   status: DeadlineStatus;
@@ -52,7 +57,8 @@ export interface Payment {
   id: string;
   version: number;
   clientId: string;
-  kopecks: number;
+  /** null — сумма в таблице пустая или не число: в суммы не идёт, на экране «сумма не указана». */
+  kopecks: number | null;
   period: string;
   method: PayMethod;
   date: string; // ISO
@@ -97,7 +103,7 @@ export interface Question {
   options: string[];
   clientId: string | null;
   status: 'waiting' | 'asked';
-  askedAt: string; // ISO date-time
+  askedAt: string | null; // ISO date-time; null — вопрос ещё ждёт отправки (status waiting)
   answer: string | null;
 }
 

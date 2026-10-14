@@ -47,6 +47,11 @@ export function parseMoney(input: string): ParseResult {
 }
 
 /** «1 234,56 ₴» — пробелы неразрывные, чтобы сумма не переносилась. */
+/** Сумма платежа на экран; null (в таблице пусто или не число) — «сумма не указана». */
+export function formatPayMoney(kopecks: number | null): string {
+  return kopecks === null ? 'сумма не указана' : formatMoney(kopecks);
+}
+
 export function formatMoney(kopecks: number, withSign = true): string {
   const neg = kopecks < 0;
   const abs = Math.abs(Math.round(kopecks));

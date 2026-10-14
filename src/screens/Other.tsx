@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { canWrite } from '../config';
 import { useStore } from '../data/store';
-import { TODAY, addDays, daysBetween, daysLabel, fmtDate, statusByDays } from '../lib/dates';
+import { TODAY, addDays, daysBetween, daysLabel, fmtDate, statusByDays, plural } from '../lib/dates';
 import { parseQuickTask } from '../lib/quickTask';
 import type { Priority, Task } from '../data/types';
 import { formatMoney } from '../lib/money';
@@ -81,6 +81,8 @@ export function Reference() {
 const PRIORITY_LABEL: Record<Priority, string> = { critical: 'Критический', high: 'Высокий', medium: 'Средний', low: 'Низкий' };
 const PRIORITY_ICON: Record<Priority, IconName> = { critical: 'critical', high: 'high', medium: 'medium', low: 'low' };
 
+const DONE_SHOWN = 20;
+
 export function Tasks() {
   const store = useStore();
   const ui = useUi();
@@ -89,13 +91,17 @@ export function Tasks() {
   const client = parsed?.clientId ? store.client(parsed.clientId) : undefined;
 
   const open = store.tasks.filter((t) => !t.done);
+  // В снимке — все задачи листа: сделанных бывают сотни, на экране — 20 последних, остальное в таблице.
+  const done = store.tasks.filter((t) => t.done);
+  const doneShown = done.slice(-DONE_SHOWN);
+  const doneHidden = done.length - doneShown.length;
   const groups: [string, Task[]][] = [
     ['Просрочено', open.filter((t) => t.due && t.due < TODAY)],
     ['Сегодня', open.filter((t) => t.due === TODAY)],
     ['Завтра', open.filter((t) => t.due === addDays(TODAY, 1))],
     ['Позже', open.filter((t) => t.due && t.due > addDays(TODAY, 1))],
     ['Без срока', open.filter((t) => !t.due)],
-    ['Сделано', store.tasks.filter((t) => t.done)],
+    ['Сделано', doneShown],
   ];
 
   function submit(e: React.FormEvent) {
@@ -129,7 +135,7 @@ export function Tasks() {
       <section className="panel" aria-label="Список задач">
         {groups.filter(([, xs]) => xs.length).map(([title, xs]) => (
           <div key={title} className="dgroup">
-            <h2 className={`dgroup__title${title === 'Просрочено' ? ' is-overdue' : ''}`}>{title}<span className="sub">{xs.length}</span></h2>
+            <h2 className={`dgroup__title${title === 'Просрочено' ? ' is-overdue' : ''}`}>{title}<span className="sub">{title === 'Сделано' ? done.length : xs.length}</span></h2>
             <ul className="tasks">
               {xs.map((t) => {
                 const c = t.clientId ? store.client(t.clientId) : undefined;
@@ -148,6 +154,7 @@ export function Tasks() {
                 );
               })}
             </ul>
+            {title === 'Сделано' && doneHidden > 0 && <p className="sub tasks__more">Ещё {doneHidden} {plural(doneHidden, 'сделанная', 'сделанные', 'сделанных')} — в таблице</p>}
           </div>
         ))}
       </section>

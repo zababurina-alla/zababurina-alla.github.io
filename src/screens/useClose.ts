@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import gsap from 'gsap';
 import { useStore } from '../data/store';
-import { TODAY, addDays, fmtDate } from '../lib/dates';
+import { TODAY, addDays, fmtDate, fmtDue } from '../lib/dates';
 import { play } from '../lib/sound';
 import { reducedMotion } from '../ui/kit';
 import { useToast } from '../ui/toast';
@@ -41,7 +41,7 @@ export function useCloseDeadline(rowSelector = '[data-row]') {
       // Уведомление клиенту уходит через 2 мин (контракт v2, п. 31) — «Отменить» успевает его остановить.
       const notice = notifyAt ? ' Клиенту сообщим через 2 мин — можно отменить.' : '';
       toast({
-        text: (next ? `Закрыто в таблице: ${name}. Следующий срок создан — до ${fmtDate(next.due)}.` : `Закрыто в таблице: ${name}.`) + notice,
+        text: (next ? `Закрыто в таблице: ${name}. Следующий срок создан — до ${fmtDue(next.due)}.` : `Закрыто в таблице: ${name}.`) + notice,
         action: { label: 'Отменить', run: () => store.reopenDeadline(id) },
       });
     }, animate ? 600 : 0);

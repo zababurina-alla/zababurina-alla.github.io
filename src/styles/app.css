@@ -3650,3 +3650,9 @@ body {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+.undated__hint,
+.tasks__more {
+  margin: 0;
+  padding: 0 var(--space-5) var(--space-3);
+}
