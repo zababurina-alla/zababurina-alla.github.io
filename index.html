@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Сверка</title>
+    <meta name="theme-color" content="#F6F7F9" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <script>
+      // Тема до первой отрисовки, чтобы не мигало: выбор пользователя → настройка системы. ?theme= — для скриншотов.
+      (function () {
+        var t = new URLSearchParams(location.search).get('theme');
+        try { t = t || localStorage.getItem('sverka.theme'); } catch (e) {}
+        if (t !== 'dark' && t !== 'light') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.dataset.theme = t;
+      })();
+    </script>
+    <script type="module" crossorigin src="./assets/main-BgeD6b8C.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/Flip-BUiyKS8F.js">
+    <link rel="stylesheet" crossorigin href="./assets/Flip-MwXtSg9k.css">
+    <link rel="stylesheet" crossorigin href="./assets/main-T-KIloni.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
