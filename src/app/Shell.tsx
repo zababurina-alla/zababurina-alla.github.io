@@ -1,4 +1,4 @@
-// Оболочка: левое меню на ноутбуке; верхняя полоса, нижние вкладки и кнопка «+» на телефоне.
+// Оболочка: плавающее стеклянное меню слева на ноутбуке; верхняя полоса, нижние вкладки и кнопка «+» на телефоне.
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { auth, useAuth } from '../data/session';
 import { roAttrs } from '../ui/readonly';
@@ -7,11 +7,14 @@ import type { ReactNode } from 'react';
 import { useStore } from '../data/store';
 import { TODAY, daysBetween } from '../lib/dates';
 import { play, soundSettings } from '../lib/sound';
+import type { SoundMode } from '../lib/sound';
+import { RollingNumber } from '../ui/kit';
 import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
 import type { RouteName } from '../router';
 import { navigate, toHash } from '../router';
 import { useUi } from './ui-context';
+import '../ui/fx';
 
 const NAV: { id: RouteName; label: string; icon: IconName; group: 'work' | 'ref' }[] = [
   { id: 'today', label: 'Сегодня', icon: 'today', group: 'work' },
@@ -29,9 +32,14 @@ function useTheme(): [string, () => void] {
   return [theme, toggleTheme];
 }
 
-/** Звук: переключатель, громкость, «Проверить». Настройка — удобство этого браузера (localStorage). */
-function SoundSettings({ on, setOn }: { on: boolean; setOn: (v: boolean) => void }) {
+const SOUND_MODES: { id: SoundMode; label: string }[] = [
+  { id: 'on', label: 'Вкл' }, { id: 'night', label: 'Ночью тихо' }, { id: 'off', label: 'Выкл' },
+];
+
+/** Звук: режим (вкл / ночью тихо 22–7 / выкл), громкость, «Проверить». Настройка — удобство этого браузера (localStorage). */
+function SoundSettings() {
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<SoundMode>(soundSettings.mode);
   const [vol, setVol] = useState(Math.round(soundSettings.volume * 100));
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -43,27 +51,45 @@ function SoundSettings({ on, setOn }: { on: boolean; setOn: (v: boolean) => void
     document.addEventListener('keydown', close);
     return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', close); };
   }, [open]);
+  const label = mode === 'off' ? 'выключен' : mode === 'night' ? `ночью тихо, ${vol} %` : `включён, ${vol} %`;
   return (
     <div ref={ref} className="pop-wrap">
       <button type="button" className="icon-btn" aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen(!open)}
-        aria-label={`Звук: ${on ? `включён, ${vol} %` : 'выключен'}`}>
-        <Icon name={on ? 'sound' : 'soundOff'} />
+        aria-label={`Звук: ${label}`} title={`Звук: ${label}`}>
+        <Icon name={mode === 'off' ? 'soundOff' : 'sound'} />
       </button>
       {open && (
         <div className="pop" role="dialog" aria-label="Звук">
-          <label className="check">
-            <input type="checkbox" checked={on} onChange={(e) => { soundSettings.on = e.target.checked; setOn(e.target.checked); }} />
-            Звуки включены
-          </label>
+          <p className="pop__title">Звук</p>
+          <div className="seg seg--fill" role="group" aria-label="Когда звучит">
+            {SOUND_MODES.map((m) => (
+              <button key={m.id} type="button" className="seg__opt" aria-pressed={mode === m.id}
+                onClick={() => { soundSettings.mode = m.id; setMode(m.id); }}>{m.label}</button>
+            ))}
+          </div>
+          <p className="sub">{mode === 'night' ? 'С 22:00 до 7:00 — тишина.' : mode === 'on' ? 'Звучит всегда, только в ответ на ваши действия.' : 'Без звуков.'}</p>
           <label className="pop__range">
             <span>Громкость <strong className="num">{vol} %</strong></span>
-            <input type="range" min={0} max={100} step={5} value={vol} disabled={!on}
+            <input type="range" min={0} max={100} step={5} value={vol} disabled={mode === 'off'}
               onChange={(e) => { const v = Number(e.target.value); setVol(v); soundSettings.volume = v / 100; }} />
           </label>
-          <button type="button" className="btn btn--secondary btn--sm" disabled={!on} onClick={() => play('saved')}>Проверить звук</button>
+          <button type="button" className="btn btn--secondary btn--sm" disabled={mode === 'off'} onClick={() => play('closed', true)}>Проверить звук</button>
         </div>
       )}
     </div>
+  );
+}
+
+/** «Закрыто сегодня»: сюда улетает закрытый срок (closeFx.flyToCounter — в тот счётчик, что виден). */
+function ClosedCounter({ compact = false }: { compact?: boolean }) {
+  const { closed } = useStore();
+  return (
+    <a href="#/deadlines" className={`closed-chip${compact ? ' closed-chip--compact' : ''}${closed.length ? ' is-on' : ''}`} data-closed-counter
+      aria-label={`Закрыто сегодня: ${closed.length}`} title="Закрыто сегодня">
+      <span className="closed-chip__tick" aria-hidden="true"><Icon name="check" size={14} /></span>
+      {!compact && <span className="closed-chip__label">Закрыто сегодня</span>}
+      <RollingNumber value={closed.length} className="closed-chip__n" />
+    </a>
   );
 }
 
@@ -121,12 +147,11 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
   const { deadlines } = useStore();
   const ui = useUi();
   const [theme, toggleTheme] = useTheme();
-  const [soundOn, setSoundOn] = useState(soundSettings.on);
   const overdue = deadlines.filter((d) => daysBetween(TODAY, d.due) < 0).length;
   const navRef = useRef<HTMLElement>(null);
   const pillRef = useRef<HTMLSpanElement>(null);
 
-  // Подсветка выбранного раздела переезжает к новому пункту (transform, 280 мс) — видно, куда перешли.
+  // Подсветка выбранного раздела переезжает к новому пункту пружиной (только transform) — видно, куда перешли.
   useLayoutEffect(() => {
     const active = navRef.current?.querySelector<HTMLElement>('.nav__item[aria-current="page"]');
     const pill = pillRef.current;
@@ -157,11 +182,23 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
     return () => { window.removeEventListener('keydown', onKey); document.removeEventListener('click', onClick); };
   }, [ui]);
 
+  // Шапка телефона: после прокрутки — тень под стеклом (класс на <html>, одно чтение на кадр).
+  useEffect(() => {
+    let raf = 0;
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => { raf = 0; document.documentElement.classList.toggle('is-scrolled', window.scrollY > 8); });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => { window.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf); };
+  }, []);
+
+  const themeLabel = theme === 'dark' ? 'Светлая тема' : 'Тёмная тема';
   const navLink = (n: (typeof NAV)[number]) => (
     <a key={n.id} href={toHash({ name: n.id, params: [] })} className="nav__item" aria-current={route === n.id ? 'page' : undefined}>
       <Icon name={n.icon} />
       <span>{n.label}</span>
-      {n.id === 'deadlines' && overdue > 0 && <span className="nav__badge num"><span aria-hidden="true">{overdue}</span><span className="visually-hidden">, просрочено: {overdue}</span></span>}
+      {n.id === 'deadlines' && overdue > 0 && <span className="nav__badge num" title="Просрочено"><span aria-hidden="true">{overdue}</span><span className="visually-hidden">, просрочено: {overdue}</span></span>}
     </a>
   );
 
@@ -173,8 +210,12 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
           <span className="brand__mark" aria-hidden="true">Б</span>
           <span className="brand__name">Бухгалтерия</span>
         </a>
+        <SyncStatus />
         <button type="button" className="btn btn--primary rail__cta" onClick={() => ui.openPayment()} aria-keyshortcuts="Alt+N" {...roAttrs('payments')}>
-          <Icon name="plus" />Записать платёж<kbd className="kbd kbd--on-accent">Alt N</kbd>
+          <Icon name="plus" />Записать платёж<kbd className="kbd kbd--on-btn">Alt N</kbd>
+        </button>
+        <button type="button" className="search-field rail__search" onClick={ui.openPalette} aria-keyshortcuts="Control+K">
+          <Icon name="search" /><span>Найти клиента</span><kbd className="kbd">Ctrl K</kbd>
         </button>
         <nav ref={navRef} className="nav" aria-label="Разделы">
           <span ref={pillRef} className="nav__pill" aria-hidden="true" />
@@ -183,23 +224,24 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
           {NAV.filter((n) => n.group === 'ref').map(navLink)}
         </nav>
         <div className="rail__foot">
-          <SyncStatus />
+          <ClosedCounter />
           <div className="rail__tools">
-            <button type="button" className="icon-btn" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}>
+            <button type="button" className="icon-btn" onClick={toggleTheme} aria-label={themeLabel} title={themeLabel}>
               <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
             </button>
-            <SoundSettings on={soundOn} setOn={setSoundOn} />
+            <SoundSettings />
             <Me />
           </div>
         </div>
       </aside>
 
       <header className="topbar">
-        <a href="#/today" className="brand"><span className="brand__mark" aria-hidden="true">Б</span><span className="brand__name">Бухгалтерия</span></a>
+        <a href="#/today" className="brand" aria-label="Бухгалтерия — на главную"><span className="brand__mark" aria-hidden="true">Б</span><span className="brand__name">Бухгалтерия</span></a>
         <div className="topbar__tools">
           <SyncStatus />
+          <ClosedCounter compact />
           <a href="#/clients/search" className="icon-btn" aria-label="Поиск клиента"><Icon name="search" /></a>
-          <button type="button" className="icon-btn" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}>
+          <button type="button" className="icon-btn" onClick={toggleTheme} aria-label={themeLabel}>
             <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
           </button>
         </div>

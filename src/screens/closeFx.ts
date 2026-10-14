@@ -30,8 +30,9 @@ export function burst(at: HTMLElement, color = 'var(--dot-green)'): void {
 
 /** Плашка «✓ что закрыто» летит из строки в счётчик. Возвращает обещание конца полёта. */
 export function flyToCounter(from: HTMLElement, text: string): Promise<void> {
-  const target = document.querySelector<HTMLElement>('[data-closed-counter]');
-  if (!target || reducedMotion() || target.getBoundingClientRect().width === 0) return Promise.resolve();
+  // Счётчиков два (в меню и на телефоне в шапке экрана) — летим в тот, что сейчас виден.
+  const target = [...document.querySelectorAll<HTMLElement>('[data-closed-counter]')].find((el) => el.getBoundingClientRect().width > 0);
+  if (!target || reducedMotion()) return Promise.resolve();
   const a = from.getBoundingClientRect();
   const b = target.getBoundingClientRect();
   const ghost = document.createElement('span');

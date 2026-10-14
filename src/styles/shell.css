@@ -1,0 +1,522 @@
+/* Оболочка. Ноутбук (от 1024 px): плавающее стеклянное меню слева — не съедает высоту экрана 1366×768.
+   Телефон: стеклянная шапка сверху, вкладки снизу, большая кнопка «+». */
+
+.shell {
+  min-height: 100dvh;
+}
+
+.rail {
+  display: none;
+}
+
+.main {
+  padding: var(--space-4) var(--space-4) calc(9rem + env(safe-area-inset-bottom));
+}
+
+.main:focus {
+  outline: none;
+}
+
+/* Стекло: лист просвечивает свечениями фона, размытие 18 px (как шапка образца) */
+.topbar,
+.tabbar,
+.rail {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
+}
+
+/* ═════════ Телефон: шапка ═════════ */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  height: 3.75rem;
+  padding: 0 var(--space-2) 0 var(--space-4);
+  box-shadow: inset 0 -1px 0 transparent;
+  transition: box-shadow var(--dur-base) ease;
+}
+
+.is-scrolled .topbar {
+  box-shadow: inset 0 -1px 0 var(--line), 0 8px 24px rgb(13 18 24 / 0.06);
+}
+
+.topbar__tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* В шапке телефона — только точка связи; слова — когда есть что сказать (сохраняется, нет связи, ошибка) */
+.topbar .sync {
+  padding: 0 var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.topbar .sync:not(.is-saving, .is-offline, .is-failed) .sync__text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+/* ═════════ Телефон: вкладки и «+» ═════════ */
+.tabbar {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  padding-bottom: env(safe-area-inset-bottom);
+  box-shadow: inset 0 1px 0 var(--line);
+}
+
+.tabbar__item {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 2px;
+  min-height: 4.25rem;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+}
+
+.tabbar__item[aria-current='page'] {
+  color: var(--ink);
+  font-weight: var(--weight-semibold);
+}
+
+.tabbar__icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 2rem;
+  border-radius: var(--radius-full);
+  transition: background-color var(--dur-base) ease;
+}
+
+.tabbar__item[aria-current='page'] .tabbar__icon {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.tabbar__badge {
+  position: absolute;
+  top: 2px;
+  right: 12px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--dot-red);
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+.fab {
+  position: fixed;
+  right: var(--space-4);
+  bottom: calc(4.25rem + var(--space-4) + env(safe-area-inset-bottom));
+  z-index: 31;
+  display: grid;
+  place-items: center;
+  width: 4rem;
+  height: 4rem;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--btn);
+  color: var(--on-btn);
+  box-shadow: var(--shadow-3);
+  transition: transform var(--dur-pop) var(--spring-pop);
+}
+
+.fab:active {
+  transform: scale(0.92);
+  transition-duration: var(--dur-press);
+}
+
+/* ═════════ Ноутбук: стеклянное меню ═════════ */
+@media (min-width: 1024px) {
+  .shell {
+    display: grid;
+    grid-template-columns: calc(var(--rail-w) + var(--space-4)) minmax(0, 1fr);
+  }
+
+  .rail {
+    position: sticky;
+    top: var(--space-3);
+    height: calc(100dvh - var(--space-3) * 2);
+    margin: var(--space-3) 0 var(--space-3) var(--space-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-3) var(--space-3);
+    border-radius: var(--radius-xl);
+    box-shadow: inset 0 1px 0 var(--edge), 0 0 0 1px var(--line), var(--shadow-1);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    z-index: 20;
+  }
+
+  .topbar,
+  .tabbar,
+  .fab {
+    display: none;
+  }
+
+  .main {
+    padding: var(--space-6) var(--space-6) var(--space-8) var(--space-5);
+  }
+}
+
+@media (min-width: 1440px) {
+  .main {
+    padding-inline: var(--space-7);
+  }
+}
+
+/* ═════════ Знак и название ═════════ */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-2);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+/* Знак — буква «Б» с засечками на чернильной плашке, как печать в углу бланка */
+.brand__mark {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-md);
+  background: var(--btn);
+  color: var(--on-btn);
+  font-family: var(--display);
+  font-size: 1.25rem;
+  font-weight: var(--weight-bold);
+  box-shadow: var(--shadow-1);
+}
+
+.brand__name {
+  font-family: var(--display);
+  font-size: 1.3125rem;
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.02em;
+}
+
+/* Связь с таблицей — под названием, как подпись образца «всё считается на этом компьютере» */
+.rail > .sync {
+  margin: -6px 0 var(--space-1);
+  gap: var(--space-3);
+  padding: 0 var(--space-2) 0 calc(var(--space-2) + 1.125rem - 4px); /* точка — под серединой знака «Б» */
+}
+
+.sync {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  line-height: 1.3;
+}
+
+.sync__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dot-green);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dot-green) 18%, transparent);
+}
+
+.sync.is-saving .sync__dot {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.sync.is-offline .sync__dot {
+  background: var(--dot-orange);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dot-orange) 20%, transparent);
+}
+
+.sync.is-failed .sync__dot {
+  background: var(--dot-red);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dot-red) 20%, transparent);
+}
+
+.sync.is-offline,
+.sync.is-failed {
+  color: var(--ink);
+  font-weight: var(--weight-semibold);
+}
+
+.rail__cta {
+  width: 100%;
+  justify-content: flex-start;
+  min-height: 3rem;
+  padding-left: var(--space-4);
+}
+
+.rail__cta .kbd {
+  margin-left: auto;
+}
+
+.rail__search {
+  width: 100%;
+  min-height: 2.75rem;
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+}
+
+/* ═════════ Разделы ═════════ */
+.nav {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  margin-top: var(--space-1);
+}
+
+/* Подсветка выбранного раздела — лист, переезжает пружиной */
+.nav__pill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--tap);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--line), var(--shadow-1);
+  transition: transform var(--dur-spring) var(--spring), opacity var(--dur-fast) ease;
+  pointer-events: none;
+}
+
+.nav__group {
+  margin: var(--space-4) var(--space-3) var(--space-1);
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.nav__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--tap);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--ink-2);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+
+.nav__item[aria-current='page'] {
+  color: var(--ink);
+  font-weight: var(--weight-semibold);
+}
+
+.nav__item[aria-current='page'] .icon {
+  color: var(--accent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .nav__item:hover:not([aria-current='page']) {
+    background: color-mix(in srgb, var(--ink) 5%, transparent);
+    color: var(--ink);
+  }
+}
+
+.nav__badge {
+  margin-left: auto;
+  min-width: 1.625rem;
+  padding: 0 7px;
+  border-radius: var(--radius-full);
+  background: var(--st-red-bg);
+  color: var(--st-red-ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  text-align: center;
+}
+
+/* ═════════ Низ меню: «Закрыто сегодня», тема, звук, кто вошёл ═════════ */
+.rail__foot {
+  margin-top: auto;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.rail__tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-top: var(--space-2);
+  box-shadow: inset 0 1px 0 var(--line);
+}
+
+/* Счётчик «Закрыто сегодня»: сюда улетает закрытый срок; пока ноль — тихий, после первого — зелёный */
+.closed-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color var(--dur-slow, 400ms) ease, color var(--dur-base) ease;
+}
+
+.closed-chip__tick {
+  display: grid;
+  place-items: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+
+.closed-chip__label {
+  flex: 1;
+}
+
+.closed-chip__n {
+  font-family: var(--display);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+}
+
+.closed-chip.is-on {
+  background: var(--st-green-bg);
+  color: var(--st-green-ink);
+}
+
+.closed-chip.is-on .closed-chip__tick {
+  background: var(--st-green-ink);
+  color: var(--st-green-bg);
+  box-shadow: none;
+}
+
+.closed-chip--compact {
+  min-height: 2.25rem;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
+}
+
+.closed-chip--compact:not(.is-on) {
+  display: none;
+}
+
+.me {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  margin-left: auto;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+
+.me__text {
+  max-width: 6.5rem;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Имя и «Выйти» — столбиком: в узком меню в строку не помещаются. */
+.me__who {
+  display: grid;
+  justify-items: start;
+  gap: 2px;
+}
+
+.me__out {
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+/* ═════════ Окошко настроек звука ═════════ */
+.pop-wrap {
+  position: relative;
+}
+
+.pop {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + var(--space-2));
+  z-index: 40;
+  display: grid;
+  gap: var(--space-3);
+  width: 17.5rem;
+  padding: var(--space-4);
+  border-radius: var(--radius-l);
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--line), var(--shadow-3);
+  transform-origin: 1.5rem 100%;
+  transition: transform var(--dur-pop) var(--spring-pop), opacity var(--dur-fast) var(--ease-out);
+
+  @starting-style {
+    opacity: 0;
+    transform: scale(0.9) translateY(6px);
+  }
+}
+
+.pop__title {
+  font-weight: var(--weight-semibold);
+}
+
+.pop__range {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.pop__range span {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-sm);
+}
+
+.pop__range input {
+  width: 100%;
+  min-height: var(--tap);
+  accent-color: var(--accent);
+}
+
+/* «К содержимому» — видна только при переходе Tab */
+.skip {
+  position: fixed;
+  top: var(--space-3);
+  left: var(--space-3);
+  z-index: 95;
+  min-height: var(--tap);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--btn);
+  color: var(--on-btn);
+  font-weight: var(--weight-semibold);
+  transform: translateY(-200%);
+}
+
+.skip:focus-visible {
+  transform: none;
+}

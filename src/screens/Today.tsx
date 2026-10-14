@@ -1,21 +1,26 @@
-// «Сегодня»: за 10 секунд понять день — сводка, ближайшие сроки, ключи ЭЦП, вопросы, что изменилось.
+// «Сегодня»: за 10 секунд понять день. Сверху — одна фраза о дне из чисел и четыре плашки срочности (они же фильтр),
+// ниже — что сдать по дням; сбоку — вопрос от Дмитрия, ключи ЭЦП, деньги месяца, что изменилось.
 import { useRef, useState } from 'react';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { useStore } from '../data/store';
-import { TODAY, daysBetween, daysInMonth, daysLabel, fmtDate, monthName, plural, statusByDays, weekday, fmtDayMonth } from '../lib/dates';
+import { TODAY, addDays, daysBetween, daysInMonth, daysLabel, fmtDate, monthName, plural, statusByDays, weekday, fmtDayMonth } from '../lib/dates';
 import { monthStats } from '../lib/monthStats';
 import { formatMoney } from '../lib/money';
 import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
-import { RollingNumber, StatusPill, Tabs, reducedMotion } from '../ui/kit';
+import { Money, RollingNumber, Tabs, reducedMotion } from '../ui/kit';
+import { Empty } from '../ui/Empty';
+import { shortName } from '../ui/names';
+import { play } from '../lib/sound';
 import { useUi } from '../app/ui-context';
 import { useToast } from '../ui/toast';
 import { canWrite } from '../config';
 import type { Question } from '../data/types';
-import { DeadlineTable } from './DeadlineTable';
+import { URGENCY_ICON } from './DeadlineTable';
+import { DayGroups } from './DayGroups';
 
-type Filter = 'all' | 'overdue' | 'burning' | 'week';
+type Filter = 'week' | 'month' | 'overdue' | 'burning' | 'soon';
 
 /** Нарастающий итог месяца по дням (копейки), ось — все дни месяца: видно, сколько месяца ещё впереди. */
 function AreaChart({ cumulative, month }: { cumulative: number[]; month: string }) {
@@ -93,141 +98,170 @@ function QuestionAnswer({ q }: { q: Question }) {
 
 const SOURCE_ICON: Record<string, IconName> = { 'сайт': 'globe', 'бот': 'bot', 'таблица': 'sheet' };
 
+const FILTER_TITLE: Record<Filter, string> = {
+  week: 'На этой неделе', overdue: 'Просрочено', burning: 'Горит — 0–7 дней', soon: 'Скоро — 8–30 дней', month: 'До 30 дней',
+};
+
+/** Плашка-фильтр первого экрана: значок срочности (цвет + форма), крупное число, подпись и шкала дней. */
+function Tally({ icon, tone, n, label, note, pressed, onClick, href }: {
+  icon: IconName; tone: string; n: number; label: string; note: string; pressed?: boolean; onClick?: () => void; href?: string;
+}) {
+  const inner = (
+    <>
+      <span className="tally__top"><Icon name={icon} size={22} className={`urgency--${tone}`} /><span className="tally__n display"><RollingNumber value={n} /></span></span>
+      <span className="tally__l">{label}</span>
+      <span className="tally__note">{note}</span>
+    </>
+  );
+  const cls = `tally tally--${tone}${n === 0 ? ' is-zero' : ''}`;
+  if (href) return <a className={cls} href={href}>{inner}</a>;
+  return <button type="button" className={cls} aria-pressed={pressed} onClick={onClick}>{inner}</button>;
+}
+
 export function Today() {
   const store = useStore();
   const ui = useUi();
   const scope = useRef<HTMLDivElement>(null);
-  const [filter, setFilter] = useState<Filter>('all');
+  const listRef = useRef<HTMLElement>(null);
+  const [filter, setFilter] = useState<Filter>('week');
 
-  const withDays = store.deadlines.map((d) => ({ d, days: daysBetween(TODAY, d.due) }));
-  const overdue = withDays.filter((x) => x.days < 0);
-  const burning = withDays.filter((x) => x.days >= 0 && x.days <= 3);
-  const week = withDays.filter((x) => x.days <= 7);
-  const keys = store.clients.filter((c) => c.keyUntil && daysBetween(TODAY, c.keyUntil) <= 14)
+  // Пороги — словарь значков, п. 1: просрочено < 0, горит 0–7, скоро 8–30 (как цвет строк, statusByDays).
+  const withDays = store.deadlines.map((d) => ({ d, st: statusByDays(daysBetween(TODAY, d.due)), days: daysBetween(TODAY, d.due) }));
+  const overdue = withDays.filter((x) => x.st === 'red');
+  const burning = withDays.filter((x) => x.st === 'orange');
+  const soon = withDays.filter((x) => x.st === 'yellow');
+  const KEY_DAYS = 14; // бриф, п. 3: ключи, истекающие ≤ 14 дней
+  const keys = store.clients.filter((c) => c.keyUntil && daysBetween(TODAY, c.keyUntil) <= KEY_DAYS)
     .sort((a, b) => (a.keyUntil ?? '').localeCompare(b.keyUntil ?? ''));
   const month = monthStats(store.payments, TODAY);
 
-  const list = (filter === 'overdue' ? overdue : filter === 'burning' ? burning : filter === 'week' ? week : withDays.filter((x) => x.days <= 30))
-    .sort((a, b) => a.days - b.days).map((x) => x.d);
+  const pick = { week: [...overdue, ...burning], overdue, burning, soon, month: withDays.filter((x) => x.days <= 30) }[filter];
+  const list = pick.map((x) => x.d);
 
-  // Сцена открытия: блоки поднимаются по очереди (16 px, 40 мс между ними). Только при открытии экрана.
+  // Сцена открытия: первый экран, плашки и листы поднимаются по очереди (16 px, шаг 50 мс). Только при открытии экрана.
   useGSAP(() => {
     if (reducedMotion()) return;
-    gsap.from('.reveal', { y: 16, opacity: 0, duration: 0.5, stagger: 0.05, ease: 'power3.out', clearProps: 'transform,opacity' });
+    gsap.from('.reveal', { y: 16, opacity: 0, duration: 0.6, stagger: 0.05, ease: 'power3.out', clearProps: 'transform,opacity' });
   }, { scope });
 
-  // Мягкий свет за курсором на карточках сводки (только мышь; на телефоне не работает и не нужен).
-  const spotlight = (e: React.PointerEvent<HTMLElement>) => {
-    if (e.pointerType !== 'mouse') return;
-    const r = e.currentTarget.getBoundingClientRect();
-    e.currentTarget.style.setProperty('--mx', `${e.clientX - r.left}px`);
-    e.currentTarget.style.setProperty('--my', `${e.clientY - r.top}px`);
+  const toggle = (f: Filter) => {
+    setFilter((cur) => (cur === f ? 'week' : f));
+    play('tick');
+    // На узком экране список ниже плашек — показать его.
+    window.requestAnimationFrame(() => {
+      const top = listRef.current?.getBoundingClientRect().top ?? 0;
+      if (top > window.innerHeight * 0.75) listRef.current?.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' });
+    });
   };
 
   const hour = new Date().getHours();
   const hello = hour < 12 ? 'Доброе утро' : hour < 18 ? 'Добрый день' : 'Добрый вечер';
-  const weekdayCap = weekday(TODAY).replace(/^./, (s) => s.toUpperCase());
+  const weekEnd = addDays(TODAY, 7);
+
+  // Главная фраза дня — из чисел, без украшений: что горит сильнее всего.
+  const headline = overdue.length
+    ? `${overdue.length} ${plural(overdue.length, 'срок просрочен', 'срока просрочены', 'сроков просрочено')}`
+    : burning.length
+      ? `${burning.length} ${plural(burning.length, 'срок горит', 'срока горят', 'сроков горят')} на неделе`
+      : 'всё спокойно';
+  const lede: string[] = [];
+  if (overdue.length && burning.length) lede.push(`Ещё ${burning.length} ${plural(burning.length, 'горит', 'горят', 'горят')} до ${fmtDayMonth(weekEnd)}.`);
+  if (!overdue.length && !burning.length) lede.push(soon.length ? `Ближайшие сроки — через 8–30 дней, их ${soon.length}.` : 'Открытых сроков на месяц вперёд нет.');
+  if (keys.length) lede.push(`${keys.length} ${plural(keys.length, 'ключ ЭЦП заканчивается', 'ключа ЭЦП заканчиваются', 'ключей ЭЦП заканчиваются')} в ближайшие ${KEY_DAYS} дней.`);
+  if (store.questions.length) lede.push(`Дмитрий ждёт ответа на ${store.questions.length} ${plural(store.questions.length, 'вопрос', 'вопроса', 'вопросов')}.`);
+  if (overdue.length) lede.push('Начните с красных.');
 
   return (
-    <div ref={scope} className="page">
-      <header className="page__head reveal">
-        <div>
-          <h1 className="page__title">{hello}</h1>
-          <p className="page__sub">{weekdayCap}, {fmtDayMonth(TODAY)} {TODAY.slice(0, 4)}</p>
+    <div ref={scope} className="page today">
+      <section className="hero reveal" aria-labelledby="t-hello">
+        <p className="eyebrow">{weekday(TODAY)} · {fmtDayMonth(TODAY)} {TODAY.slice(0, 4)}</p>
+        <h1 id="t-hello" className="hero__title">{hello},<br /><em className={overdue.length ? 'is-red' : undefined}>{headline}</em></h1>
+        <p className="hero__lede">{lede.join(' ')}</p>
+        <div className="tallies" role="group" aria-label="Сроки по срочности — нажмите, чтобы показать">
+          <Tally icon="overdue" tone="red" n={overdue.length} label="Просрочено" note="срок прошёл" pressed={filter === 'overdue'} onClick={() => toggle('overdue')} />
+          <Tally icon="burning" tone="orange" n={burning.length} label="Горит" note="0–7 дней" pressed={filter === 'burning'} onClick={() => toggle('burning')} />
+          <Tally icon="soon" tone="yellow" n={soon.length} label="Скоро" note="8–30 дней" pressed={filter === 'soon'} onClick={() => toggle('soon')} />
+          <Tally icon="keys" tone="accent" n={keys.length} label="Ключи ЭЦП" note={`до ${KEY_DAYS} дней`} href="#/keys" />
         </div>
-        <div className="page__actions">
-          <span className="closed-chip" data-closed-counter title="Закрыто сегодня">
-            <Icon name="done" size={18} /><span>Закрыто сегодня</span><RollingNumber value={store.closed.length} />
-          </span>
-        <a className="search-field" href="#/clients/search">
-          <Icon name="search" /><span>Поиск клиента</span><kbd className="kbd">Ctrl K</kbd>
-        </a>
-        </div>
-      </header>
-
-      <section className="kpis reveal" aria-label="Сводка дня">
-        <div className="kpi kpi--wide" onPointerMove={spotlight}>
-          <p className="kpi__label">Получено от клиентов в {monthName(month.key, 'prep')}</p>
-          <p className="kpi__value"><RollingNumber value={month.total} format={(n) => formatMoney(n)} /></p>
-          <p className="kpi__note">в {monthName(month.prevKey, 'prep')} {formatMoney(month.prevTotal)}
-            {month.growth !== null && month.growth !== 0 && (
-              <> <span className={month.growth > 0 ? 'up' : 'down'}><Icon name={month.growth > 0 ? 'arrowUp' : 'arrowDown'} size={14} />{Math.abs(month.growth)}{' '}% к{' '}{monthName(month.prevKey, 'dat')}</span></>
-            )}</p>
-          <AreaChart cumulative={month.cumulative} month={month.key} />
-        </div>
-        <button type="button" className="kpi kpi--btn" onPointerMove={spotlight} onClick={() => setFilter('overdue')}>
-          <span className="kpi__label">Просрочено</span>
-          <span className="kpi__value kpi__value--md"><RollingNumber value={overdue.length} /></span>
-          <span className="kpi__note"><span className="dot dot--red" aria-hidden="true" /><span>{plural(overdue.length, 'срок требует', 'срока требуют', 'сроков требуют')} внимания</span></span>
-        </button>
-        <button type="button" className="kpi kpi--btn" onPointerMove={spotlight} onClick={() => setFilter('burning')}>
-          <span className="kpi__label">Горит, до 3 дней</span>
-          <span className="kpi__value kpi__value--md"><RollingNumber value={burning.length} /></span>
-          <span className="kpi__note"><span className="dot dot--orange" aria-hidden="true" />до субботы</span>
-        </button>
-        <a className="kpi kpi--btn" href="#/keys" onPointerMove={spotlight}>
-          <span className="kpi__label">Ключи ЭЦП, 14 дней</span>
-          <span className="kpi__value kpi__value--md"><RollingNumber value={keys.length} /></span>
-          <span className="kpi__note"><span className="dot dot--yellow" aria-hidden="true" />продлить заранее</span>
-        </a>
       </section>
 
       <div className="today-grid">
-        <section className="panel reveal" aria-labelledby="t-dl">
+        <section ref={listRef} className="panel reveal today-list" aria-labelledby="t-dl">
           <header className="panel__head">
-            <h2 id="t-dl" className="panel__title">Ближайшие сроки</h2>
-            <Tabs label="Какие сроки показать" value={filter} onChange={setFilter} items={[
-              { id: 'all', label: 'Месяц', count: withDays.filter((x) => x.days <= 30).length },
-              { id: 'overdue', label: 'Просрочено', count: overdue.length },
-              { id: 'burning', label: 'Горит', count: burning.length },
-              { id: 'week', label: 'Неделя', count: week.length },
+            <h2 id="t-dl" className="panel__title">{FILTER_TITLE[filter]}<span className="sub num">{list.length}</span></h2>
+            <Tabs label="Какие сроки показать" value={filter} onChange={(f) => { setFilter(f); play('tick'); }} items={[
+              { id: 'week', label: 'Неделя', count: overdue.length + burning.length },
+              { id: 'month', label: 'Месяц', count: withDays.filter((x) => x.days <= 30).length },
             ]} />
           </header>
-          <DeadlineTable items={list} empty="Здесь пусто — все сроки закрыты" />
+          <DayGroups items={list} empty={
+            <Empty pic="calm" title={filter === 'week' ? 'На этой неделе сдавать нечего' : 'Здесь пусто'}>
+              {filter === 'week' ? 'Ни просроченных, ни горящих сроков. Можно выдохнуть.' : 'Сроков с такой срочностью нет.'}
+            </Empty>
+          } />
         </section>
 
         <div className="today-side">
+          {store.questions.length > 0 && (
+            <section className="panel panel--wheat reveal" aria-labelledby="t-q">
+              <header className="panel__head">
+                <h2 id="t-q" className="panel__title"><Icon name="questions" tile="wheat" />{store.questions.length === 1 ? 'Вопрос от Дмитрия' : `Вопросы от Дмитрия: ${store.questions.length}`}</h2>
+              </header>
+              {store.questions.map((q) => (
+                <div key={q.id} className="question">
+                  <p className="question__text">{q.text}</p>
+                  <QuestionAnswer q={q} />
+                  <p className="question__foot sub">{fmtDayMonth(q.askedAt.slice(0, 10))}, {q.askedAt.slice(11, 16)} · можно ответить и в Telegram-боте</p>
+                </div>
+              ))}
+            </section>
+          )}
+
           <section className="panel reveal" aria-labelledby="t-keys">
-            <header className="panel__head"><h2 id="t-keys" className="panel__title">Ключи ЭЦП</h2><a className="link" href="#/keys">Все</a></header>
-            <ul className="mini">
-              {keys.map((c) => {
-                const days = daysBetween(TODAY, c.keyUntil ?? TODAY);
-                return (
-                  <li key={c.id} className={store.fresh.includes(c.id) ? 'is-fresh' : undefined}>
-                    <button type="button" className="mini__row" onClick={() => ui.openClient(c.id)}>
-                      <span className="mini__icon"><Icon name="key" /></span>
-                      <span className="mini__text"><strong>{c.name.split(' ').slice(0, 2).join(' ')}</strong><span className="sub">до {fmtDate(c.keyUntil ?? '')}</span></span>
-                      <StatusPill status={statusByDays(days)}>{daysLabel(days)}</StatusPill>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+            <header className="panel__head"><h2 id="t-keys" className="panel__title">Ключи ЭЦП<span className="sub">до {KEY_DAYS} дней</span></h2><a className="link" href="#/keys">Все ключи</a></header>
+            {keys.length ? (
+              <ul className="mini">
+                {keys.map((c) => {
+                  const days = daysBetween(TODAY, c.keyUntil ?? TODAY);
+                  const st = statusByDays(days);
+                  return (
+                    <li key={c.id} className={store.fresh.includes(c.id) ? 'is-fresh' : undefined}>
+                      <button type="button" className="mini__row" onClick={() => ui.openClient(c.id)}>
+                        <Icon name={URGENCY_ICON[st]} size={18} className={`urgency--${st}`} />
+                        <span className="mini__text"><strong>{shortName(c.name)}</strong><span className="sub num">до {fmtDate(c.keyUntil ?? '')}</span></span>
+                        <span className={`mini__when due--${st}`}>{daysLabel(days)}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : <p className="panel__note sub">Ни один ключ не заканчивается в ближайшие {KEY_DAYS} дней.</p>}
           </section>
 
-          {store.questions.length > 0 && (
-          <section className="panel reveal" aria-labelledby="t-q">
-            <header className="panel__head"><h2 id="t-q" className="panel__title">{store.questions.length === 1 ? 'Вопрос' : `Вопросы: ${store.questions.length}`}</h2></header>
-            {store.questions.map((q) => (
-              <div key={q.id} className="question">
-                <p>{q.text}</p>
-                <QuestionAnswer q={q} />
-                <div className="question__foot"><span className="sub">{fmtDayMonth(q.askedAt.slice(0, 10))}, {q.askedAt.slice(11, 16)}</span><span className="sub">или в Telegram-боте</span></div>
-              </div>
-            ))}
+          <section className="panel reveal money-card" aria-labelledby="t-money">
+            <header className="panel__head"><h2 id="t-money" className="panel__title">Получено в {monthName(month.key, 'prep')}</h2><a className="link" href="#/payments">Платежи</a></header>
+            <div className="money-card__body">
+              <p className="money-card__sum display"><RollingNumber value={month.total} format={(n) => formatMoney(n)} /></p>
+              <p className="sub">в {monthName(month.prevKey, 'prep')} — <Money text={formatMoney(month.prevTotal)} />
+                {month.growth !== null && month.growth !== 0 && (
+                  <> · <span className={month.growth > 0 ? 'up' : 'trend-down'}><Icon name={month.growth > 0 ? 'arrowUp' : 'arrowDown'} size={14} />{Math.abs(month.growth)}{' '}% к{' '}{monthName(month.prevKey, 'dat')}</span></>
+                )}</p>
+              <AreaChart cumulative={month.cumulative} month={month.key} />
+            </div>
           </section>
-          )}
 
           <section className="panel reveal" aria-labelledby="t-act">
             <header className="panel__head"><h2 id="t-act" className="panel__title">Что изменилось</h2></header>
-            <ul className="feed">
-              {store.activity.slice(0, 5).map((a) => (
-                <li key={a.id} className={`feed__item${store.fresh.includes(a.id) ? ' is-fresh' : ''}`}>
-                  <span className="feed__icon" title={`Источник: ${a.source}`}><Icon name={SOURCE_ICON[a.source] ?? 'sync'} size={16} /></span>
-                  <span className="feed__text">{a.text}<span className="sub">{a.source === 'сайт' ? 'с сайта' : a.source === 'бот' ? 'через бота' : 'в таблице'}, {a.when.slice(11)}</span></span>
-                </li>
-              ))}
-            </ul>
+            {store.activity.length ? (
+              <ul className="feed">
+                {store.activity.slice(0, 5).map((a) => (
+                  <li key={a.id} className={`feed__item${store.fresh.includes(a.id) ? ' is-fresh' : ''}`}>
+                    <span className="feed__icon" title={`Источник: ${a.source}`}><Icon name={SOURCE_ICON[a.source] ?? 'sync'} size={16} /></span>
+                    <span className="feed__text">{a.text}<span className="sub">{a.source === 'сайт' ? 'с сайта' : a.source === 'бот' ? 'через бота' : 'в таблице'}, {a.when.slice(11)}</span></span>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="panel__note sub">Сегодня в таблице ничего не менялось.</p>}
           </section>
         </div>
       </div>

@@ -45,15 +45,18 @@ export function RollingNumber({ value, format = (n) => String(Math.round(n)), cl
   const chars = text.split('');
   let digitIndex = 0;
   const totalDigits = chars.filter((c) => /\d/.test(c)).length;
+  // Сумма «20 700,00 ₴»: копейки и знак — мельче и тише (класс roll__cents).
+  const cents = /,\d{2}(\s₴)?$/.test(text) ? text.lastIndexOf(',') : -1;
   return (
     <span className={`roll num ${className}`} role="img" aria-label={text}>
       {chars.map((ch, i) => {
         const fromRight = chars.length - i;
-        if (!/\d/.test(ch)) return <span key={`s${fromRight}`} className="roll__sep" aria-hidden="true">{ch}</span>;
+        const tail = cents >= 0 && i >= cents ? ' roll__cents' : '';
+        if (!/\d/.test(ch)) return <span key={`s${fromRight}`} className={`roll__sep${tail}`} aria-hidden="true">{ch}</span>;
         const d = ready ? Number(ch) : 0;
         const order = totalDigits - digitIndex++;
         return (
-          <span key={`d${fromRight}`} className="roll__col" aria-hidden="true">
+          <span key={`d${fromRight}`} className={`roll__col${tail}`} aria-hidden="true">
             <span className="roll__strip" style={{ transform: `translateY(${-d * 10}%)`, transitionDelay: `${order * 35}ms` }}>
               {'0123456789'.split('').map((n) => <span key={n}>{n}</span>)}
             </span>
@@ -63,6 +66,13 @@ export function RollingNumber({ value, format = (n) => String(Math.round(n)), cl
       })}
     </span>
   );
+}
+
+/** Сумма без движения: «20 700» крупно, «,00 ₴» — мельче и тише. */
+export function Money({ text, className = '' }: { text: string; className?: string }) {
+  const at = /,\d{2}(\s₴)?$/.test(text) ? text.lastIndexOf(',') : -1;
+  if (at < 0) return <span className={`money-v num ${className}`}>{text}</span>;
+  return <span className={`money-v num ${className}`}>{text.slice(0, at)}<span className="money-v__cents">{text.slice(at)}</span></span>;
 }
 
 const STATUS_TEXT: Record<Status, string> = {
@@ -112,7 +122,10 @@ export function Tabs<T extends string>({ items, value, onChange, label }: {
   const ind = useRef<HTMLSpanElement>(null);
   useLayoutEffect(() => {
     const btn = wrap.current?.querySelector<HTMLElement>(`[data-tab="${value}"]`);
-    if (!btn || !ind.current) return;
+    if (!ind.current) return;
+    // Выбрано то, чего нет среди вкладок (например, фильтр плашкой «Просрочено»), — индикатор прячется.
+    ind.current.style.opacity = btn ? '1' : '0';
+    if (!btn) return;
     ind.current.style.transform = `translateX(${btn.offsetLeft}px)`;
     ind.current.style.width = `${btn.offsetWidth}px`;
   }, [value, items]);
