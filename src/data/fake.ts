@@ -3,11 +3,11 @@
 // на живых данных их считает сервер.
 import type { Activity, Client, Deadline, Payment, Question, Task } from './types';
 
-const ESV = { name: 'ЄСВ', kopecks: 190234, note: '22 % МЗП' };
-const EP1 = { name: 'ЄП', kopecks: 33280, note: '10 % ПМ' };
-const EP2 = { name: 'ЄП', kopecks: 172940, note: '20 % МЗП' };
-const VZ = { name: 'ВЗ', kopecks: 86470, note: '10 % МЗП' };
-const EP3 = { name: 'ЄП', kopecks: null, note: '5 % дохода — введите оборот' };
+const ESV = { name: 'ЄСВ', kopecks: 190234, note: '22 % МЗП' };
+const EP1 = { name: 'ЄП', kopecks: 33280, note: '10 % ПМ' };
+const EP2 = { name: 'ЄП', kopecks: 172940, note: '20 % МЗП' };
+const VZ = { name: 'ВЗ', kopecks: 86470, note: '10 % МЗП' };
+const EP3 = { name: 'ЄП', kopecks: null, note: '5 % дохода — введите оборот' };
 
 const c = (id: string, name: string, kind: Client['kind'], kved: [string, string][], keyUntil: string | null,
   monthly: Client['monthly'], employer = false, keyIssuer = 'ПриватБанк', marks: Client['marks'] = []): Client => ({

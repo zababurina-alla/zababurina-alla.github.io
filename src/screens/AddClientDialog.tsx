@@ -32,10 +32,10 @@ const KVEDS = [
 
 // Начисления по типу — те же ставки 2026, что в fake.ts (бриф: МЗП 8 647, ПМ 3 328). На живых данных их отдаёт сервер.
 function charges(kind: ClientKind): Client['monthly'] {
-  const esv = { name: 'ЄСВ', kopecks: 190234, note: '22 % МЗП' };
-  if (kind === 'fop1') return [{ name: 'ЄП', kopecks: 33280, note: '10 % ПМ' }, esv, { name: 'ВЗ', kopecks: 86470, note: '10 % МЗП' }];
-  if (kind === 'fop2') return [{ name: 'ЄП', kopecks: 172940, note: '20 % МЗП' }, esv, { name: 'ВЗ', kopecks: 86470, note: '10 % МЗП' }];
-  if (kind === 'fop3') return [{ name: 'ЄП', kopecks: null, note: '5 % дохода — введите оборот' }, esv];
+  const esv = { name: 'ЄСВ', kopecks: 190234, note: '22 % МЗП' };
+  if (kind === 'fop1') return [{ name: 'ЄП', kopecks: 33280, note: '10 % ПМ' }, esv, { name: 'ВЗ', kopecks: 86470, note: '10 % МЗП' }];
+  if (kind === 'fop2') return [{ name: 'ЄП', kopecks: 172940, note: '20 % МЗП' }, esv, { name: 'ВЗ', kopecks: 86470, note: '10 % МЗП' }];
+  if (kind === 'fop3') return [{ name: 'ЄП', kopecks: null, note: '5 % дохода — введите оборот' }, esv];
   if (kind === 'fopGeneral') return [esv];
   return [];
 }

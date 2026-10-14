@@ -42,7 +42,7 @@ function Month({ picked, onPick }: { picked: string | null; onPick: (iso: string
           );
         })}
       </div>
-      <p className="month__legend sub"><span><span className="dot dot--red" />просрочено</span><span><span className="dot dot--orange" />горит 0–7 дн.</span><span><span className="dot dot--yellow" />скоро 8–30 дн.</span></p>
+      <p className="month__legend sub"><span><span className="dot dot--red" />просрочено</span><span><span className="dot dot--orange" />горит 0–7{' '}дн.</span><span><span className="dot dot--yellow" />скоро 8–30{' '}дн.</span></p>
     </div>
   );
 }
