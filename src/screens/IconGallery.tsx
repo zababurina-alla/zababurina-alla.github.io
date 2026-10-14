@@ -19,7 +19,7 @@ export function IconGallery() {
     <div className="page">
       <header className="page__head">
         <div>
-          <h1 className="page__title">Значки «Сверки»</h1>
+          <h1 className="page__title">Значки «Бухгалтерии»</h1>
           <p className="page__sub">{entries.length} значков, {cats.length} категорий. Свои, сетка 24, линия 1,75. Тема — переключателем в меню.</p>
         </div>
         <div className="seg" role="group" aria-label="Вид">

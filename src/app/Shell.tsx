@@ -149,9 +149,9 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
     <div className="shell">
       <button type="button" className="skip" onClick={() => document.getElementById('main')?.focus()}>К содержимому</button>
       <aside className="rail" aria-label="Меню">
-        <a href="#/today" className="brand" aria-label="Сверка — на главную">
-          <span className="brand__mark" aria-hidden="true">С</span>
-          <span className="brand__name">Сверка</span>
+        <a href="#/today" className="brand" aria-label="Бухгалтерия — на главную">
+          <span className="brand__mark" aria-hidden="true">Б</span>
+          <span className="brand__name">Бухгалтерия</span>
         </a>
         <button type="button" className="btn btn--primary rail__cta" onClick={() => ui.openPayment()} aria-keyshortcuts="Alt+N">
           <Icon name="plus" />Записать платёж<kbd className="kbd kbd--on-accent">Alt N</kbd>
@@ -175,7 +175,7 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
       </aside>
 
       <header className="topbar">
-        <a href="#/today" className="brand"><span className="brand__mark" aria-hidden="true">С</span><span className="brand__name">Сверка</span></a>
+        <a href="#/today" className="brand"><span className="brand__mark" aria-hidden="true">Б</span><span className="brand__name">Бухгалтерия</span></a>
         <div className="topbar__tools">
           <SyncStatus />
           <a href="#/clients/search" className="icon-btn" aria-label="Поиск клиента"><Icon name="search" /></a>
