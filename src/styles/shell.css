@@ -379,7 +379,7 @@
   font-weight: var(--weight-semibold);
   text-decoration: none;
   white-space: nowrap;
-  transition: background-color var(--dur-slow, 400ms) ease, color var(--dur-base) ease;
+  transition: background-color var(--dur-move) ease, color var(--dur-base) ease;
 }
 
 .closed-chip__tick {

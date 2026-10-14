@@ -327,7 +327,7 @@
 .month__head {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   margin-bottom: var(--space-3);
 }
 
@@ -462,4 +462,27 @@
 
 .closed__text strong {
   font-weight: var(--weight-semibold);
+}
+
+.month__title em {
+  font-style: italic;
+  font-weight: var(--weight-regular);
+  color: var(--ink-2);
+}
+
+.month__nav {
+  display: inline-flex;
+  margin-right: calc(var(--space-2) * -1);
+}
+
+.month__legend .icon {
+  margin-right: 2px;
+}
+
+.month__total {
+  margin-top: var(--space-2);
+}
+
+.month__total strong {
+  color: var(--ink);
 }

@@ -22,8 +22,15 @@ export function Modal({ open, onClose, title, kind = 'dialog', children, footer,
     const d = ref.current;
     if (!d) return;
     if (open && !d.open) {
+      // Окно вырастает из кнопки, которой его открыли (как в «Сверке рейсов»): точка роста — середина кнопки.
+      const from = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement.getBoundingClientRect() : null;
       d.classList.remove('is-closing');
       d.showModal();
+      const box = d.querySelector<HTMLElement>('.modal__box');
+      if (box && from && from.width > 0) {
+        const b = box.getBoundingClientRect();
+        box.style.transformOrigin = `${from.left + from.width / 2 - b.left}px ${from.top + from.height / 2 - b.top}px`;
+      } else if (box) box.style.transformOrigin = '';
     } else if (!open && d.open) {
       d.classList.add('is-closing');
       const t = window.setTimeout(() => { d.close(); d.classList.remove('is-closing'); }, CLOSE_MS);
