@@ -1,14 +1,21 @@
 // Хранилище прототипа. Имитирует сервер-таблицу: задержку подтверждения записи и автоцикл сроков.
 // На этапе 2 станет адаптером с тем же интерфейсом, что API; на этапе 4 заменится живым адаптером.
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ACTIVITY, CLIENTS, DEADLINES, PAYMENTS } from './fake';
 import type { Activity, Client, Deadline, Payment, SaveState } from './types';
 import { TODAY, addDays, daysBetween, fmtDate } from '../lib/dates';
 import { formatMoney } from '../lib/money';
+import { play } from '../lib/sound';
 
 // Задержка «записи в таблицу» в прототипе. Замер у Apps Script — на этапе 3; сейчас число наше, не проверено.
 const FAKE_SAVE_MS = 900;
+// Имитация первой загрузки из таблицы (прототип). Живое время ответа API — замер на этапе 4.
+const FAKE_LOAD_MS = 700;
+// Сколько подсвечивается запись, пришедшая из таблицы или бота.
+const FRESH_MS = 2600;
+
+export type IncomingKind = 'payment' | 'key' | 'close';
 
 export type CloseResult =
   | { ok: true; next: Deadline | null }
@@ -27,6 +34,12 @@ interface Store {
   addPayment: (p: Omit<Payment, 'id' | 'source' | 'save'>, onSaved?: () => void) => string;
   removePayment: (id: string) => void;
   addClient: (c: Omit<Client, 'id' | 'version'>) => { client: Client; created: Deadline[] };
+  /** Данные загружены из таблицы (в прототипе — через FAKE_LOAD_MS). */
+  loaded: boolean;
+  /** id записей, которые только что пришли из таблицы или бота — экран их мягко подсвечивает. */
+  fresh: string[];
+  /** Режим отладки: имитация правки в таблице или через бота. Возвращает текст для уведомления. */
+  simulateIncoming: (kind: IncomingKind) => string;
 }
 
 const Ctx = createContext<Store | null>(null);
@@ -57,6 +70,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [activity, setActivity] = useState(ACTIVITY);
   const [closed, setClosed] = useState<Store['closed']>([]);
   const [saving, setSaving] = useState<Record<string, SaveState>>({});
+  const [loaded, setLoaded] = useState(false);
+  const [fresh, setFresh] = useState<string[]>([]);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setLoaded(true), FAKE_LOAD_MS);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  const markFresh = useCallback((id: string) => {
+    setFresh((xs) => [...xs, id]);
+    window.setTimeout(() => setFresh((xs) => xs.filter((x) => x !== id)), FRESH_MS);
+  }, []);
 
   const client = useCallback((id: string) => clients.find((c) => c.id === id), [clients]);
 
@@ -135,10 +160,42 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return { client: newClient, created };
   }, [confirm, log]);
 
+  const simulateIncoming = useCallback((kind: IncomingKind): string => {
+    const now = `${TODAY}T${new Date().toTimeString().slice(0, 5)}`;
+    play('incoming');
+    if (kind === 'payment') {
+      const id = `p${Date.now()}`;
+      setPayments((xs) => [{ id, clientId: 'c5', kopecks: 320000, period: 'III квартал 2026', method: 'на счёт', date: TODAY, source: 'бот' }, ...xs]);
+      setActivity((xs) => [{ id: `a${id}`, when: now, source: 'бот', text: 'Платёж 3 200,00 ₴ от Ясенко Миколы записан' }, ...xs]);
+      markFresh(id); markFresh(`a${id}`);
+      return 'Через бота: платёж 3 200,00 ₴ от Ясенко Миколы';
+    }
+    if (kind === 'key') {
+      setClients((xs) => xs.map((c) => (c.id === 'c1' ? { ...c, keyUntil: '2027-10-19', version: c.version + 1 } : c)));
+      const aid = `a${Date.now()}`;
+      setActivity((xs) => [{ id: aid, when: now, source: 'таблица', text: 'Ключ ЭЦП Ромашко Олены продлён до 19.10.2027' }, ...xs]);
+      markFresh('c1'); markFresh(aid);
+      return 'Из таблицы: ключ ЭЦП Ромашко Олены продлён до 19.10.2027';
+    }
+    // Бот закрыл срок: строка сначала подсвечивается, потом уходит (видно, что изменилось и где).
+    const d = deadlines.filter((x) => !x.periodEnds).sort((a, b) => a.due.localeCompare(b.due))[0];
+    if (!d) return 'Нет сроков, которые можно закрыть';
+    markFresh(d.id);
+    const name = clients.find((c) => c.id === d.clientId)?.name.split(' ').slice(0, 2).join(' ') ?? '';
+    window.setTimeout(() => {
+      setDeadlines((xs) => xs.filter((x) => x.id !== d.id));
+      setClosed((xs) => [{ deadline: d, next: null, save: 'saved' }, ...xs]);
+      const aid = `a${Date.now()}`;
+      setActivity((xs) => [{ id: aid, when: now, source: 'бот', text: `Закрыт срок «${d.what}» — ${name}` }, ...xs]);
+      markFresh(aid);
+    }, 1100);
+    return `Через бота: закрыт срок «${d.what}» — ${name}`;
+  }, [clients, deadlines, markFresh]);
+
   const value = useMemo<Store>(() => ({
     clients, deadlines, payments, activity, closed, saving, client,
-    closeDeadline, reopenDeadline, addPayment, removePayment, addClient,
-  }), [clients, deadlines, payments, activity, closed, saving, client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient]);
+    closeDeadline, reopenDeadline, addPayment, removePayment, addClient, loaded, fresh, simulateIncoming,
+  }), [clients, deadlines, payments, activity, closed, saving, client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, loaded, fresh, simulateIncoming]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -76,9 +76,9 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
         <div className="cp">
           <header className="cp__head">
             <button type="button" className="icon-btn cp__close" aria-label="Закрыть карточку" onClick={onClose}><Icon name="close" /></button>
-            <Avatar name={c.name} size="lg" />
+            <span className="vt-avatar"><Avatar name={c.name} size="lg" /></span>
             <div className="cp__who">
-              <h2 id="cp-name" className="cp__name">{c.name}</h2>
+              <h2 id="cp-name" className="cp__name"><span className="vt-name">{c.name}</span></h2>
               <p className="cp__kind"><span className="tag">{KIND_LABEL[c.kind]}</span>{c.employer && <span className="tag">работодатель</span>}</p>
             </div>
             <div className="cp__actions">

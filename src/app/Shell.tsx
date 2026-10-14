@@ -1,5 +1,5 @@
 // Оболочка: левое меню на ноутбуке; верхняя полоса, нижние вкладки и кнопка «+» на телефоне.
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useStore } from '../data/store';
 import { TODAY, daysBetween } from '../lib/dates';
@@ -7,7 +7,7 @@ import { soundSettings } from '../lib/sound';
 import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
 import type { RouteName } from '../router';
-import { toHash } from '../router';
+import { navigate, toHash } from '../router';
 import { useUi } from './ui-context';
 
 const NAV: { id: RouteName; label: string; icon: IconName; group: 'work' | 'ref' }[] = [
@@ -49,17 +49,38 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
   const [theme, toggleTheme] = useTheme();
   const [soundOn, setSoundOn] = useState(soundSettings.on);
   const overdue = deadlines.filter((d) => daysBetween(TODAY, d.due) < 0).length;
+  const navRef = useRef<HTMLElement>(null);
+  const pillRef = useRef<HTMLSpanElement>(null);
+
+  // Подсветка выбранного раздела переезжает к новому пункту (transform, 280 мс) — видно, куда перешли.
+  useLayoutEffect(() => {
+    const active = navRef.current?.querySelector<HTMLElement>('.nav__item[aria-current="page"]');
+    const pill = pillRef.current;
+    if (!pill) return;
+    if (!active) { pill.style.opacity = '0'; return; }
+    pill.style.opacity = '1';
+    pill.style.transform = `translateY(${active.offsetTop}px)`;
+  }, [route]);
 
   // Горячие клавиши (ноутбук): Alt+N — платёж, Ctrl+K или «/» — поиск клиента. Без анимации: действие частое.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const typing = e.target instanceof HTMLElement && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName);
       if (e.altKey && (e.code === 'KeyN')) { e.preventDefault(); ui.openPayment(); }
-      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyK') { e.preventDefault(); window.location.hash = '#/clients/search'; }
-      if (!typing && e.key === '/') { e.preventDefault(); window.location.hash = '#/clients/search'; }
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyK') { e.preventDefault(); ui.openPalette(); }
+      if (!typing && e.key === '/') { e.preventDefault(); navigate('#/clients/search'); }
+    };
+    // Переходы по ссылкам «#/…» внутри приложения — с плавной сменой экрана.
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const a = (e.target as HTMLElement).closest<HTMLAnchorElement>('a[href^="#/"]');
+      if (!a) return;
+      e.preventDefault();
+      navigate(a.getAttribute('href') ?? '#/today');
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    document.addEventListener('click', onClick);
+    return () => { window.removeEventListener('keydown', onKey); document.removeEventListener('click', onClick); };
   }, [ui]);
 
   const navLink = (n: (typeof NAV)[number]) => (
@@ -80,7 +101,8 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
         <button type="button" className="btn btn--primary rail__cta" onClick={() => ui.openPayment()} aria-keyshortcuts="Alt+N">
           <Icon name="plus" />Записать платёж<kbd className="kbd kbd--on-accent">Alt N</kbd>
         </button>
-        <nav className="nav" aria-label="Разделы">
+        <nav ref={navRef} className="nav" aria-label="Разделы">
+          <span ref={pillRef} className="nav__pill" aria-hidden="true" />
           {NAV.filter((n) => n.group === 'work').map(navLink)}
           <p className="nav__group">Справка</p>
           {NAV.filter((n) => n.group === 'ref').map(navLink)}

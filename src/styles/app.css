@@ -68,8 +68,11 @@ body {
   padding: var(--space-5) var(--space-4) calc(9rem + env(safe-area-inset-bottom));
 }
 
-.screen {
-  animation: screen-in var(--dur-base) var(--ease-out);
+/* Смена экрана без поддержки View Transitions — запасной вариант */
+@supports not (view-transition-name: none) {
+  .screen {
+    animation: screen-in var(--dur-base) var(--ease-out);
+  }
 }
 
 @keyframes screen-in {
@@ -212,8 +215,21 @@ body {
 }
 
 .nav {
+  position: relative;
   display: grid;
   gap: 2px;
+}
+
+.nav__pill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--tap);
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  transition: transform 280ms var(--ease-out), opacity var(--dur-fast) ease;
+  pointer-events: none;
 }
 
 .nav__group {
@@ -236,8 +252,11 @@ body {
   transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
 }
 
+.nav__item {
+  position: relative;
+}
+
 .nav__item[aria-current='page'] {
-  background: var(--accent-soft);
   color: var(--accent);
   font-weight: var(--weight-semibold);
 }
@@ -2295,9 +2314,22 @@ body {
   bottom: calc(4rem + var(--space-4) + env(safe-area-inset-bottom));
   z-index: 60;
   display: grid;
-  gap: var(--space-2);
   justify-items: center;
+  align-items: end;
   pointer-events: none;
+}
+
+/* Стопка: новое — спереди, прежние — выше на 10 px и меньше на 5 %; наведение раскрывает стопку (300 мс) */
+.toasts > .toast {
+  grid-area: 1 / 1;
+  z-index: calc(10 - var(--i));
+  transform: translateY(calc(var(--i) * -10px)) scale(calc(1 - var(--i) * 0.05));
+  transform-origin: 50% 0;
+  transition: transform 300ms var(--ease-out), opacity var(--dur-base) var(--ease-out);
+}
+
+.toasts:hover > .toast {
+  transform: translateY(calc(var(--i) * (-100% - 8px)));
 }
 
 @media (min-width: 1024px) {
@@ -2331,9 +2363,9 @@ body {
   }
 }
 
-.toast.is-leaving {
+.toasts > .toast.is-leaving {
   opacity: 0;
-  transform: translateY(8px);
+  transform: translateY(calc(var(--i) * -10px + 8px)) scale(calc(1 - var(--i) * 0.05));
   transition-duration: 160ms;
 }
 
@@ -2596,4 +2628,558 @@ body {
 .icon-cell__name {
   color: var(--ink-2);
   font-size: 0.8125rem;
+}
+
+/* ═════════ Плавные переходы (View Transitions) ═════════
+   Смена раздела: старый экран уходит вверх и тает (140 мс), новый поднимается снизу (220 мс). Меню неподвижно.
+   Строка → карточка: инициалы и имя перелетают из строки в заголовок карточки (320 мс), панель выезжает справа. */
+.rail {
+  view-transition-name: rail;
+}
+
+.main {
+  view-transition-name: main;
+}
+
+.toasts {
+  view-transition-name: toasts;
+}
+
+::view-transition-group(root),
+::view-transition-group(rail),
+::view-transition-group(toasts) {
+  animation-duration: 0s;
+}
+
+::view-transition-old(main) {
+  animation: vt-out 140ms ease-in both;
+}
+
+::view-transition-new(main) {
+  animation: vt-in 240ms var(--ease-out) both;
+}
+
+[data-vt='card']::view-transition-old(main),
+[data-vt='card']::view-transition-new(main),
+[data-vt='panel']::view-transition-old(main),
+[data-vt='panel']::view-transition-new(main) {
+  animation: none;
+}
+
+@keyframes vt-out {
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes vt-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+/* Карточка клиента */
+.modal--panel .modal__box {
+  view-transition-name: client-panel;
+}
+
+.modal--panel .vt-avatar {
+  view-transition-name: client-avatar;
+}
+
+[data-vt='card'] .modal--panel .modal__box,
+[data-vt='panel'] .modal--panel .modal__box {
+  transition: none;
+}
+
+::view-transition-new(client-panel) {
+  animation: vt-panel-in 320ms var(--ease-drawer) both;
+}
+
+::view-transition-group(client-avatar) {
+  animation-duration: 340ms;
+  animation-timing-function: var(--ease-in-out);
+}
+
+/* Имя и остальное содержимое карточки проявляются, пока панель выезжает */
+.modal--panel .cp__who,
+.modal--panel .cp__actions {
+  animation: vt-fade-in 260ms ease 120ms both;
+}
+
+@keyframes vt-panel-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes vt-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes vt-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.vt-avatar {
+  display: inline-flex;
+}
+
+.vt-name {
+  display: inline-block;
+}
+
+/* ═════════ Число-барабан ═════════ */
+.roll {
+  display: inline-flex;
+  align-items: baseline;
+  white-space: nowrap;
+}
+
+.roll__col {
+  position: relative;
+  display: inline-block;
+  height: 1.15em;
+  line-height: 1.15em;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+
+/* Невидимая цифра задаёт ширину колонки (табличные цифры одной ширины) */
+.roll__ghost {
+  visibility: hidden;
+}
+
+.roll__strip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  transition: transform 900ms var(--ease-out);
+}
+
+.roll__strip > span {
+  height: 1.15em;
+}
+
+.roll__sep {
+  white-space: pre;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .roll__strip,
+  .nav__pill {
+    transition: none;
+  }
+}
+
+/* ═════════ Закрытие срока: вспышка, полёт, счётчик ═════════ */
+.page__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+@media (min-width: 900px) {
+  .page__actions {
+    flex-wrap: nowrap;
+  }
+
+  .page__actions .search-field {
+    width: 18rem;
+  }
+}
+
+.closed-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap);
+  padding: 0 var(--space-4) 0 var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--st-green-bg);
+  color: var(--st-green-ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+}
+
+.closed-chip .roll {
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+}
+
+.fx-dot {
+  position: fixed;
+  z-index: 70;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.fx-ghost {
+  position: fixed;
+  z-index: 70;
+  display: inline-flex;
+  align-items: center;
+  height: 2.25rem;
+  max-width: 22rem;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--st-green-bg);
+  color: var(--st-green-ink);
+  box-shadow: var(--shadow-md);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  transform-origin: 50% 50%;
+}
+
+/* Галочка: кнопка заливается зелёным с лёгким «толчком» (scale 0.92 → 1.06 → 1) */
+.is-closing .check-btn {
+  animation: check-pop 360ms var(--ease-out);
+}
+
+@keyframes check-pop {
+  0% { transform: scale(0.92); }
+  45% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-closing .check-btn {
+    animation: none;
+  }
+}
+
+/* ═════════ График с откликом ═════════ */
+.chart-wrap {
+  position: relative;
+  margin-top: var(--space-3);
+}
+
+.chart-wrap .chart {
+  margin-top: 0;
+  cursor: crosshair;
+}
+
+.chart__cursor {
+  stroke: var(--ink-2);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart__hdot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: var(--focus);
+  box-shadow: 0 0 0 3px var(--surface);
+  pointer-events: none;
+}
+
+.chart__tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  translate: -50% 0;
+  display: grid;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--toast);
+  color: var(--on-toast);
+  font-size: 0.875rem;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: var(--shadow-md);
+  animation: fade-in 120ms ease;
+}
+
+/* Точка «сегодня» на графике мягко пульсирует кольцом — данные живые */
+.chart__dot--live {
+  animation: live-ring 2.4s ease-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes live-ring {
+  0%, 60%, 100% { stroke-width: 2; }
+  20% { stroke-width: 7; }
+}
+
+/* ═════════ Свет за курсором на карточках сводки ═════════ */
+.kpi {
+  position: relative;
+  isolation: isolate;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .kpis .kpi::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: radial-gradient(18rem circle at var(--mx, 50%) var(--my, 50%), var(--accent-soft), transparent 70%);
+    opacity: 0;
+    transition: opacity var(--dur-base) ease;
+    pointer-events: none;
+  }
+
+  .kpis:hover .kpi:hover::before {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chart__dot--live {
+    animation: none;
+  }
+}
+
+/* ═════════ Пришло из таблицы или бота: мягкая подсветка 2,6 с ═════════
+   Подсветка — слой поверх строки (opacity), строка не прыгает и фокус в форме не теряется. */
+.is-fresh {
+  position: relative;
+}
+
+.is-fresh::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--focus);
+  opacity: 0;
+  pointer-events: none;
+  animation: fresh 2.6s ease-out;
+}
+
+@keyframes fresh {
+  0% { opacity: 0; }
+  12% { opacity: 0.14; }
+  100% { opacity: 0; }
+}
+
+.feed__item.is-fresh {
+  animation: rise-in 360ms var(--ease-out) both;
+}
+
+.feed__item.is-fresh::after {
+  inset: -4px -8px;
+  border-radius: var(--radius-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feed__item.is-fresh {
+    animation: none;
+  }
+}
+
+/* ═════════ Заготовка при загрузке ═════════ */
+.sk {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunk);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.sk::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.55), transparent);
+  transform: translateX(-100%);
+  animation: shimmer 1.3s ease-in-out infinite;
+}
+
+:root[data-theme='dark'] .sk::after {
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.06), transparent);
+}
+
+@keyframes shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.sk-stack {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.sk--title { width: 16rem; height: 2.25rem; }
+.sk--line { height: 1rem; }
+.sk--short { width: 6rem; margin-left: auto; }
+.sk--kpi { height: 8rem; border-radius: var(--radius-lg); }
+.sk--avatar { width: 2.25rem; height: 2.25rem; border-radius: 50%; flex: none; }
+
+.sk-note {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink-2);
+}
+
+.sk-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--space-3);
+}
+
+.sk-rows {
+  display: grid;
+}
+
+.sk-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sk::after {
+    animation: none;
+  }
+}
+
+/* ═════════ Отладка ═════════ */
+.debug {
+  position: fixed;
+  left: calc(var(--rail-w) + var(--space-4));
+  bottom: var(--space-4);
+  z-index: 55;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.debug__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink-2);
+  font-size: 0.875rem;
+  font-weight: var(--weight-semibold);
+}
+
+@media (max-width: 1023px) {
+  .debug {
+    left: var(--space-3);
+    bottom: calc(4rem + var(--space-3));
+  }
+}
+
+/* ═════════ Командная строка ═════════ */
+.palette {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 12vh var(--space-4) 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+}
+
+.palette:not([open]) {
+  display: none;
+}
+
+.palette[open] {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+}
+
+.palette::backdrop {
+  background: var(--scrim);
+}
+
+.palette__box {
+  width: min(40rem, 100%);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.palette__search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
+  min-height: 3.75rem;
+  color: var(--ink-2);
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+
+.palette__search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--text-lg);
+}
+
+.palette__list {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2);
+  max-height: min(26rem, 60vh);
+  overflow-y: auto;
+}
+
+.palette__group {
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  color: var(--ink-2);
+  font-size: 0.875rem;
+  font-weight: var(--weight-semibold);
+}
+
+.palette__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--tap);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.palette__item[aria-selected='true'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.palette__label {
+  flex: 1;
+  font-weight: var(--weight-medium);
+}
+
+.palette__empty {
+  padding: var(--space-4);
 }

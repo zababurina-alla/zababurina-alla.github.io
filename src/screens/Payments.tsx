@@ -8,7 +8,7 @@ import { fmtDate, fmtDayMonth, plural, weekday } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
-import { Avatar, SaveBadge, Ticker, reducedMotion } from '../ui/kit';
+import { Avatar, RollingNumber, SaveBadge, reducedMotion } from '../ui/kit';
 import { useUi } from '../app/ui-context';
 
 const SOURCE: Record<string, { icon: IconName; text: string }> = {
@@ -41,7 +41,7 @@ export function Payments() {
       <section className="panel panel--pad pay-summary reveal" aria-label="Итог месяца">
         <div>
           <p className="kpi__label">Получено в октябре</p>
-          <p className="kpi__value kpi__value--xl"><Ticker value={total} format={(n) => formatMoney(n)} /></p>
+          <p className="kpi__value kpi__value--xl"><RollingNumber value={total} format={(n) => formatMoney(n)} /></p>
           <p className="kpi__note">{october.length} {plural(october.length, 'платёж', 'платежа', 'платежей')}, в сентябре {formatMoney(SEPTEMBER_TOTAL * 100)}</p>
         </div>
         <div className="bars" role="img" aria-label="Поступления по дням октября">
@@ -64,7 +64,7 @@ export function Payments() {
                 const c = store.client(p.clientId);
                 const src = SOURCE[p.source] ?? { icon: 'sync' as const, text: '' };
                 return (
-                  <li key={p.id} className={`paylist__row${p.save === 'saving' ? ' is-saving' : ''}`}>
+                  <li key={p.id} className={`paylist__row${p.save === 'saving' ? ' is-saving' : ''}${store.fresh.includes(p.id) ? ' is-fresh' : ''}`}>
                     <button type="button" className="linklike paylist__who" onClick={() => ui.openClient(p.clientId)}>
                       <Avatar name={c?.name ?? '?'} /><span><strong>{c?.name.split(' ').slice(0, 2).join(' ')}</strong><span className="sub">{p.period}, {p.method}</span></span>
                     </button>

@@ -1,5 +1,5 @@
 // Мелкие общие элементы: число с пересчётом, значок статуса, инициалы, вкладки со скользящим индикатором.
-import { useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import type { SaveState, Status } from '../data/types';
@@ -29,6 +29,42 @@ export function Ticker({ value, format = (n) => String(Math.round(n)), className
   return <span ref={ref} className={`num ${className}`} aria-label={format(value)}>{format(0)}</span>;
 }
 
+/**
+ * Число-барабан: каждая цифра прокручивается к новому значению (как на табло банка), справа налево с шагом 35 мс.
+ * При первом показе цифры прокручиваются от нуля. Только transform; при «уменьшить движение» — сразу.
+ */
+export function RollingNumber({ value, format = (n) => String(Math.round(n)), className = '' }: {
+  value: number; format?: (n: number) => string; className?: string;
+}) {
+  const text = format(value);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setReady(true));
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  const chars = text.split('');
+  let digitIndex = 0;
+  const totalDigits = chars.filter((c) => /\d/.test(c)).length;
+  return (
+    <span className={`roll num ${className}`} role="img" aria-label={text}>
+      {chars.map((ch, i) => {
+        const fromRight = chars.length - i;
+        if (!/\d/.test(ch)) return <span key={`s${fromRight}`} className="roll__sep" aria-hidden="true">{ch}</span>;
+        const d = ready ? Number(ch) : 0;
+        const order = totalDigits - digitIndex++;
+        return (
+          <span key={`d${fromRight}`} className="roll__col" aria-hidden="true">
+            <span className="roll__strip" style={{ transform: `translateY(${-d * 10}%)`, transitionDelay: `${order * 35}ms` }}>
+              {'0123456789'.split('').map((n) => <span key={n}>{n}</span>)}
+            </span>
+            <span className="roll__ghost">{ch}</span>
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
 const STATUS_TEXT: Record<Status, string> = {
   red: 'Просрочено', orange: 'Горит', yellow: 'Скоро', green: 'В порядке', grey: 'Неактивно',
 };
@@ -48,8 +84,8 @@ export function initials(name: string): string {
   return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase();
 }
 
-export function Avatar({ name, size = 'md', flipId }: { name: string; size?: 'sm' | 'md' | 'lg'; flipId?: string }) {
-  return <span className={`avatar avatar--${size}`} data-flip-id={flipId} aria-hidden="true">{initials(name)}</span>;
+export function Avatar({ name, size = 'md', clientId }: { name: string; size?: 'sm' | 'md' | 'lg'; clientId?: string }) {
+  return <span className={`avatar avatar--${size}`} data-client-avatar={clientId} aria-hidden="true">{initials(name)}</span>;
 }
 
 /** Честный статус записи: «сохраняется…» → «в таблице» → «не сохранилось». */

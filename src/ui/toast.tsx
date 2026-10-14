@@ -18,7 +18,7 @@ const Ctx = createContext<(t: ToastInput) => void>(() => undefined);
 
 const ICON: Record<NonNullable<ToastInput['tone']>, IconName> = { ok: 'check', error: 'alert', info: 'sync' };
 
-function Toast({ t, onClose }: { t: ToastItem; onClose: (id: number) => void }) {
+function Toast({ t, index, onClose }: { t: ToastItem; index: number; onClose: (id: number) => void }) {
   const total = t.timeout ?? (t.tone === 'error' ? 0 : t.action ? 10_000 : 5000);
   const left = useRef(total);
   const [paused, setPaused] = useState(false);
@@ -38,6 +38,7 @@ function Toast({ t, onClose }: { t: ToastItem; onClose: (id: number) => void }) 
   }, []);
   return (
     <div className={`toast toast--${t.tone ?? 'ok'}${t.leaving ? ' is-leaving' : ''}`} role={t.tone === 'error' ? 'alert' : 'status'}
+      style={{ '--i': index } as React.CSSProperties}
       onPointerEnter={() => setPaused(true)} onPointerLeave={() => setPaused(document.hidden)}>
       <Icon name={ICON[t.tone ?? 'ok']} size={18} className="toast__icon" />
       <span className="toast__text">{t.text}</span>
@@ -63,7 +64,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <Ctx.Provider value={push}>
       {children}
       <div className="toasts" aria-live="polite">
-        {items.map((t) => <Toast key={t.id} t={t} onClose={close} />)}
+        {items.map((t, i) => <Toast key={t.id} t={t} index={items.length - 1 - i} onClose={close} />)}
       </div>
     </Ctx.Provider>
   );

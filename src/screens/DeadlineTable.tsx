@@ -1,12 +1,31 @@
 // Таблица сроков — одна на «Сегодня», «Сроки» и карточку клиента.
+import { useLayoutEffect, useRef } from 'react';
+import gsap from 'gsap';
+import { Flip } from 'gsap/Flip';
 import { useStore } from '../data/store';
 import type { Deadline } from '../data/types';
 import { TODAY, daysBetween, daysLabel, fmtDate, statusByDays } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 import { Icon } from '../ui/Icon';
-import { Avatar, StatusPill } from '../ui/kit';
+import { Avatar, StatusPill, reducedMotion } from '../ui/kit';
 import { useUi } from '../app/ui-context';
 import { useCloseDeadline } from './useClose';
+
+gsap.registerPlugin(Flip);
+
+/**
+ * Список строк плавно перестраивается при любом изменении — закрыла мама, закрыл бот, пришло из таблицы:
+ * оставшиеся строки переезжают на новые места (Flip, только transform, 320 мс), а не прыгают.
+ */
+function useFlipRows(scope: React.RefObject<HTMLElement | null>, key: string) {
+  const prev = useRef<Flip.FlipState | null>(null);
+  useLayoutEffect(() => {
+    const rows = scope.current?.querySelectorAll('[data-row]');
+    if (!rows) return;
+    if (prev.current && !reducedMotion()) Flip.from(prev.current, { targets: rows, duration: 0.32, ease: 'power2.inOut' });
+    prev.current = Flip.getState(rows);
+  }, [key, scope]);
+}
 
 export function DeadlineTable({ items, showClient = true, empty = 'Сроков нет' }: {
   items: Deadline[]; showClient?: boolean; empty?: string;
@@ -14,9 +33,11 @@ export function DeadlineTable({ items, showClient = true, empty = 'Сроков 
   const store = useStore();
   const ui = useUi();
   const { close, closing, warn } = useCloseDeadline();
+  const scope = useRef<HTMLDivElement>(null);
+  useFlipRows(scope, items.map((d) => d.id).join(','));
   if (items.length === 0) return <p className="empty">{empty}</p>;
   return (
-    <div className={`dtable${showClient ? '' : ' dtable--noclient'}`} role="table" aria-label="Сроки">
+    <div ref={scope} className={`dtable${showClient ? '' : ' dtable--noclient'}`} role="table" aria-label="Сроки">
       <div className="dtable__head" role="row">
         {showClient && <span role="columnheader" className="c-client">Клиент</span>}
         <span role="columnheader" className="c-what">Что сдать или оплатить</span>
@@ -30,12 +51,12 @@ export function DeadlineTable({ items, showClient = true, empty = 'Сроков 
         const st = statusByDays(days);
         const c = store.client(d.clientId);
         return (
-          <div key={d.id} data-row data-id={d.id} data-flip-id={d.id} className="dtable__row" role="row">
+          <div key={d.id} data-row data-id={d.id} data-flip-id={d.id} className={`dtable__row${store.fresh.includes(d.id) ? ' is-fresh' : ''}`} role="row">
             {showClient && (
               <span role="cell" className="dtable__client c-client">
                 <button type="button" className="linklike" onClick={() => ui.openClient(d.clientId)}>
-                  <Avatar name={c?.name ?? '?'} />
-                  <span className="dtable__name">{c?.name.split(' ').slice(0, 2).join(' ')}</span>
+                  <Avatar name={c?.name ?? '?'} clientId={d.clientId} />
+                  <span className="dtable__name" data-client-name={d.clientId}>{c?.name.split(' ').slice(0, 2).join(' ')}</span>
                 </button>
               </span>
             )}

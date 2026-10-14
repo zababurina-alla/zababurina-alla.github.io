@@ -81,8 +81,8 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
             return (
               <button key={c.id} type="button" className="ctable__row" role="row" onClick={() => ui.openClient(c.id)}>
                 <span role="cell" className="ctable__client">
-                  <Avatar name={c.name} />
-                  <span className="ctable__who"><strong>{c.name}</strong><span className="sub">{KIND_LABEL[c.kind]}{c.employer ? ', работодатель' : ''}</span></span>
+                  <Avatar name={c.name} clientId={c.id} />
+                  <span className="ctable__who"><strong data-client-name={c.id}>{c.name}</strong><span className="sub">{KIND_LABEL[c.kind]}{c.employer ? ', работодатель' : ''}</span></span>
                 </span>
                 <span role="cell" className="num">{c.kved.map((k) => k.code).join(', ')}</span>
                 <span role="cell" className="ta-r num">{month ? formatMoney(month) : <span className="sub">по доходу</span>}</span>

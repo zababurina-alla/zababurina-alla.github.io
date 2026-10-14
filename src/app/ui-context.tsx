@@ -5,9 +5,12 @@ export interface UiApi {
   openPayment: (clientId?: string) => void;
   openAddClient: () => void;
   openClient: (id: string) => void;
+  openPalette: () => void;
 }
 
-export const UiCtx = createContext<UiApi>({ openPayment: () => undefined, openAddClient: () => undefined, openClient: () => undefined });
+export const UiCtx = createContext<UiApi>({
+  openPayment: () => undefined, openAddClient: () => undefined, openClient: () => undefined, openPalette: () => undefined,
+});
 
 export function useUi(): UiApi {
   return useContext(UiCtx);

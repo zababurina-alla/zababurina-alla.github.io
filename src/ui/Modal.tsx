@@ -1,6 +1,6 @@
 // Окно на основе <dialog>: фокус остаётся внутри, Esc закрывает, фон недоступен — это даёт сам браузер.
 // Вид: «dialog» — по центру (ноутбук) / шторка снизу (телефон); «panel» — выезжает справа (карточка клиента).
-import { useEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { Icon } from './Icon';
 
@@ -16,7 +16,8 @@ export function Modal({ open, onClose, title, kind = 'dialog', children, footer,
   labelledBy?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
+  // Синхронно (layout effect): окно должно открыться в том же кадре, что снимает плавный переход.
+  useLayoutEffect(() => {
     const d = ref.current;
     if (!d) return;
     if (open && !d.open) {

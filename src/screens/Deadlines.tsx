@@ -6,7 +6,7 @@ import { useStore } from '../data/store';
 import type { Status } from '../data/types';
 import { TODAY, daysBetween, fmtDayMonth, plural, statusByDays, weekday } from '../lib/dates';
 import { Icon } from '../ui/Icon';
-import { SaveBadge, Tabs, reducedMotion } from '../ui/kit';
+import { RollingNumber, SaveBadge, Tabs, reducedMotion } from '../ui/kit';
 import { DeadlineTable } from './DeadlineTable';
 
 type Range = 'month' | 'overdue' | 'week' | 'all';
@@ -82,6 +82,10 @@ export function Deadlines() {
           <h1 className="page__title">Сроки</h1>
           <p className="page__sub">Закрыть можно только когда отчётный период закончился — система проверит сама.</p>
         </div>
+          <span className="closed-chip" data-closed-counter title="Закрыто сегодня">
+            <Icon name="done" size={18} /><span>Закрыто сегодня</span><RollingNumber value={store.closed.length} />
+          </span>
+
       </header>
 
       <div className="deadlines-grid">
