@@ -1,6 +1,6 @@
 // Интерфейс данных кабинета — тот же, что будет у JSON-API в Apps Script (контракт: docs/api-contract.md, этап 3).
 // Сейчас его реализует fakeServer.ts (выдуманная «таблица»); на этапе 4 — живой адаптер. Экраны знают только это.
-import type { Activity, Client, Deadline, Payment } from './types';
+import type { Activity, Client, Deadline, Payment, Task } from './types';
 
 /** Снимок данных при открытии кабинета. cursor — номер последнего изменения в таблице (выдаёт сервер, не часы браузера). */
 export interface Snapshot {
@@ -8,10 +8,11 @@ export interface Snapshot {
   deadlines: Deadline[];
   payments: Payment[];
   activity: Activity[];
+  tasks: Task[];
   cursor: number;
 }
 
-export type Entity = 'client' | 'deadline' | 'payment' | 'activity';
+export type Entity = 'client' | 'deadline' | 'payment' | 'activity' | 'task';
 
 /** Одно изменение в таблице после курсора: запись появилась/изменилась или удалена (закрыта). */
 export interface Change {
@@ -19,7 +20,7 @@ export interface Change {
   entity: Entity;
   op: 'upsert' | 'delete';
   id: string;
-  record?: Client | Deadline | Payment | Activity;
+  record?: Client | Deadline | Payment | Activity | Task;
   /** Откуда изменение: requestId записи с этого сайта, или 'таблица' / 'бот'. */
   origin: string;
 }
@@ -31,7 +32,9 @@ export type WriteOp =
   | { kind: 'addPayment'; requestId: string; payment: Payment }
   | { kind: 'cancelPayment'; requestId: string; id: string }
   | { kind: 'addClient'; requestId: string; client: Client }
-  | { kind: 'updateClient'; requestId: string; id: string; baseVersion: number; patch: Partial<Pick<Client, 'phone' | 'bank' | 'keyUntil'>> };
+  | { kind: 'updateClient'; requestId: string; id: string; baseVersion: number; patch: Partial<Pick<Client, 'phone' | 'bank' | 'keyUntil'>> }
+  | { kind: 'createTask'; requestId: string; task: Task }
+  | { kind: 'completeTask'; requestId: string; id: string; done: boolean };
 
 export type ErrorCode = 'NETWORK' | 'CONFLICT' | 'PERIOD_OPEN' | 'NOT_FOUND' | 'SERVER' | 'AUTH';
 

@@ -43,6 +43,18 @@ export interface Payment {
   save?: SaveState;
 }
 
+export type Priority = 'critical' | 'high' | 'medium' | 'low';
+
+export interface Task {
+  id: string;
+  version: number;
+  clientId: string | null;
+  text: string;
+  due: string | null; // ISO
+  priority: Priority;
+  done: boolean;
+}
+
 export interface Activity {
   id: string;
   when: string; // ISO date-time

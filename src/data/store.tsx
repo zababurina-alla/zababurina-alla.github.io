@@ -11,7 +11,7 @@ import { Outbox } from './outbox';
 import type { Counters, OutboxEvent, OutboxItem } from './outbox';
 import { newRequestId } from './api';
 import type { CabinetApi, Change, WriteOp } from './api';
-import type { Activity, Client, Deadline, Payment, SaveState } from './types';
+import type { Activity, Client, Deadline, Payment, SaveState, Task } from './types';
 import { TODAY, daysBetween, fmtDate } from '../lib/dates';
 import { play } from '../lib/sound';
 
@@ -42,6 +42,7 @@ interface Store {
   deadlines: Deadline[];
   payments: Payment[];
   activity: Activity[];
+  tasks: Task[];
   closed: ClosedEntry[];
   fresh: string[];
   pending: OutboxItem[];
@@ -57,6 +58,8 @@ interface Store {
   addClient: (c: Omit<Client, 'id' | 'version'>, onSaved?: (created: Deadline[]) => void) => Client;
   /** baseVersion — версия, которую мама видела, когда начала править (бриф, п. 6: конфликт). */
   updatePhone: (clientId: string, phone: string, baseVersion: number) => void;
+  addTask: (t: Omit<Task, 'id' | 'version' | 'done'>) => void;
+  toggleTask: (id: string, done: boolean) => void;
   resolveConflict: (keep: 'mine' | 'theirs') => void;
   retry: (requestId: string) => void;
   discard: (requestId: string) => void;
@@ -84,6 +87,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [activity, setActivity] = useState<Activity[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [closed, setClosed] = useState<ClosedEntry[]>([]);
   const [fresh, setFresh] = useState<string[]>([]);
   const [pending, setPending] = useState<OutboxItem[]>([]);
@@ -127,6 +131,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           if (own) rec.save = 'saved'; else delete rec.save;
           setPayments((xs) => upsert(xs, rec));
         }
+      } else if (ch.entity === 'task') {
+        if (ch.op === 'delete') setTasks((xs) => xs.filter((x) => x.id !== ch.id));
+        else setTasks((xs) => upsert(xs, ch.record as Task));
       } else if (ch.op === 'upsert') {
         setActivity((xs) => (xs.some((a) => a.id === ch.id) ? xs : [ch.record as Activity, ...xs]));
       }
@@ -152,6 +159,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setClients((xs) => upsert(xs, op.client));
     } else if (op.kind === 'updateClient') {
       setClients((xs) => xs.map((c) => (c.id === op.id ? { ...c, ...op.patch } : c)));
+    } else if (op.kind === 'createTask') {
+      setTasks((xs) => upsert(xs, op.task));
+    } else if (op.kind === 'completeTask') {
+      setTasks((xs) => xs.map((t) => (t.id === op.id ? { ...t, done: op.done } : t)));
     }
   }, []);
 
@@ -206,7 +217,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       try {
         const snap = await api.snapshot();
         if (!alive) return;
-        setClients(snap.clients); setDeadlines(snap.deadlines); setPayments(snap.payments); setActivity(snap.activity);
+        setClients(snap.clients); setDeadlines(snap.deadlines); setPayments(snap.payments); setActivity(snap.activity); setTasks(snap.tasks);
         cursorRef.current = snap.cursor; setCursor(snap.cursor);
       } catch {
         setOnlineState(false);
@@ -304,6 +315,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     send({ kind: 'updateClient', requestId: newRequestId(), id: clientId, baseVersion, patch: { phone } }, 'Телефон клиента');
   }, [send]);
 
+  const addTask = useCallback((t: Omit<Task, 'id' | 'version' | 'done'>) => {
+    const requestId = newRequestId();
+    send({ kind: 'createTask', requestId, task: { ...t, id: requestId, version: 1, done: false } }, `Задача «${t.text}»`);
+  }, [send]);
+
+  const toggleTask = useCallback((id: string, done: boolean) => {
+    send({ kind: 'completeTask', requestId: newRequestId(), id, done }, done ? 'Задача сделана' : 'Задача снова в работе');
+  }, [send]);
+
   /** «Запись изменилась в таблице»: оставить своё (отправить поверх новой версии) или взять из таблицы. */
   const resolveConflict = useCallback((keep: 'mine' | 'theirs') => {
     const cf = conflict;
@@ -337,11 +357,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const failNextWrite = useCallback(() => { fakeServer.failNext = 'SERVER'; }, []);
 
   const value = useMemo<Store>(() => ({
-    loaded, online, clients, deadlines, payments, activity, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, resolveConflict,
+    loaded, online, clients, deadlines, payments, activity, tasks, closed, fresh, pending, counters, cursor, conflict,
+    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, addTask, toggleTask, resolveConflict,
     retry, discard, syncNow, external, setOnline, failNextWrite,
-  }), [loaded, online, clients, deadlines, payments, activity, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, resolveConflict,
+  }), [loaded, online, clients, deadlines, payments, activity, tasks, closed, fresh, pending, counters, cursor, conflict,
+    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, addTask, toggleTask, resolveConflict,
     retry, discard, syncNow, external, setOnline, failNextWrite]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

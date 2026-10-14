@@ -1,7 +1,7 @@
 // Выдуманные данные прототипа. Ни один клиент не взят из таблицы; совпадения фамилий случайны.
 // Начисления посчитаны по ставкам 2026 из брифа (МЗП 8 647, ПМ 3 328, ЄСВ 22 % МЗП = 1 902,34) — только для вида;
 // на живых данных их считает сервер.
-import type { Activity, Client, Deadline, Payment } from './types';
+import type { Activity, Client, Deadline, Payment, Task } from './types';
 
 const ESV = { name: 'ЄСВ', kopecks: 190234, note: '22 % МЗП' };
 const EP1 = { name: 'ЄП', kopecks: 33280, note: '10 % ПМ' };
@@ -70,6 +70,14 @@ export const ACTIVITY: Activity[] = [
   { id: 'a2', when: '2026-10-14T08:40', source: 'таблица', text: 'Ключ ЭЦП Ясенко Миколы продлён до 26.10.2026' },
   { id: 'a3', when: '2026-10-13T17:05', source: 'сайт', text: 'Закрыт срок «ЄСВ за III кв.» — Вербицький Андрій. Следующий создан: до 20.01.2027' },
   { id: 'a4', when: '2026-10-13T11:30', source: 'сайт', text: 'Платёж 4 200,00 ₴ от Вербицкого Андрея записан' },
+];
+
+export const TASKS: Task[] = [
+  { id: 't1', version: 1, clientId: 'c1', text: 'Позвонить — продлить ключ ЭЦП', due: '2026-10-15', priority: 'high', done: false },
+  { id: 't2', version: 1, clientId: 'c10', text: 'Запросить первичку за сентябрь', due: '2026-10-16', priority: 'medium', done: false },
+  { id: 't3', version: 1, clientId: 'c5', text: 'Проверить новый КВЕД 47.91', due: '2026-10-17', priority: 'low', done: false },
+  { id: 't4', version: 1, clientId: 'c6', text: 'Напомнить об оплате ЄП за сентябрь', due: '2026-10-14', priority: 'critical', done: false },
+  { id: 't5', version: 1, clientId: null, text: 'Сверить выписку Приватбанка за неделю', due: null, priority: 'medium', done: false },
 ];
 
 export const QUESTIONS = [

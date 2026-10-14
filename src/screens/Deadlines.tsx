@@ -18,7 +18,7 @@ function Month({ picked, onPick }: { picked: string | null; onPick: (iso: string
   const days = Array.from({ length: 31 }, (_, i) => `2026-10-${String(i + 1).padStart(2, '0')}`);
   const cells: (string | null)[] = [null, null, null, ...days];
   return (
-    <div className="month" role="grid" aria-label="Октябрь 2026">
+    <div className="month" role="group" aria-label="Октябрь 2026, выбор дня">
       <div className="month__head"><p className="month__title">Октябрь 2026</p>
         {picked && <button type="button" className="link" onClick={() => onPick(null)}>Весь месяц</button>}</div>
       <div className="month__grid">
@@ -32,7 +32,7 @@ function Month({ picked, onPick }: { picked: string | null; onPick: (iso: string
           }, null);
           const isToday = iso === TODAY;
           return (
-            <button key={iso} type="button" role="gridcell" aria-selected={picked === iso}
+            <button key={iso} type="button" aria-pressed={picked === iso}
               className={`month__day${isToday ? ' is-today' : ''}${worst ? ` month__day--${worst}` : ''}`}
               title={due.length ? `${due.length} ${plural(due.length, 'срок', 'срока', 'сроков')}` : undefined}
               aria-label={`${fmtDayMonth(iso)}${due.length ? `, ${due.length} ${plural(due.length, 'срок', 'срока', 'сроков')}` : ''}`}

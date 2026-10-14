@@ -2,9 +2,9 @@
 // — запись подтверждается с задержкой; — автоцикл создаёт следующий период; — проверка «период закончился»;
 // — версии записей и ошибка CONFLICT; — журнал изменений с курсором; — повтор того же requestId не создаёт дубль.
 // Рычаги отладки (обрыв связи, отказ, правка извне) — для кнопок в режиме отладки.
-import { ACTIVITY, CLIENTS, DEADLINES, PAYMENTS } from './fake';
+import { ACTIVITY, CLIENTS, DEADLINES, PAYMENTS, TASKS } from './fake';
 import type { CabinetApi, Change, Entity, Snapshot, WriteOp, WriteResult } from './api';
-import type { Activity, Client, Deadline, Payment } from './types';
+import type { Activity, Client, Deadline, Payment, Task } from './types';
 import { TODAY, addDays, daysBetween, fmtDate } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 
@@ -38,6 +38,7 @@ class FakeServer implements CabinetApi {
   private deadlines = new Map<string, Deadline>(DEADLINES.map((d) => [d.id, { ...d }]));
   private payments = new Map<string, Payment>(PAYMENTS.map((p) => [p.id, { ...p }]));
   private activity: Activity[] = ACTIVITY.map((a) => ({ ...a }));
+  private tasks = new Map<string, Task>(TASKS.map((t) => [t.id, { ...t }]));
   private log: Change[] = [];
   private cursor = 100;
   /** Ответы на уже выполненные requestId — повтор из очереди возвращает тот же ответ (идемпотентность). */
@@ -69,6 +70,7 @@ class FakeServer implements CabinetApi {
       deadlines: [...this.deadlines.values()].map((d) => ({ ...d })),
       payments: [...this.payments.values()].map((p) => ({ ...p })),
       activity: this.activity.map((a) => ({ ...a })),
+      tasks: [...this.tasks.values()].map((t) => ({ ...t })),
       cursor: this.cursor,
     };
   }
@@ -151,6 +153,18 @@ class FakeServer implements CabinetApi {
         for (const d of made) { this.deadlines.set(d.id, d); changes.push(this.record('deadline', 'upsert', d.id, o, d)); }
         changes.push(this.act(`Добавлен клиент ${c.name}. Создано сроков: ${made.length}`, o, 'сайт'));
         return { ok: true, changes, cursor: this.cursor };
+      }
+      case 'createTask': {
+        const t = { ...op.task, version: 1 };
+        this.tasks.set(t.id, t);
+        return { ok: true, changes: [this.record('task', 'upsert', t.id, o, t)], cursor: this.cursor };
+      }
+      case 'completeTask': {
+        const t = this.tasks.get(op.id);
+        if (!t) return { ok: false, code: 'NOT_FOUND', message: 'Этой задачи уже нет' };
+        const upd = { ...t, done: op.done, version: t.version + 1 };
+        this.tasks.set(t.id, upd);
+        return { ok: true, changes: [this.record('task', 'upsert', t.id, o, upd)], cursor: this.cursor };
       }
       case 'updateClient': {
         const c = this.clients.get(op.id);

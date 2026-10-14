@@ -1,12 +1,14 @@
 // Ключи ЭЦП, Справочник, Задачи и «Ещё» (телефон). Короче основных экранов, но рабочие.
 import { useState } from 'react';
 import { useStore } from '../data/store';
-import { TODAY, daysBetween, daysLabel, fmtDate, statusByDays } from '../lib/dates';
+import { TODAY, addDays, daysBetween, daysLabel, fmtDate, statusByDays } from '../lib/dates';
+import { parseQuickTask } from '../lib/quickTask';
+import type { Priority, Task } from '../data/types';
 import { formatMoney } from '../lib/money';
 import { fold } from '../lib/search';
 import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
-import { Avatar, StatusPill } from '../ui/kit';
+import { Avatar, SaveBadge, StatusPill } from '../ui/kit';
 import { useUi } from '../app/ui-context';
 
 export function Keys() {
@@ -75,32 +77,77 @@ export function Reference() {
   );
 }
 
-const TASKS = [
-  { id: 't1', text: 'Позвонить Ромашко — продлить ключ ЭЦП', due: '2026-10-15' },
-  { id: 't2', text: 'Запросить первичку у ТОВ «Бриз-Агро» за сентябрь', due: '2026-10-16' },
-  { id: 't3', text: 'Проверить КВЕД 47.91 у Ясенко', due: '2026-10-17' },
-];
+const PRIORITY_LABEL: Record<Priority, string> = { critical: 'Критический', high: 'Высокий', medium: 'Средний', low: 'Низкий' };
+const PRIORITY_ICON: Record<Priority, IconName> = { critical: 'critical', high: 'high', medium: 'medium', low: 'low' };
 
 export function Tasks() {
-  const [done, setDone] = useState<string[]>([]);
+  const store = useStore();
+  const ui = useUi();
+  const [line, setLine] = useState('');
+  const parsed = line.trim() ? parseQuickTask(line, store.clients) : null;
+  const client = parsed?.clientId ? store.client(parsed.clientId) : undefined;
+
+  const open = store.tasks.filter((t) => !t.done);
+  const groups: [string, Task[]][] = [
+    ['Просрочено', open.filter((t) => t.due && t.due < TODAY)],
+    ['Сегодня', open.filter((t) => t.due === TODAY)],
+    ['Завтра', open.filter((t) => t.due === addDays(TODAY, 1))],
+    ['Позже', open.filter((t) => t.due && t.due > addDays(TODAY, 1))],
+    ['Без срока', open.filter((t) => !t.due)],
+    ['Сделано', store.tasks.filter((t) => t.done)],
+  ];
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!parsed?.text) return;
+    store.addTask({ text: parsed.text, clientId: parsed.clientId, due: parsed.due, priority: parsed.priority });
+    setLine('');
+  }
+
   return (
     <div className="page">
-      <header className="page__head"><div><h1 className="page__title">Задачи</h1><p className="page__sub">Звонки, первичка, ключи.</p></div></header>
-      <section className="panel" aria-label="Задачи">
-        <ul className="tasks">
-          {TASKS.map((t) => {
-            const isDone = done.includes(t.id);
-            const days = daysBetween(TODAY, t.due);
-            return (
-              <li key={t.id} className={`tasks__row${isDone ? ' is-done' : ''}`}>
-                <button type="button" className="tasks__check" aria-pressed={isDone} aria-label={isDone ? 'Вернуть в работу' : 'Отметить сделанной'}
-                  onClick={() => setDone((xs) => (isDone ? xs.filter((x) => x !== t.id) : [...xs, t.id]))}><Icon name="check" size={16} /></button>
-                <span className="tasks__text">{t.text}</span>
-                <span className="sub">{daysLabel(days)}</span>
-              </li>
-            );
-          })}
-        </ul>
+      <header className="page__head"><div><h1 className="page__title">Задачи</h1><p className="page__sub">Звонки, первичка, ключи. Пишите как удобно — клиента и дату пойму сам.</p></div></header>
+      <form className="panel quick" onSubmit={submit}>
+        <label className="quick__row">
+          <Icon name="plus" />
+          <span className="visually-hidden">Новая задача</span>
+          <input value={line} onChange={(e) => setLine(e.target.value)} placeholder="Например: Позвонить Ромашко завтра" autoComplete="off" />
+          <button type="submit" className="btn btn--primary btn--sm" disabled={!parsed?.text}>Добавить</button>
+        </label>
+        {parsed && (
+          <p className="quick__parsed" aria-live="polite">
+            <span className="sub">Понял так:</span>
+            <span className="tag">{parsed.text || '…'}</span>
+            {client && <span className="tag"><Icon name="fop" size={14} />{client.name.split(' ').slice(0, 2).join(' ')}</span>}
+            {parsed.due && <span className="tag"><Icon name="date" size={14} />{fmtDate(parsed.due)}</span>}
+            {parsed.priority !== 'medium' && <span className="tag"><Icon name={PRIORITY_ICON[parsed.priority]} size={14} />{PRIORITY_LABEL[parsed.priority]}</span>}
+          </p>
+        )}
+      </form>
+      <section className="panel" aria-label="Список задач">
+        {groups.filter(([, xs]) => xs.length).map(([title, xs]) => (
+          <div key={title} className="dgroup">
+            <h2 className={`dgroup__title${title === 'Просрочено' ? ' is-overdue' : ''}`}>{title}<span className="sub">{xs.length}</span></h2>
+            <ul className="tasks">
+              {xs.map((t) => {
+                const c = t.clientId ? store.client(t.clientId) : undefined;
+                const saving = store.pending.some((p) => (p.op.kind === 'createTask' && p.op.task.id === t.id) || (p.op.kind === 'completeTask' && p.op.id === t.id));
+                return (
+                  <li key={t.id} className={`tasks__row${t.done ? ' is-done' : ''}${store.fresh.includes(t.id) ? ' is-fresh' : ''}`}>
+                    <button type="button" className="tasks__check" aria-pressed={t.done} aria-label={t.done ? `Вернуть в работу: ${t.text}` : `Отметить сделанной: ${t.text}`}
+                      onClick={() => store.toggleTask(t.id, !t.done)}><Icon name="check" size={16} /></button>
+                    <span className="tasks__text">
+                      {t.priority !== 'medium' && !t.done && <Icon name={PRIORITY_ICON[t.priority]} size={16} className={`prio prio--${t.priority}`} label={PRIORITY_LABEL[t.priority]} />}
+                      {t.text}
+                      {c && <button type="button" className="link tasks__client" onClick={() => ui.openClient(c.id)}>{c.name.split(' ').slice(0, 2).join(' ')}</button>}
+                    </span>
+                    {saving ? <SaveBadge state="saving" offline={!store.online} /> : t.due && !t.done && <span className={`sub due--${statusByDays(daysBetween(TODAY, t.due))}`}>{daysLabel(daysBetween(TODAY, t.due))}</span>}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
       </section>
     </div>
   );
