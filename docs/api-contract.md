@@ -106,7 +106,7 @@
 ## 3. Вход
 
 1. Сайт показывает кнопку «Войти через Google» (Google Identity Services, client ID проекта; в «Authorized
-   JavaScript origins» — `https://zaibalistudio.github.io`, путь не указывается).
+   JavaScript origins» — `https://zababurina-alla.github.io`, путь не указывается; адрес уточнил Дмитрий 14.10.2026).
 2. Сайт берёт одноразовый `nonce` (`auth.nonce`, без сеанса) и передаёт его в GIS; браузер получает **ID-токен**
    (JWT, живёт ~1 ч) с этим `nonce` и вызывает `auth.login` [п. 5].
 3. Сервер проверяет токен через `https://oauth2.googleapis.com/tokeninfo?id_token=…` (UrlFetchApp) и сам сверяет:
@@ -400,7 +400,7 @@ changelogRev, requestsStored }`. Сайт показывает их рядом �
 ## 11. Что проверить на первом деплое (до подключения сайта)
 
 1. `curl -i -L -X POST -H "Content-Type: text/plain" -d '{"v":1,"action":"auth.me"}' <exec>` — есть ли
-   `Access-Control-Allow-Origin: *` на финальном ответе; то же из браузера с `https://zaibalistudio.github.io`.
+   `Access-Control-Allow-Origin: *` на финальном ответе; то же из браузера с `https://zababurina-alla.github.io`.
 2. Время ответа: 20 запросов подряд и 5 после 30 мин простоя (`time_total`); записать p50/p95 в этот файл.
 3. Размер `sync.snapshot` на живых данных (КБ) и время его сборки.
 4. `tokeninfo`: время ответа; что при ошибке.
