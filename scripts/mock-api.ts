@@ -9,7 +9,10 @@ import { existsSync, readFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Plugin, ViteDevServer } from 'vite';
 
-interface Ctx { fake: FakeLike; nonces: Set<string>; sessions: Map<string, { email: string; name: string; exp: number }> }
+interface Ctx {
+  fake: FakeLike; nonces: Set<string>; sessions: Map<string, { email: string; name: string; exp: number }>;
+  counters: { received: number; applied: number; rejectedByCode: Record<string, number>; repeats: number; seen: Set<string> };
+}
 interface FakeLike {
   snapshot(): Promise<{ cursor: number } & Record<string, unknown>>;
   changesSince(c: number): Promise<{ changes: { cursor: number; entity: string; op: string; id: string; origin: string; record?: unknown }[]; cursor: number }>;
@@ -75,9 +78,13 @@ async function handle(ctx: Ctx, body: { action: string; payload?: Record<string,
     const r = await f.changesSince(Number(p.since ?? 0));
     return env({ changes: r.changes.map((c) => ({ rev: c.cursor, entity: c.entity, op: c.op, id: c.id, origin: c.origin, record: c.record })), cursor: r.cursor, hasMore: false }, r.cursor);
   }
+  if (body.action === 'diag.counters') return env({ received: ctx.counters.received, applied: ctx.counters.applied, rejectedByCode: ctx.counters.rejectedByCode, repeats: ctx.counters.repeats }, 0);
   if (body.action === 'clients.revealPassword') return env({ login: 'учебный-логин', password: 'учебный-пароль', ttlSeconds: 30 }, 0);
 
   const rid = body.requestId ?? randomUUID();
+  const cnt = ctx.counters;
+  cnt.received++;
+  if (cnt.seen.has(rid)) cnt.repeats++; else cnt.seen.add(rid);
   const ops: Record<string, () => Record<string, unknown>> = {
     'deadlines.close': () => ({ kind: 'closeDeadline', id: p.id, baseVersion: p.baseVersion }),
     'deadlines.reopen': () => ({ kind: 'reopenDeadline', id: p.id, undoOf: p.undoOf }),
@@ -92,7 +99,11 @@ async function handle(ctx: Ctx, body: { action: string; payload?: Record<string,
   const make = ops[body.action];
   if (!make) return fail('SERVER', `Неизвестное действие ${body.action}`);
   const r = await f.write({ ...make(), requestId: rid });
-  if (!r.ok) return fail(r.code, r.message, r.retryAt ? { retryable: true, retryAt: r.retryAt } : {}, r.current ?? null);
+  if (!r.ok) {
+    cnt.rejectedByCode[r.code] = (cnt.rejectedByCode[r.code] ?? 0) + 1;
+    return fail(r.code, r.message, r.retryAt ? { retryable: true, retryAt: r.retryAt } : {}, r.current ?? null);
+  }
+  cnt.applied++;
   const recs = (entity: string) => r.changes.filter((c) => c.entity === entity && c.op === 'upsert').map((c) => c.record);
   switch (body.action) {
     case 'deadlines.close': {
@@ -135,7 +146,7 @@ export function mockApi(): Plugin {
           try {
             if (!ctx) {
               const mod = await server.ssrLoadModule('/src/data/fakeServer.ts') as { fakeServer: FakeLike };
-              ctx = { fake: mod.fakeServer, nonces: new Set(), sessions: new Map() };
+              ctx = { fake: mod.fakeServer, nonces: new Set(), sessions: new Map(), counters: { received: 0, applied: 0, rejectedByCode: {}, repeats: 0, seen: new Set() } };
             }
             const body = JSON.parse(await readBody(req)) as Parameters<typeof handle>[1];
             res.end(JSON.stringify(await handle(ctx, body)));

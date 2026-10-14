@@ -12,6 +12,14 @@ export interface SessionProvider {
   refresh(): Promise<string>;
 }
 
+export interface DiagCounters {
+  received: number;
+  applied: number;
+  rejectedByCode: Record<string, number>;
+  repeats: number;
+  changelogRev?: number;
+}
+
 interface ServerChange { rev: number; entity: string; op: 'upsert' | 'delete'; id: string; origin: string; record?: unknown }
 
 const ENTITIES: ReadonlySet<string> = new Set<Entity>(['client', 'deadline', 'payment', 'activity', 'task', 'question']);
@@ -149,6 +157,12 @@ export class LiveApi implements CabinetApi {
       }
       return res;
     }
+  }
+
+  /** Счётчики сервера за день (только owner, контракт 8.8) — рядом со ступенями сайта. */
+  async diagCounters(): Promise<DiagCounters> {
+    const env = await this.rpc<DiagCounters>('diag.counters', {});
+    return env.data;
   }
 
   /** Пароль — отдельный запрос по явному «Показать», мимо очереди и IndexedDB (контракт, 8.2). RATE_LIMIT не повторяем. */
