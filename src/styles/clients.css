@@ -10,6 +10,7 @@
 
 .search-input {
   flex: 1 1 20rem;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -195,6 +196,12 @@
   .ctable__head > :nth-child(2),
   .ctable__row > :nth-child(2) {
     display: none;
+  }
+}
+
+@media (max-width: 559px) {
+  .toolbar {
+    padding: var(--space-3);
   }
 }
 

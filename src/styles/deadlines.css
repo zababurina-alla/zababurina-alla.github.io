@@ -324,6 +324,13 @@
   }
 }
 
+/* Телефон: сначала список (ради него пришли), календарь — под ним */
+@media (max-width: 759px) {
+  .deadlines-grid > aside {
+    order: 2;
+  }
+}
+
 .month__head {
   display: flex;
   justify-content: space-between;
