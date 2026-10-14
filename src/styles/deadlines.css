@@ -486,3 +486,9 @@
 .month__total strong {
   color: var(--ink);
 }
+
+/* Сроки без даты в таблице — подсказка, где поправить */
+.undated__hint {
+  margin: 0;
+  padding: 0 var(--space-5) var(--space-3);
+}

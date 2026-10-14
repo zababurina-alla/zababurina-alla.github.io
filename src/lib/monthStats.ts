@@ -1,7 +1,7 @@
 // Суммы поступлений за месяц — из платежей, а не из констант: одно и то же для выдуманных и живых данных.
 import { monthKey, prevMonthKey } from './dates';
 
-interface Pay { kopecks: number; date: string; status?: string }
+interface Pay { kopecks: number | null; date: string; status?: string }
 
 export interface MonthStats {
   key: string;
@@ -26,6 +26,7 @@ export function monthStats(payments: Pay[], today: string): MonthStats {
   for (const p of payments) {
     // «Ожидается», «не получено», «возвращено» — не деньги в кассе.
     if (p.status !== undefined && p.status !== 'received') continue;
+    if (p.kopecks === null) continue; // сумма не указана — в итог не идёт
     const k = monthKey(p.date);
     if (k === key) {
       const d = Number(p.date.slice(8, 10));

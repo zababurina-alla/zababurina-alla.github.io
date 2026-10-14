@@ -6,7 +6,7 @@ import { METHOD_LABEL } from '../data/types';
 import type { PayMethod } from '../data/types';
 import { useDraft } from '../data/drafts';
 import { TODAY, addDays, endOfMonth, fmtDate, parseUserDate } from '../lib/dates';
-import { formatMoney, parseMoney } from '../lib/money';
+import { formatMoney, parseMoney, formatPayMoney } from '../lib/money';
 import { search } from '../lib/search';
 import { play } from '../lib/sound';
 import { Icon } from '../ui/Icon';
@@ -173,7 +173,7 @@ export function PaymentDialog({ open, clientId, onClose }: { open: boolean; clie
           {touched.amount && errors.amount
             ? <p id={`${ids}-amount-msg`} className="field__error" role="alert">{errors.amount}</p>
             : <p id={`${ids}-amount-msg`} className="field__hint">{money.ok ? <>Будет записано: <strong className="num">{formatMoney(money.kopecks)}</strong></> : 'Можно писать 1234.5 или 1 234,50 — покажем одинаково'}</p>}
-          {lastPay && <p className="field__hint">Прошлый платёж: {formatMoney(lastPay.kopecks)} за {lastPay.period.toLowerCase()}</p>}
+          {lastPay && <p className="field__hint">Прошлый платёж: {formatPayMoney(lastPay.kopecks)} за {lastPay.period.toLowerCase()}</p>}
         </div>
 
         <div className="field">

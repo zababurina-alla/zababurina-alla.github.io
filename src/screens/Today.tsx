@@ -211,7 +211,7 @@ export function Today() {
                 <div key={q.id} className="question">
                   <p className="question__text">{q.text}</p>
                   <QuestionAnswer q={q} />
-                  <p className="question__foot sub">{fmtDayMonth(q.askedAt.slice(0, 10))}, {q.askedAt.slice(11, 16)} · можно ответить и в Telegram-боте</p>
+                  <p className="question__foot sub">{q.askedAt ? `${fmtDayMonth(q.askedAt.slice(0, 10))}, ${q.askedAt.slice(11, 16)} · ` : ''}можно ответить и в Telegram-боте</p>
                 </div>
               ))}
             </section>

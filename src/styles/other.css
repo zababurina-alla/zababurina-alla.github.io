@@ -292,3 +292,9 @@
 .more__item > .icon:last-child {
   color: var(--ink-2);
 }
+
+/* «Ещё N сделанных — в таблице» под списком задач */
+.tasks__more {
+  margin: 0;
+  padding: var(--space-1) var(--space-5) var(--space-3);
+}

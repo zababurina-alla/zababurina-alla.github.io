@@ -6,7 +6,7 @@ import { useStore } from '../data/store';
 import { useDraft } from '../data/drafts';
 import { MARK_LABEL, marksProblem } from '../data/types';
 import type { Client, ClientKind, ClientMark, Deadline } from '../data/types';
-import { TODAY, addDays, fmtDate } from '../lib/dates';
+import { TODAY, addDays, fmtDate, fmtDue } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 import { fold } from '../lib/search';
 import { play } from '../lib/sound';
@@ -247,7 +247,7 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
             <p className="created__lead"><span className="created__ok"><Icon name="check" /></span><span><strong>{result.client.name}</strong> записан в таблицу. Система сама создала сроки:</span></p>
             <ul className="created__list">
               {(result.created ?? []).map((d, i) => (
-                <li key={d.id} className="created__item" style={{ animationDelay: `${120 * i + 150}ms` }}><Icon name="calendar" size={18} /><span>{d.what}</span><span className="num sub">до {fmtDate(d.due)}</span></li>
+                <li key={d.id} className="created__item" style={{ animationDelay: `${120 * i + 150}ms` }}><Icon name="calendar" size={18} /><span>{d.what}</span><span className="num sub">до {fmtDue(d.due)}</span></li>
               ))}
             </ul>
           </div>

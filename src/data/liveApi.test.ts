@@ -167,6 +167,14 @@ describe('живой адаптер: чтение', () => {
     expect(snap.questions).toEqual([]);
   });
 
+  it('пустые поля таблицы доходят как null: дата срока, сумма платежа, дата вопроса', async () => {
+    const s = server(ok({ clients: [], deadlines: [{ ...dl('D-2'), due: null }],
+      payments: [{ id: 'P-1', version: 1, clientId: 'C-1', kopecks: null, period: 'x', method: 'cash', date: '2026-10-11', source: 'таблица', status: 'expected' }],
+      tasks: [], activity: [], questions: [{ id: 'Q-2', version: 1, text: '?', type: 'text', options: [], clientId: null, status: 'waiting', askedAt: null, answer: null }], cursor: 6 }));
+    const snap = await new LiveApi(URL_, auth(), s.fetchImpl).snapshot();
+    expect([snap.deadlines[0]?.due, snap.payments[0]?.kopecks, snap.questions[0]?.askedAt]).toEqual([null, null, null]);
+  });
+
   it('CURSOR_EXPIRED уходит наверх как ApiError', async () => {
     const s = server(fail('CURSOR_EXPIRED', 'старый курсор'));
     await expect(new LiveApi(URL_, auth(), s.fetchImpl).changesSince(1)).rejects.toBeInstanceOf(ApiError);

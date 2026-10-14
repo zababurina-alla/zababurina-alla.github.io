@@ -1,7 +1,7 @@
 // Сроки по дням: «Просрочено», «Сегодня», «Завтра», «Пятница, 16 октября». Десятки сроков в один день не растягивают
 // экран: в группе видно первые 6, остальное — «Показать ещё N». Одна деталь на «Сегодня» и «Сроки».
 import { useState } from 'react';
-import type { Deadline } from '../data/types';
+import type { DatedDeadline } from '../data/types';
 import { TODAY, addDays, daysBetween, fmtDayMonth, plural, weekday } from '../lib/dates';
 import { DeadlineTable } from './DeadlineTable';
 
@@ -16,7 +16,7 @@ function dayTitle(key: string): string {
   return `${wd.replace(/^./, (s) => s.toUpperCase())}, ${fmtDayMonth(key)}`;
 }
 
-function Group({ dayKey, items }: { dayKey: string; items: Deadline[] }) {
+function Group({ dayKey, items }: { dayKey: string; items: DatedDeadline[] }) {
   const [open, setOpen] = useState(false);
   const folded = items.length > FOLD_AT && !open;
   const shown = folded ? items.slice(0, FOLD_SHOW) : items;
@@ -36,10 +36,10 @@ function Group({ dayKey, items }: { dayKey: string; items: Deadline[] }) {
   );
 }
 
-export function DayGroups({ items, empty }: { items: Deadline[]; empty: React.ReactNode }) {
+export function DayGroups({ items, empty }: { items: DatedDeadline[]; empty: React.ReactNode }) {
   if (items.length === 0) return <>{empty}</>;
   const sorted = [...items].sort((a, b) => a.due.localeCompare(b.due));
-  const groups = new Map<string, Deadline[]>();
+  const groups = new Map<string, DatedDeadline[]>();
   for (const d of sorted) {
     const key = daysBetween(TODAY, d.due) < 0 ? 'overdue' : d.due;
     groups.set(key, [...(groups.get(key) ?? []), d]);

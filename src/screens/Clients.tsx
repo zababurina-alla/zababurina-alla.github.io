@@ -5,7 +5,7 @@ import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { kindLabel } from '../data/fake';
 import { useStore } from '../data/store';
-import type { ClientKind, Deadline } from '../data/types';
+import type { ClientKind, DatedDeadline } from '../data/types';
 import { TODAY, daysBetween, daysLabel, fmtDate, statusByDays } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 import { search } from '../lib/search';
@@ -37,7 +37,7 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
   // Ближайший срок каждого клиента — один проход по срокам, а не перебор на каждую строку.
   const deadlines = store.deadlines;
   const nextByClient = useMemo(() => {
-    const m = new Map<string, Deadline>();
+    const m = new Map<string, DatedDeadline>();
     for (const d of deadlines) {
       const cur = m.get(d.clientId);
       if (!cur || d.due < cur.due) m.set(d.clientId, d);

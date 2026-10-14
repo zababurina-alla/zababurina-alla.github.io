@@ -5,7 +5,7 @@ import { useLayoutEffect, useRef } from 'react';
 import gsap from 'gsap';
 import { Flip } from 'gsap/Flip';
 import { useStore } from '../data/store';
-import type { Deadline, Status } from '../data/types';
+import type { DatedDeadline, Status } from '../data/types';
 import { TODAY, daysBetween, daysLabel, fmtDate, statusByDays } from '../lib/dates';
 import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
@@ -33,7 +33,7 @@ function useFlipRows(scope: React.RefObject<HTMLElement | null>, key: string) {
 }
 
 export function DeadlineTable({ items, showClient = true, empty = 'Сроков нет' }: {
-  items: Deadline[]; showClient?: boolean; empty?: string;
+  items: DatedDeadline[]; showClient?: boolean; empty?: string;
 }) {
   const store = useStore();
   const ui = useUi();

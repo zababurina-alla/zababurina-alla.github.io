@@ -5,8 +5,8 @@
 import { ACTIVITY, CLIENTS, DEADLINES, PAYMENTS, QUESTIONS, TASKS } from './fake';
 import type { CabinetApi, Change, Entity, Snapshot, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Deadline, Payment, Question, Task } from './types';
-import { TODAY, addDays, endOfMonth, fmtDate } from '../lib/dates';
-import { formatMoney } from '../lib/money';
+import { TODAY, addDays, endOfMonth, fmtDate, fmtDue } from '../lib/dates';
+import { formatPayMoney } from '../lib/money';
 
 // Задержки прототипа: запись 1–3 с — по оценке архитектора «Мамы CRM» (p50 1–5 с, p95 до 10–12 с; не замер).
 // Режим отладки «медленная таблица» — 12 с (верхняя оценка p95).
@@ -26,11 +26,11 @@ export function nextPeriod(d: Deadline, id: string, version: number): Deadline |
   if (q?.[1]) {
     const nextQ = QUARTERS[(QUARTERS.indexOf(q[1]) + 1) % 4] ?? 'I';
     const pe = d.periodEnd ? nextMonthEnd(nextMonthEnd(nextMonthEnd(d.periodEnd))) : null;
-    return { ...base, what: d.what.replace(q[1], nextQ), due: addDays(d.due, 92), periodEnd: pe };
+    return { ...base, what: d.what.replace(q[1], nextQ), due: addDays(d.due ?? TODAY, 92), periodEnd: pe };
   }
   const m = MONTHS.findIndex((name) => d.what.toLowerCase().includes(name));
   if (m >= 0) {
-    return { ...base, what: d.what.replace(new RegExp(MONTHS[m] ?? '', 'i'), MONTHS[(m + 1) % 12] ?? ''), due: addDays(d.due, 30),
+    return { ...base, what: d.what.replace(new RegExp(MONTHS[m] ?? '', 'i'), MONTHS[(m + 1) % 12] ?? ''), due: addDays(d.due ?? TODAY, 30),
       periodEnd: d.periodEnd ? nextMonthEnd(d.periodEnd) : null };
   }
   return null;
@@ -131,7 +131,7 @@ class FakeServer implements CabinetApi {
         if (next) { this.deadlines.set(next.id, next); changes.push(this.record('deadline', 'upsert', next.id, o, next)); }
         this.closedBy.set(o, { closed: d, next });
         const name = this.clients.get(d.clientId)?.name ?? '';
-        changes.push(this.act(`Закрыт срок «${d.what}» — ${short(name)}${next ? `. Следующий создан: до ${fmtDate(next.due)}` : ''}`, o, 'сайт'));
+        changes.push(this.act(`Закрыт срок «${d.what}» — ${short(name)}${next ? `. Следующий создан: до ${fmtDue(next.due)}` : ''}`, o, 'сайт'));
         // Уведомления клиенту и маме — через 2 мин, если закрытие не отменили (п. 31).
         const notifyAt = new Date(Date.now() + 120_000).toISOString();
         return { ok: true, changes, cursor: this.cursor, notifyAt };
@@ -152,7 +152,7 @@ class FakeServer implements CabinetApi {
         delete p.save;
         this.payments.set(p.id, p);
         const name = this.clients.get(p.clientId)?.name ?? '';
-        const changes = [this.record('payment', 'upsert', p.id, o, p), this.act(`Платёж ${formatMoney(p.kopecks)} от ${short(name)} записан`, o, 'сайт')];
+        const changes = [this.record('payment', 'upsert', p.id, o, p), this.act(`Платёж ${formatPayMoney(p.kopecks)} от ${short(name)} записан`, o, 'сайт')];
         return { ok: true, changes, cursor: this.cursor };
       }
       case 'cancelPayment': {
@@ -233,7 +233,7 @@ class FakeServer implements CabinetApi {
       this.act(kind === 'key' ? 'Ключ ЭЦП Ромашко Олены продлён до 19.10.2027' : 'Телефон Ромашко Олены изменён в таблице', 'таблица', 'таблица');
       return kind === 'key' ? 'Из таблицы: ключ ЭЦП Ромашко Олены продлён до 19.10.2027' : 'Из таблицы: изменён телефон Ромашко Олены';
     }
-    const d = [...this.deadlines.values()].filter((x) => x.status !== 'done' && (!x.periodEnd || x.periodEnd < TODAY)).sort((a, b) => a.due.localeCompare(b.due))[0];
+    const d = [...this.deadlines.values()].filter((x) => x.status !== 'done' && (!x.periodEnd || x.periodEnd < TODAY)).sort((a, b) => (a.due ?? '').localeCompare(b.due ?? ''))[0];
     if (!d) return 'Нет сроков, которые можно закрыть';
     const done: Deadline = { ...d, status: 'done', closedAt: TODAY, version: this.cursor + 1 };
     this.deadlines.set(d.id, done);

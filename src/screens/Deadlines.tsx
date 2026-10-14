@@ -5,7 +5,7 @@ import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { useStore } from '../data/store';
 import type { Status } from '../data/types';
-import { TODAY, daysBetween, daysInMonth, fmtDate, fmtDayMonth, monthKey, monthName, plural, prevMonthKey, statusByDays } from '../lib/dates';
+import { TODAY, daysBetween, daysInMonth, fmtDayMonth, monthKey, monthName, plural, prevMonthKey, statusByDays, fmtDue } from '../lib/dates';
 import { play } from '../lib/sound';
 import { Icon } from '../ui/Icon';
 import { Empty } from '../ui/Empty';
@@ -121,6 +121,21 @@ export function Deadlines() {
         </section>
       </div>
 
+      {store.undated.length > 0 && (
+        <section className="panel reveal" aria-labelledby="undated-title">
+          <header className="panel__head"><h2 id="undated-title" className="panel__title">Без даты срока<span className="sub num">{store.undated.length}</span></h2></header>
+          <p className="sub undated__hint">В таблице у этих сроков пустая дата — проверьте и впишите её там, на сайте они встанут на свой день сами.</p>
+          <ul className="closed">
+            {store.undated.map((d) => (
+              <li key={d.id} className="closed__row">
+                <Icon name="calendar" tile="wheat" />
+                <span className="closed__text"><strong>{(() => { const c = store.client(d.clientId); return c ? shortName(c.name) : 'клиент не найден'; })()}</strong> — {d.what}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {store.closed.length > 0 && (
         <section className="panel reveal" aria-labelledby="closed-title">
           <header className="panel__head"><h2 id="closed-title" className="panel__title">Закрыто сегодня<span className="sub num">{store.closed.length}</span></h2></header>
@@ -131,7 +146,7 @@ export function Deadlines() {
                 <li key={deadline.id} className="closed__row">
                   <span className="closed__check"><Icon name="check" size={16} /></span>
                   <span className="closed__text"><strong>{c ? shortName(c.name) : 'Клиент не указан'}</strong> — {deadline.what}
-                    {next && <span className="sub">Система создала следующий: {next.what}, до {fmtDate(next.due)}</span>}</span>
+                    {next && <span className="sub">Система создала следующий: {next.what}, до {fmtDue(next.due)}</span>}</span>
                   <SaveBadge state={save} offline={!store.online} onRetry={() => store.retry(requestId)} />
                   <button type="button" className="btn btn--ghost btn--sm" onClick={() => store.reopenDeadline(deadline.id)}><Icon name="undo" size={16} />Вернуть</button>
                 </li>

@@ -9,7 +9,7 @@ import { METHOD_LABEL, PAY_STATUS_LABEL, isReceived } from '../data/types';
 import type { PayMethod } from '../data/types';
 import { TODAY, addDays, daysInMonth, fmtDayMonth, monthName, plural, weekday } from '../lib/dates';
 import { monthStats } from '../lib/monthStats';
-import { formatMoney } from '../lib/money';
+import { formatMoney, formatPayMoney } from '../lib/money';
 import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
 import { Avatar, Money, RollingNumber, SaveBadge, reducedMotion } from '../ui/kit';
@@ -39,7 +39,7 @@ export function Payments() {
   const today = Number(TODAY.slice(8, 10));
   const byDay = new Map<string, typeof inMonth>();
   for (const p of [...inMonth].sort((a, b) => b.date.localeCompare(a.date))) byDay.set(p.date, [...(byDay.get(p.date) ?? []), p]);
-  const daySum = (xs: typeof inMonth) => xs.filter(isReceived).reduce((s, p) => s + p.kopecks, 0);
+  const daySum = (xs: typeof inMonth) => xs.filter(isReceived).reduce((s, p) => s + (p.kopecks ?? 0), 0);
   const maxDay = Math.max(1, ...[...byDay.values()].map(daySum));
   const waiting = inMonth.filter((p) => !isReceived(p));
 
@@ -69,7 +69,7 @@ export function Payments() {
             )}
           </p>
           {waiting.length > 0 && (
-            <p className="pay-hero__wait"><Icon name="waiting" size={16} />Ещё {waiting.length} {plural(waiting.length, 'платёж', 'платежа', 'платежей')} не в кассе: <Money text={formatMoney(waiting.reduce((s, p) => s + p.kopecks, 0))} /> — в итог не входят</p>
+            <p className="pay-hero__wait"><Icon name="waiting" size={16} />Ещё {waiting.length} {plural(waiting.length, 'платёж', 'платежа', 'платежей')} не в кассе: <Money text={formatMoney(waiting.reduce((s, p) => s + (p.kopecks ?? 0), 0))} /> — в итог не входят</p>
           )}
         </div>
         <div className="bars" role="img" aria-label={`Поступления по дням ${monthName(stats.key, 'gen')}: всего ${formatMoney(stats.total)}, самый большой день — ${formatMoney(maxDay)}`}>
@@ -109,7 +109,7 @@ export function Payments() {
                     <span className="paylist__how sub"><Icon name={METHOD_ICON[p.method]} size={16} />{METHOD_LABEL[p.method]}<span className="paylist__src" title={`Записано ${src.text}`}><Icon name={src.icon} size={14} />{src.text}</span></span>
                     {p.save ? <SaveBadge state={p.save} offline={!store.online} onRetry={() => store.retry(p.id)} />
                       : !got && p.status ? <span className="pill pill--grey">{PAY_STATUS_LABEL[p.status]}</span> : <span />}
-                    <span className="paylist__sum display"><Money text={formatMoney(p.kopecks)} /></span>
+                    <span className="paylist__sum display"><Money text={formatPayMoney(p.kopecks)} /></span>
                   </li>
                 );
               })}
