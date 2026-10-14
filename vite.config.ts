@@ -6,6 +6,12 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   base: './',
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      // concept.html — макеты этапа 1; уберём из сборки перед публикацией.
+      input: { main: 'index.html', concept: 'concept.html' },
+    },
+  },
   test: {
     environment: 'jsdom',
     include: ['src/**/*.test.{ts,tsx}', 'scripts/**/*.test.ts'],

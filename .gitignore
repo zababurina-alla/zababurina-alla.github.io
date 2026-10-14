@@ -10,3 +10,7 @@ Thumbs.db
 coverage/
 .claude/settings.local.json
 ПРОМТ-НОВОЙ-СЕССИИ.md
+
+# скриншоты макетов — пересобираются, в репозиторий не кладём
+docs/mockups/
+.playwright-mcp/

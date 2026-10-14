@@ -1,0 +1,492 @@
+/* Направление «Штиль». Цвета проверены на контраст (см. отчёт этапа 1); после выбора направления переедут в tokens.css. */
+:root[data-direction='shtil'] {
+  --canvas: #EEF3F6;
+  --surface: #FFFFFF;
+  --surface-sunk: #F5F8FA;
+  --line: #DCE5EB;
+  --ink: #0F2233;
+  --ink-2: #4A5B6B;
+  --accent: #0E5A8A;
+  --on-accent: #FFFFFF;
+  --accent-soft: #E1EEF6;
+  --focus: #0E5A8A;
+  --sh-field: #0D3550;
+  --sh-on-field: #FFFFFF;
+  --sh-on-field-2: #B9D3E3;
+  --sh-water: #14476A;
+  --sh-water-line: #8CCBE8;
+  --sh-mark-red: #FFB4B4;
+  --sh-mark-orange: #FDBA8C;
+  --sh-mark-yellow: #F8D77A;
+  --sh-mark-green: #8EE0A8;
+}
+
+:root[data-direction='shtil'][data-theme='dark'] {
+  --canvas: #08141E;
+  --surface: #0F1F2C;
+  --surface-sunk: #0C1A26;
+  --line: #1C3245;
+  --ink: #E6EEF4;
+  --ink-2: #9FB3C3;
+  --accent: #7FC4E8;
+  --on-accent: #06202F;
+  --accent-soft: #12344A;
+  --focus: #7FC4E8;
+  --sh-field: #0B2A40;
+  --sh-water: #12405F;
+}
+
+.sh {
+  max-width: 82rem;
+  margin: 0 auto;
+  display: grid;
+  gap: var(--space-6);
+}
+
+/* ───────── Поле моря: главный экран дня ───────── */
+.sh-field {
+  position: relative;
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-6) var(--space-6) 0;
+  border-radius: 28px;
+  background: var(--sh-field);
+  color: var(--sh-on-field);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.sh-field__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.sh-date,
+.sh-closed {
+  font-size: var(--text-lg);
+  color: var(--sh-on-field-2);
+}
+
+.sh-closed .odo {
+  color: var(--sh-on-field);
+  font-weight: var(--weight-semibold);
+}
+
+.sh-word {
+  font-size: clamp(4.5rem, 11vw, 10.5rem);
+  line-height: 0.9;
+  font-weight: 700;
+  letter-spacing: -0.055em;
+  margin-left: -0.04em;
+}
+
+.sh-word__in {
+  display: inline-flex;
+  overflow: hidden;
+  padding-bottom: 0.08em;
+  animation: sh-word-in var(--dur-base) var(--ease-out);
+}
+
+.sh-word__ch {
+  display: inline-block;
+}
+
+@keyframes sh-word-in {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+  }
+}
+
+.sh-sentence {
+  font-size: clamp(1.25rem, 2vw, 1.75rem);
+  line-height: 1.3;
+  font-weight: var(--weight-medium);
+  max-width: 42ch;
+  text-wrap: pretty;
+  color: var(--sh-on-field);
+}
+
+/* Волна во всю ширину поля, прижата к низу */
+.sh-sea {
+  position: relative;
+  margin: var(--space-4) calc(-1 * var(--space-6)) 0;
+  height: clamp(11rem, 24vw, 19rem);
+}
+
+.sh-sea__svg,
+.sh-sea__marks {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.sh-sea__area {
+  fill: var(--sh-water);
+}
+
+.sh-sea__line {
+  fill: none;
+  stroke: var(--sh-water-line);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.sh-today {
+  stroke: var(--sh-on-field-2);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 5;
+  vector-effect: non-scaling-stroke;
+}
+
+.sh-marker__ring {
+  fill: none;
+  stroke: var(--sh-water-line);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+}
+
+.sh-sea__dots {
+  position: absolute;
+  inset: 0;
+}
+
+/* Точка срока на поверхности воды — кнопка: нажала — список прокрутился к этому сроку */
+.sh-marker__dot {
+  position: absolute;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin: -1.375rem 0 0 -1.375rem;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+
+.sh-marker__dot::before {
+  content: '';
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 3px var(--sh-field);
+  transition: transform var(--dur-press) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sh-marker__dot:hover::before {
+    transform: scale(1.35);
+  }
+}
+
+.sh-marker--red { color: var(--sh-mark-red); }
+.sh-marker--orange { color: var(--sh-mark-orange); }
+.sh-marker--yellow { color: var(--sh-mark-yellow); }
+.sh-marker--green { color: var(--sh-mark-green); }
+
+.sh-ticks {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--space-3);
+  height: 1.5rem;
+  font-size: var(--text-sm);
+  color: var(--sh-on-field-2);
+  pointer-events: none;
+}
+
+.sh-ticks span {
+  position: absolute;
+  translate: -50% 0;
+  white-space: nowrap;
+}
+
+.sh-ticks span:first-child {
+  translate: var(--space-4) 0;
+}
+
+.sh-ticks span.is-today {
+  color: var(--sh-on-field);
+  font-weight: var(--weight-semibold);
+}
+
+/* Капля, которая летит от кнопки в волну */
+.sh-drop {
+  position: fixed;
+  z-index: 50;
+  width: 18px;
+  height: 18px;
+  border-radius: 50% 50% 50% 0;
+  rotate: -45deg;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--surface);
+  pointer-events: none;
+}
+
+/* ───────── Тело: список сроков и боковая колонка ───────── */
+.sh-body {
+  display: grid;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+@media (min-width: 1100px) {
+  .sh-body {
+    grid-template-columns: minmax(0, 1fr) 22rem;
+  }
+}
+
+.sh-h {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.015em;
+  margin-bottom: var(--space-3);
+}
+
+.sh-calm {
+  font-size: var(--text-xl);
+  color: var(--ink-2);
+}
+
+.sh-list,
+.sh-mini {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.sh-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-4) var(--space-4) var(--space-5);
+  background: var(--surface);
+  border-radius: 18px;
+}
+
+/* Полоса статуса слева — цвет из палитры таблицы */
+.sh-row::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 14px;
+  bottom: 14px;
+  width: 4px;
+  border-radius: 4px;
+  background: var(--st-grey-ink);
+}
+
+.sh-row--red::before { background: var(--st-red-ink); }
+.sh-row--orange::before { background: var(--st-orange-ink); }
+.sh-row--yellow::before { background: var(--st-yellow-ink); }
+.sh-row--green::before { background: var(--st-green-ink); }
+
+.sh-row::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 3px var(--accent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+
+.sh-row.is-flash::after {
+  opacity: 1;
+}
+
+.sh-row__main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.sh-row__client {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
+}
+
+.sh-row__what {
+  color: var(--ink-2);
+}
+
+.sh-row__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-2);
+  color: var(--ink-2);
+}
+
+.sh-row__amount {
+  color: var(--ink);
+  font-weight: var(--weight-semibold);
+}
+
+.sh-row__warn {
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--st-yellow-bg);
+  color: var(--st-yellow-ink);
+}
+
+.sh-close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 3.25rem;
+  padding: 0 var(--space-5) 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: var(--weight-semibold);
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-base) ease, color var(--dur-base) ease;
+}
+
+.sh-close:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.sh-close:disabled:not(.is-done) {
+  opacity: 0.6;
+}
+
+.sh-close.is-done {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* Галочка дорисовывается при нажатии */
+.sh-close svg path {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 0;
+}
+
+.sh-close.is-done svg path {
+  animation: sh-check 260ms var(--ease-out) both;
+}
+
+@keyframes sh-check {
+  from {
+    stroke-dashoffset: 24;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sh-close:hover:not(:disabled) {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+}
+
+.sh-side {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.sh-mini li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border-radius: 16px;
+}
+
+.sh-mini__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.sh-mini__text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  color: var(--ink-2);
+}
+
+.sh-mini__text strong {
+  color: var(--ink);
+  font-weight: var(--weight-semibold);
+}
+
+/* ───────── Телефон ───────── */
+@media (max-width: 699px) {
+  .sh-field {
+    margin: calc(-1 * var(--space-5)) calc(-1 * var(--space-4)) 0;
+    border-radius: 0 0 28px 28px;
+    padding: var(--space-6) var(--space-4) 0;
+  }
+
+  .sh-sea {
+    margin: var(--space-3) calc(-1 * var(--space-4)) 0;
+  }
+
+  .sh-row {
+    flex-wrap: wrap;
+  }
+
+  .sh-close {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .sh-ticks span:nth-child(3),
+  .sh-ticks span:nth-child(5) {
+    display: none;
+  }
+}
+
+/* ───────── Счётчик-барабан ───────── */
+.odo {
+  display: inline-flex;
+  font-variant-numeric: tabular-nums;
+  vertical-align: top;
+  line-height: inherit;
+}
+
+.odo__col {
+  display: inline-block;
+  height: 1lh;
+  overflow: hidden;
+}
+
+.odo__strip > span {
+  display: block;
+  height: 1lh;
+}
+
+.odo__strip {
+  display: flex;
+  flex-direction: column;
+  transition: transform var(--dur-count) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-word__in {
+    animation: none;
+  }
+}

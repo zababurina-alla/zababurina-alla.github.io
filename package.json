@@ -9,9 +9,12 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "typecheck": "tsc -b",
-    "test": "vitest run"
+    "test": "vitest run",
+    "contrast": "node --experimental-strip-types --no-warnings scripts/contrast.ts"
   },
   "dependencies": {
+    "@gsap/react": "^2.1.2",
+    "gsap": "^3.15.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },

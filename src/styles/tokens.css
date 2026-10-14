@@ -1,0 +1,238 @@
+/*
+  Токены дизайна кабинета. Единственное место, где задаются цвета, шрифт, размеры, отступы, радиусы, тени и движение.
+  Источник статусных цветов и порогов дней — эталон таблиц «Мамы CRM» (docs/стиль-таблиц.md, п. 1 и п. 10),
+  чтобы сайт и таблица говорили одним языком. Отличия от таблицы помечены «≠ таблица» с причиной.
+  Контраст каждой пары «текст → фон» проверяет `npm run contrast` (таблица — docs/контраст.md) и тест contrast.test.ts.
+  Цвета задаются только в виде #RRGGBB — так их читает проверка контраста.
+
+  Направления: основное «Штемпель» (акцент — штемпельная краска, закрытие срока — оттиск штампа);
+  запасное «Графит» (акцент — цвет шапки таблицы #1F2937) включается атрибутом data-direction="graphite".
+*/
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('../assets/fonts/inter-cyrillic-ext-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('../assets/fonts/inter-cyrillic-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('../assets/fonts/inter-latin-ext-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF,
+    U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('../assets/fonts/inter-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ───────── Светлая тема (по умолчанию) ───────── */
+:root {
+  color-scheme: light;
+
+  /* Поверхности */
+  --canvas: #F3F5F8;        /* фон страницы: холодная бумага при дневном свете */
+  --surface: #FFFFFF;       /* списки, карточка клиента, формы — как ячейки таблицы */
+  --surface-sunk: #F8FAFC;  /* чётная строка списка — зебра таблицы */
+  --line: #E5E7EB;          /* тонкие разделители строк — рамки таблицы */
+  --field-border: #8A94A6;  /* рамка поля ввода: ≥ 3 : 1 к белому (WCAG 1.4.11) */
+
+  /* Текст — как в таблице */
+  --ink: #1F2937;
+  --ink-2: #4B5563;
+
+  /* Акцент — штемпельная краска (синие печати на документах). Синий в таблице не занят статусами (п. 1). */
+  --accent: #2E3A8C;
+  --on-accent: #FFFFFF;
+  --accent-soft: #E8EBF8;
+  --stamp: #2E3A8C;
+  --focus: #2E3A8C;
+
+  /* Статусы — пары из таблицы (п. 1) */
+  --st-red-bg: #FEE2E2;
+  --st-red-ink: #991B1B;
+  --st-orange-bg: #FFEDD5;
+  --st-orange-ink: #9A3412;
+  --st-yellow-bg: #FEF3C7;
+  --st-yellow-ink: #92400E;
+  --st-green-bg: #DCFCE7;
+  --st-green-ink: #166534;
+  --st-grey-bg: #F3F4F6;
+  --st-grey-ink: #5B6472; /* ≠ таблица: там #6B7280 на #F3F4F6 = 4,39 : 1, ниже AA; здесь 5,44 : 1 */
+
+  /* Всплывающие уведомления: тёмная плашка в обеих темах — её видно поверх любого экрана */
+  --toast: #1F2937;
+  --on-toast: #FFFFFF;
+  --toast-action: #C7CEFF;
+
+  /* Тени — только у того, что парит над страницей (окно, уведомление, кнопка «+») */
+  --shadow-float: 0 1px 2px rgb(31 41 55 / 0.06), 0 8px 24px rgb(31 41 55 / 0.12);
+  --shadow-press: 0 1px 1px rgb(31 41 55 / 0.08);
+
+  /* Шрифт: один — Inter. Цифры в суммах и датах — табличные (одинаковой ширины), чтобы столбцы не плясали. */
+  --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-features: 'cv05' 1, 'ss03' 0; /* cv05: «l» с хвостиком — не спутать l / I / 1 в логинах */
+  --num: 'tnum' 1;
+
+  /* Шкала размеров: шаг ≈ 1,2 (малая терция) от основного 17 px. Порог наш: ≥ 16 для основного текста (бриф, п. 5). */
+  --text-sm: 0.9375rem;  /* 15 px — подписи полей, значки статусов, время */
+  --text-md: 1.0625rem;  /* 17 px — основной текст */
+  --text-lg: 1.25rem;    /* 20 px — имя клиента в строке, заголовок группы дня */
+  --text-xl: 1.5rem;     /* 24 px — заголовок блока */
+  --text-2xl: 2rem;      /* 32 px — заголовок экрана; фраза дня на телефоне */
+  --text-3xl: 2.75rem;   /* 44 px — фраза дня на ноутбуке; крупная сумма в карточке */
+  --leading-body: 1.5;
+  --leading-tight: 1.2;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --measure: 68ch;       /* длина строки текста — не больше ~70 знаков */
+
+  /* Отступы — шаг 4 px */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+
+  /* Размеры касания: ≥ 44 px (WCAG 2.5.5, Apple HIG); поля ввода — 52 px, крупнее обычного для 50+ */
+  --tap: 2.75rem;
+  --field-h: 3.25rem;
+  --rail-w: 15rem;        /* левое меню на ноутбуке */
+  --content-max: 60rem;
+
+  /* Радиусы — по иерархии, а не один на всё. Строки списков без радиуса: это лист, а не стопка карточек. */
+  --radius-sm: 6px;   /* значок статуса, подсказка */
+  --radius-md: 10px;  /* кнопка, поле ввода */
+  --radius-lg: 16px;  /* окно, нижняя шторка телефона, карточка клиента */
+  --radius-full: 999px;
+
+  /* Движение — кривые из навыков animate / emil-design-eng (не придуманы) */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);       /* появление, отклик */
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);   /* перемещение по экрану (строка → карточка) */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);    /* нижняя шторка на телефоне */
+  --dur-press: 120ms;   /* нажатие кнопки */
+  --dur-fast: 160ms;    /* смена экрана, всплывающая подсказка, уход уведомления */
+  --dur-base: 220ms;    /* появление уведомления, окна, смена статуса записи */
+  --dur-move: 280ms;    /* строка → карточка клиента */
+  --dur-sheet: 300ms;   /* нижняя шторка */
+  --dur-stamp: 180ms;   /* удар штампа */
+  --dur-count: 400ms;   /* счётчик на «Сегодня», только при изменении числа */
+  --undo-window: 10s;   /* окно «Отменить» (бриф, п. 4) */
+}
+
+/* ───────── Тёмная тема: выбрана вручную ───────── */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --canvas: #12161D;
+  --surface: #1A1F28;
+  --surface-sunk: #161A22;
+  --line: #2A313C;
+  --field-border: #6E7A8C;
+  --ink: #E7EAEF;
+  --ink-2: #A9B1BE;
+  --accent: #AEB8F5;
+  --on-accent: #121633;
+  --accent-soft: #262D52;
+  --stamp: #AEB8F5;
+  --focus: #AEB8F5;
+  --st-red-bg: #3A1517;
+  --st-red-ink: #FFB4B4;
+  --st-orange-bg: #3A2112;
+  --st-orange-ink: #FDBA8C;
+  --st-yellow-bg: #352A10;
+  --st-yellow-ink: #F8D77A;
+  --st-green-bg: #12301F;
+  --st-green-ink: #8EE0A8;
+  --st-grey-bg: #232830;
+  --st-grey-ink: #B3BAC5;
+  --toast: #E7EAEF;
+  --on-toast: #12161D;
+  --toast-action: #2E3A8C;
+  --shadow-float: 0 0 0 1px rgb(255 255 255 / 0.06), 0 8px 24px rgb(0 0 0 / 0.45);
+  --shadow-press: 0 0 0 1px rgb(255 255 255 / 0.06);
+}
+
+/* ───────── Тёмная тема по настройке системы (если вручную не выбрана светлая). Должна совпадать с блоком выше. ───────── */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --canvas: #12161D;
+    --surface: #1A1F28;
+    --surface-sunk: #161A22;
+    --line: #2A313C;
+    --field-border: #6E7A8C;
+    --ink: #E7EAEF;
+    --ink-2: #A9B1BE;
+    --accent: #AEB8F5;
+    --on-accent: #121633;
+    --accent-soft: #262D52;
+    --stamp: #AEB8F5;
+    --focus: #AEB8F5;
+    --st-red-bg: #3A1517;
+    --st-red-ink: #FFB4B4;
+    --st-orange-bg: #3A2112;
+    --st-orange-ink: #FDBA8C;
+    --st-yellow-bg: #352A10;
+    --st-yellow-ink: #F8D77A;
+    --st-green-bg: #12301F;
+    --st-green-ink: #8EE0A8;
+    --st-grey-bg: #232830;
+    --st-grey-ink: #B3BAC5;
+    --toast: #E7EAEF;
+    --on-toast: #12161D;
+    --toast-action: #2E3A8C;
+    --shadow-float: 0 0 0 1px rgb(255 255 255 / 0.06), 0 8px 24px rgb(0 0 0 / 0.45);
+    --shadow-press: 0 0 0 1px rgb(255 255 255 / 0.06);
+  }
+}
+
+/* ───────── Запасное направление «Графит»: акцент = шапка таблицы ───────── */
+:root[data-direction='graphite'] {
+  --accent: #1F2937;
+  --on-accent: #FFFFFF;
+  --accent-soft: #E5E7EB;
+  --stamp: #166534;
+  --focus: #1F2937;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+}
+:root[data-theme='dark'][data-direction='graphite'] {
+  --accent: #E7EAEF;
+  --on-accent: #12161D;
+  --accent-soft: #2A313C;
+  --stamp: #8EE0A8;
+  --focus: #E7EAEF;
+}
+
+/* ───────── Меньше движения: те же сигналы, без перемещений ───────── */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-move: 0ms;
+    --dur-sheet: 160ms;   /* шторка появляется прозрачностью, без выезда */
+    --dur-stamp: 120ms;   /* оттиск проявляется, без удара */
+    --dur-count: 0ms;
+  }
+}

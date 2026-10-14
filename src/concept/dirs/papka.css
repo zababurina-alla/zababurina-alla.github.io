@@ -1,0 +1,313 @@
+/* Направление «Подшивка»: стол, квитанции, картонная папка «Справа». */
+:root[data-direction='papka'] {
+  --canvas: #DCE2DE;
+  --surface: #FFFFFF;
+  --line: #C3CCC6;
+  --ink: #1F2937;
+  --ink-2: #3F4A45;
+  --accent: #2E3A8C;
+  --on-accent: #FFFFFF;
+  --accent-soft: #E8EBF8;
+  --focus: #2E3A8C;
+  --pk-paper: #FFFFFF;
+  --pk-kraft: #C9A97A;
+  --pk-kraft-ink: #3B2A12;
+  --pk-kraft-dark: #B08D5B;
+  --pk-perf: #9AA59F;
+}
+
+:root[data-direction='papka'][data-theme='dark'] {
+  --canvas: #1B211F;
+  --surface: #252D2A;
+  --line: #36413C;
+  --ink: #E6EAE7;
+  --ink-2: #A9B4AE;
+  --accent: #AEB8F5;
+  --on-accent: #121633;
+  --accent-soft: #262D52;
+  --focus: #AEB8F5;
+  --pk-paper: #252D2A;
+  --pk-kraft: #6B5434;
+  --pk-kraft-ink: #F5E6CC;
+  --pk-kraft-dark: #574429;
+  --pk-perf: #4B5752;
+}
+
+.pk {
+  max-width: 82rem;
+  margin: 0 auto;
+  display: grid;
+  gap: var(--space-6);
+}
+
+.pk-head {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.pk-date {
+  font-size: var(--text-lg);
+  color: var(--ink-2);
+}
+
+.pk-title {
+  font-size: clamp(2.5rem, 6vw, 5.5rem);
+  line-height: 0.95;
+  letter-spacing: -0.045em;
+  font-weight: 750;
+}
+
+.pk-lead {
+  font-size: var(--text-lg);
+  color: var(--ink-2);
+  max-width: 48ch;
+}
+
+.pk-desk {
+  display: grid;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+@media (min-width: 1100px) {
+  .pk-desk {
+    grid-template-columns: minmax(0, 1fr) 19rem;
+  }
+}
+
+.pk-slips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+/* Квитанция: корешок с датой | линия отрыва | тело */
+.pk-slip {
+  position: relative;
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  background: var(--pk-paper);
+  border-radius: 6px;
+  box-shadow: 0 1px 1px rgb(31 41 55 / 0.08), 0 6px 18px rgb(31 41 55 / 0.10);
+}
+
+.pk-slip__stub {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  padding: var(--space-4) var(--space-2);
+  border-right: 2px dashed var(--pk-perf);
+  border-radius: 6px 0 0 6px;
+}
+
+.pk-slip__stub--red { background: var(--st-red-bg); color: var(--st-red-ink); }
+.pk-slip__stub--orange { background: var(--st-orange-bg); color: var(--st-orange-ink); }
+.pk-slip__stub--yellow { background: var(--st-yellow-bg); color: var(--st-yellow-ink); }
+.pk-slip__stub--green { background: var(--st-green-bg); color: var(--st-green-ink); }
+
+.pk-stub__day {
+  font-size: 2.75rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.pk-stub__month {
+  font-weight: var(--weight-semibold);
+}
+
+.pk-slip__body {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  background: var(--pk-paper);
+  border-radius: 0 6px 6px 0;
+  touch-action: pan-y;
+  cursor: grab;
+}
+
+.pk-client {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+}
+
+.pk-what {
+  color: var(--ink-2);
+  grid-column: 1;
+}
+
+.pk-meta {
+  grid-column: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.pk-amount {
+  font-weight: var(--weight-semibold);
+}
+
+.pk-warn {
+  grid-column: 1 / -1;
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--st-yellow-bg);
+  color: var(--st-yellow-ink);
+}
+
+.pk-btn {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  align-self: center;
+  min-height: 3.25rem;
+  padding: 0 var(--space-5);
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent);
+  font-weight: 700;
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-base) ease, color var(--dur-base) ease;
+}
+
+.pk-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pk-btn:hover:not(:disabled) {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+}
+
+.pk-stamp {
+  position: absolute;
+  right: 15rem;
+  top: 50%;
+  width: 10rem;
+  margin-top: -2.2rem;
+  color: var(--accent);
+  pointer-events: none;
+  rotate: -9deg;
+  mix-blend-mode: multiply;
+}
+
+:root[data-theme='dark'] .pk-stamp {
+  mix-blend-mode: screen;
+}
+
+.pk-stamp__big {
+  font: 800 30px/1 var(--font);
+  letter-spacing: 0.12em;
+  fill: currentColor;
+}
+
+.pk-stamp__small {
+  font: 700 14px/1 var(--font);
+  fill: currentColor;
+}
+
+/* Картонная папка «Справа» с завязками */
+.pk-folder {
+  position: sticky;
+  top: var(--space-6);
+  display: grid;
+  gap: var(--space-2);
+  min-height: 14rem;
+  padding: var(--space-6) var(--space-5) var(--space-5);
+  background: var(--pk-kraft);
+  color: var(--pk-kraft-ink);
+  border-radius: 4px 14px 14px 14px;
+  box-shadow: 0 1px 1px rgb(31 41 55 / 0.1), 0 10px 24px rgb(31 41 55 / 0.14);
+}
+
+.pk-folder__tab {
+  position: absolute;
+  left: 0;
+  top: -14px;
+  width: 7rem;
+  height: 16px;
+  background: var(--pk-kraft);
+  border-radius: 8px 8px 0 0;
+}
+
+.pk-folder__label {
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-bottom: 2px solid var(--pk-kraft-ink);
+  padding-bottom: var(--space-2);
+}
+
+.pk-folder__count {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+}
+
+.pk-folder__strings {
+  position: absolute;
+  right: 22px;
+  bottom: 22px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 3px solid var(--pk-kraft-dark);
+}
+
+@media (max-width: 699px) {
+  .pk-slip {
+    grid-template-columns: 4.75rem minmax(0, 1fr);
+  }
+
+  .pk-stub__day {
+    font-size: 2rem;
+  }
+
+  .pk-slip__body {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--space-4);
+  }
+
+  .pk-btn {
+    grid-column: 1;
+    grid-row: auto;
+    margin-top: var(--space-3);
+  }
+
+  .pk-stamp {
+    right: var(--space-4);
+    width: 8rem;
+  }
+
+  .pk-folder {
+    position: fixed;
+    left: var(--space-4);
+    right: 5.5rem;
+    bottom: calc(4rem + var(--space-4) + env(safe-area-inset-bottom));
+    top: auto;
+    min-height: 0;
+    padding: var(--space-3) var(--space-4);
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    z-index: 9;
+  }
+
+  .pk-folder__label {
+    font-size: var(--text-lg);
+    border: 0;
+    padding: 0;
+  }
+
+  .pk-folder__tab,
+  .pk-folder__strings {
+    display: none;
+  }
+}
