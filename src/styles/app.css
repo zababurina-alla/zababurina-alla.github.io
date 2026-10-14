@@ -3538,3 +3538,48 @@ body {
   display: grid;
   gap: 0;
 }
+
+/* Экран входа (живые данные): карточка по центру, кнопка Google, понятная ошибка. */
+.login {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: var(--space-4);
+  background: var(--canvas);
+}
+
+.login__card {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-4);
+  width: min(100%, 26rem);
+  padding: var(--space-7) var(--space-5);
+  text-align: center;
+}
+
+.login__mark {
+  width: 3rem;
+  height: 3rem;
+  font-size: var(--text-xl);
+}
+
+.login__title {
+  margin: 0;
+  font-size: var(--text-2xl);
+  letter-spacing: -0.02em;
+}
+
+.login__text {
+  margin: 0;
+  color: var(--ink-2);
+  max-width: 32ch;
+}
+
+.login__button {
+  min-height: 44px;
+}
+
+.login__error {
+  margin: 0;
+  color: var(--st-red-ink);
+}

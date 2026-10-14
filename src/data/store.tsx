@@ -6,17 +6,16 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { fakeServer } from './fakeServer';
+import { api, liveApi } from './session';
+import { ApiError } from './transport';
 import { kvAll, kvDelete, kvSet } from './idb';
 import { Outbox } from './outbox';
 import type { Counters, OutboxEvent, OutboxItem } from './outbox';
 import { newRequestId } from './api';
-import type { CabinetApi, Change, WriteOp } from './api';
+import type { Change, Snapshot, WriteOp } from './api';
 import type { Activity, Client, Deadline, Payment, Question, SaveState, Task } from './types';
 import { TODAY, addDays, fmtDate } from '../lib/dates';
 import { play } from '../lib/sound';
-
-// Адаптер данных: сейчас выдуманный сервер; на этапе 4 здесь будет живой адаптер к Apps Script.
-const api: CabinetApi = fakeServer;
 
 // Опрос изменений из таблицы: бриф — раз в 30–60 с. Квоты Apps Script дневного лимита на запросы не задают
 // (developers.google.com/apps-script/guides/services/quotas), но одновременных выполнений — 30 на владельца.
@@ -65,6 +64,8 @@ interface Store {
   retry: (requestId: string) => void;
   discard: (requestId: string) => void;
   syncNow: () => Promise<void>;
+  /** Пароль от кабинета налоговой: отдельный запрос по явному «Показать», мимо очереди и хранилища. */
+  revealPassword: (clientId: string) => Promise<{ login: string; password: string; ttlSeconds: number }>;
   /** Режим отладки: правка «извне» (в таблице или через бота) и рычаги сети. */
   external: (kind: ExternalKind) => string;
   setOnline: (on: boolean) => void;
@@ -223,6 +224,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [applyChanges]);
 
   // Загрузка: снимок таблицы, затем очередь, оставшаяся с прошлого раза (показываем её поверх снимка).
+  const applySnapshot = useCallback((snap: Snapshot) => {
+    setClients(snap.clients); setPayments(snap.payments); setActivity(snap.activity); setTasks(snap.tasks); setQuestions(snap.questions);
+    setDeadlines(snap.deadlines.filter((d) => d.status !== 'done'));
+    setClosed(snap.deadlines.filter((d) => d.status === 'done' && d.closedAt === TODAY)
+      .map((d) => ({ deadline: d, next: null, save: 'saved', requestId: `snap-${d.id}`, by: 'бот' })));
+    cursorRef.current = snap.cursor; setCursor(snap.cursor);
+  }, []);
+
   useEffect(() => {
     let alive = true;
     const ob = new Outbox(api, {
@@ -235,11 +244,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       try {
         const snap = await api.snapshot();
         if (!alive) return;
-        setClients(snap.clients); setPayments(snap.payments); setActivity(snap.activity); setTasks(snap.tasks); setQuestions(snap.questions);
-        setDeadlines(snap.deadlines.filter((d) => d.status !== 'done'));
-        setClosed(snap.deadlines.filter((d) => d.status === 'done' && d.closedAt === TODAY)
-          .map((d) => ({ deadline: d, next: null, save: 'saved', requestId: `snap-${d.id}`, by: 'бот' })));
-        cursorRef.current = snap.cursor; setCursor(snap.cursor);
+        applySnapshot(snap);
       } catch {
         setOnlineState(false);
       }
@@ -248,7 +253,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (alive) setLoaded(true);
     })();
     return () => { alive = false; };
-  }, [applyOptimistic]);
+  }, [applyOptimistic, applySnapshot]);
 
   const syncNow = useCallback(async () => {
     try {
@@ -258,10 +263,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       cursorRef.current = Math.max(cursorRef.current, res.cursor);
       setCursor(cursorRef.current);
       void outboxRef.current?.kick(true);
-    } catch {
+    } catch (e) {
+      // Журнал таблицы хранит 30 дней: курсор старше — берём снимок заново, неотправленное снова поверх.
+      if (e instanceof ApiError && e.code === 'CURSOR_EXPIRED') {
+        try {
+          applySnapshot(await api.snapshot());
+          for (const it of outboxRef.current?.list() ?? []) applyOptimistic(it.op);
+          return;
+        } catch { /* ниже — «нет связи» */ }
+      }
+      // Вход не удался — экран входа покажет App; это не обрыв связи.
+      if (e instanceof ApiError && (e.code === 'AUTH_REQUIRED' || e.code === 'FORBIDDEN')) return;
       setOnlineState(false);
     }
-  }, [applyChanges]);
+  }, [applyChanges, applySnapshot, applyOptimistic]);
 
   // Обратная связь из таблицы: каждые 30 с на открытой вкладке и сразу при возврате во вкладку / появлении сети.
   useEffect(() => {
@@ -381,16 +396,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (on) void syncNow();
   }, [syncNow]);
 
+  const revealPassword = useCallback(async (clientId: string) => (liveApi
+    ? liveApi.revealPassword(clientId)
+    : { login: 'демо-логин', password: 'демо-пароль-не-настоящий', ttlSeconds: 30 }), []);
+
   const failNextWrite = useCallback(() => { fakeServer.failNext = 'SERVER'; }, []);
   const setSlow = useCallback((on: boolean) => { fakeServer.slow = on; }, []);
   const setMaintenance = useCallback((on: boolean) => { fakeServer.maintenance = on; if (!on) void outboxRef.current?.kick(true); }, []);
 
   const value = useMemo<Store>(() => ({
     loaded, online, clients, deadlines, payments, activity, tasks, questions, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, addTask, toggleTask, resolveConflict,
+    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, addTask, toggleTask, resolveConflict, revealPassword,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance,
   }), [loaded, online, clients, deadlines, payments, activity, tasks, questions, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, addTask, toggleTask, resolveConflict,
+    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, addTask, toggleTask, resolveConflict, revealPassword,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

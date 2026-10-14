@@ -2,8 +2,9 @@
 // всё равно видны в коде страницы. Секретов здесь нет и быть не должно (контракт, раздел 3: список почт — на сервере).
 // Пока API_URL пуст — сайт работает на выдуманном сервере (src/data/fakeServer.ts).
 
-/** POST-адрес Apps Script: https://script.google.com/macros/s/<DEPLOYMENT_ID>/exec */
-export const API_URL = '';
+/** POST-адрес Apps Script: https://script.google.com/macros/s/<DEPLOYMENT_ID>/exec.
+ *  Для проверки у себя можно задать при запуске: VITE_API_URL=http://localhost:8787 npm run dev */
+export const API_URL: string = import.meta.env.VITE_API_URL ?? '';
 
 /** OAuth client ID проекта Google Cloud «zababurina-alla» (…apps.googleusercontent.com). */
 export const GOOGLE_CLIENT_ID = '1078049272948-bnvonl9qah7npdq63gktbio1rm2lbgvb.apps.googleusercontent.com';

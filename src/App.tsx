@@ -18,6 +18,8 @@ import { Skeleton } from './app/Skeleton';
 import { DebugDock } from './app/DebugDock';
 import { CommandPalette } from './app/CommandPalette';
 import { ConflictDialog, FailureWatcher, OfflineBanner } from './app/SyncUi';
+import { Login } from './app/Login';
+import { auth, useAuth } from './data/session';
 
 function Screens() {
   const route = useRoute();
@@ -71,6 +73,9 @@ function Screens() {
 }
 
 export function App() {
+  const state = useAuth();
+  // Живые данные — только после входа: снимок таблицы без сеанса сервер не отдаст.
+  if (auth && state.status !== 'signedIn') return <Login />;
   return (
     <StoreProvider>
       <ToastProvider>

@@ -1,5 +1,6 @@
 // Оболочка: левое меню на ноутбуке; верхняя полоса, нижние вкладки и кнопка «+» на телефоне.
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { auth, useAuth } from '../data/session';
 import { getTheme, subscribeTheme, toggleTheme } from '../lib/theme';
 import type { ReactNode } from 'react';
 import { useStore } from '../data/store';
@@ -97,6 +98,22 @@ function SyncStatus() {
   );
 }
 
+/** Кто вошёл. На выдуманных данных — честная пометка вместо пользователя. */
+function Me() {
+  const state = useAuth();
+  if (!auth || !state.user) {
+    return <span className="me"><span className="avatar avatar--sm" aria-hidden="true">Д</span><span className="me__text">Выдуманные данные</span></span>;
+  }
+  const initials = state.user.name.split(/\s+/).map((w) => w[0] ?? '').join('').slice(0, 2).toUpperCase();
+  return (
+    <span className="me">
+      <span className="avatar avatar--sm" aria-hidden="true">{initials}</span>
+      <span className="me__text">{state.user.name}</span>
+      <button type="button" className="linklike me__out" onClick={() => auth?.signOut()}>Выйти</button>
+    </span>
+  );
+}
+
 export function Shell({ route, children }: { route: RouteName; children: ReactNode }) {
   const { deadlines } = useStore();
   const ui = useUi();
@@ -169,7 +186,7 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
               <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
             </button>
             <SoundSettings on={soundOn} setOn={setSoundOn} />
-            <span className="me"><span className="avatar avatar--sm" aria-hidden="true">АЕ</span><span className="me__text">Вход через Google</span></span>
+            <Me />
           </div>
         </div>
       </aside>

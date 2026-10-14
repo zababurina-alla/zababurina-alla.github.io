@@ -1,6 +1,7 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "cabinet-dev", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev", "--", "--port", "5179", "--strictPort"], "port": 5179 }
+    {"name": "cabinet-dev", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev", "--", "--port", "5179", "--strictPort"], "port": 5179},
+    {"name": "cabinet-mock", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev:mock"], "port": 5179}
   ]
 }

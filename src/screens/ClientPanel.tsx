@@ -17,38 +17,65 @@ type Tab = 'overview' | 'deadlines' | 'payments' | 'history';
 // Пароль показывается 30 с и исчезает; не хранится ни в памяти страницы дольше показа, ни в черновиках (бриф, 6б).
 const PASSWORD_SHOW_MS = 30_000;
 
-function PasswordReveal() {
-  const [stage, setStage] = useState<'hidden' | 'confirm' | 'shown'>('hidden');
+function PasswordReveal({ clientId }: { clientId: string }) {
+  const store = useStore();
+  const [stage, setStage] = useState<'hidden' | 'confirm' | 'loading' | 'shown'>('hidden');
+  // Логин и пароль — только в состоянии этого блока и только на время показа; уходит — стираем.
+  const [secret, setSecret] = useState<{ login: string; password: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [left, setLeft] = useState(30);
   useEffect(() => {
     if (stage !== 'shown') return;
     const started = Date.now();
     const t = window.setInterval(() => {
       const rest = PASSWORD_SHOW_MS - (Date.now() - started);
-      if (rest <= 0) { setStage('hidden'); window.clearInterval(t); } else setLeft(Math.ceil(rest / 1000));
+      if (rest <= 0) { setSecret(null); setStage('hidden'); window.clearInterval(t); } else setLeft(Math.ceil(rest / 1000));
     }, 250);
-    return () => window.clearInterval(t);
+    return () => { window.clearInterval(t); setSecret(null); };
   }, [stage]);
-  if (stage === 'confirm') {
+  const reveal = async () => {
+    setStage('loading');
+    setError(null);
+    try {
+      const r = await store.revealPassword(clientId);
+      setSecret({ login: r.login, password: r.password });
+      setStage('shown');
+    } catch (e) {
+      // RATE_LIMIT и прочее — сами не повторяем (контракт, у. 10): говорим, что случилось.
+      setError(e instanceof Error && e.message ? e.message : 'Не получилось показать пароль — попробуйте ещё раз');
+      setStage('hidden');
+    }
+  };
+  if (stage === 'confirm' || stage === 'loading') {
     return (
       <div className="pw pw--confirm" role="group" aria-label="Подтвердите показ пароля">
         <p>Показать пароль от кабинета налоговой на 30 секунд?</p>
         <div className="row-gap">
-          <button type="button" className="btn btn--primary btn--sm" onClick={() => setStage('shown')}>Показать</button>
-          <button type="button" className="btn btn--secondary btn--sm" onClick={() => setStage('hidden')}>Не нужно</button>
+          <button type="button" className="btn btn--primary btn--sm" disabled={stage === 'loading'} onClick={() => void reveal()}>
+            {stage === 'loading' ? 'Запрашиваю…' : 'Показать'}
+          </button>
+          <button type="button" className="btn btn--secondary btn--sm" disabled={stage === 'loading'} onClick={() => setStage('hidden')}>Не нужно</button>
         </div>
       </div>
     );
   }
-  if (stage === 'shown') {
+  if (stage === 'shown' && secret) {
     return (
       <div className="pw">
-        <code className="pw__value">демо-пароль-не-настоящий</code>
+        <span className="sub">Логин</span>
+        <code className="pw__value">{secret.login}</code>
+        <span className="sub">Пароль</span>
+        <code className="pw__value">{secret.password}</code>
         <span className="sub">исчезнет через {left} с</span>
       </div>
     );
   }
-  return <button type="button" className="btn btn--secondary btn--sm" onClick={() => setStage('confirm')}><Icon name="eye" />Показать пароль</button>;
+  return (
+    <>
+      <button type="button" className="btn btn--secondary btn--sm" onClick={() => setStage('confirm')}><Icon name="eye" />Показать пароль</button>
+      {error && <p className="field__error" role="alert">{error}</p>}
+    </>
+  );
 }
 
 function PhoneField({ clientId, phone, version }: { clientId: string; phone: string; version: number }) {
@@ -140,7 +167,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                     : <p className="row-gap"><span className="num">до {fmtDate(c.keyUntil ?? '')}</span><StatusPill status={statusByDays(keyDays)}>{daysLabel(keyDays)}</StatusPill></p>}</div>
                   <div><h3 className="cp__h">Ключ выпущен</h3><p>{c.keyIssuer || '—'}</p></div>
                   <div><h3 className="cp__h">Телефон</h3><PhoneField clientId={c.id} phone={c.phone} version={c.version} /></div>
-                  <div><h3 className="cp__h">Пароль от кабинета</h3><PasswordReveal /></div>
+                  <div><h3 className="cp__h">Пароль от кабинета</h3><PasswordReveal clientId={c.id} /></div>
                 </section>
                 <section className="cp__block">
                   <h3 className="cp__h">КВЕД</h3>
