@@ -306,6 +306,21 @@ body {
 .me__text {
   max-width: 6rem;
   line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Имя и «Выйти» — столбиком: в узком меню в строку не помещаются. */
+.me__who {
+  display: grid;
+  justify-items: start;
+  gap: 2px;
+}
+
+.me__out {
+  font-size: 0.8125rem;
+  color: var(--ink-2);
 }
 
 .sync {

@@ -23,15 +23,22 @@ const TTL_MS = Number(process.env.MOCK_SESSION_TTL ?? 12 * 3600) * 1000;
 const fail = (code: string, message: string, extra: Record<string, unknown> = {}, current: unknown = null) =>
   ({ ok: false, error: { code, message, retryable: false, field: null, ...extra }, current });
 
+function allowedEmails(): string[] {
+  const fromFile = existsSync('.mock-allowed') ? readFileSync('.mock-allowed', 'utf8') : '';
+  return (process.env.MOCK_ALLOWED ?? fromFile).split(/[,\s]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
+}
+
+function fakeLogin(email: string): { email: string; name: string } | string {
+  return allowedEmails().includes(email.toLowerCase()) ? { email, name: 'Проверка' } : 'FORBIDDEN';
+}
+
 async function verifyIdToken(idToken: string, nonce: string): Promise<{ email: string; name: string } | string> {
   const r = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`, { signal: AbortSignal.timeout(10_000) });
   if (!r.ok) return 'AUTH_INVALID';
   const t = await r.json() as Record<string, string>;
   const issOk = t.iss === 'accounts.google.com' || t.iss === 'https://accounts.google.com';
   if (t.aud !== CLIENT_ID || !issOk || Number(t.exp) * 1000 < Date.now() || t.email_verified !== 'true' || t.nonce !== nonce) return 'AUTH_INVALID';
-  const fromFile = existsSync('.mock-allowed') ? readFileSync('.mock-allowed', 'utf8') : '';
-  const allowed = (process.env.MOCK_ALLOWED ?? fromFile).split(/[,\s]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
-  if (!allowed.includes((t.email ?? '').toLowerCase())) return 'FORBIDDEN';
+  if (!allowedEmails().includes((t.email ?? '').toLowerCase())) return 'FORBIDDEN';
   return { email: t.email ?? '', name: t.given_name ?? t.name ?? t.email ?? '' };
 }
 
@@ -46,7 +53,10 @@ async function handle(ctx: Ctx, body: { action: string; payload?: Record<string,
   if (body.action === 'auth.login') {
     const nonce = String(p.nonce ?? '');
     if (!ctx.nonces.delete(nonce)) return fail('AUTH_INVALID', 'Не получилось войти — попробуйте ещё раз');
-    const who = await verifyIdToken(String(p.idToken ?? ''), nonce);
+    // Учебный вход без Google («mock:почта») — для автоматических проверок, где всплывающее окно Google не открыть.
+    // Только на этом компьютере и только для почт из списка допуска; настоящий токен проверяется у Google.
+    const token = String(p.idToken ?? '');
+    const who = token.startsWith('mock:') ? fakeLogin(token.slice(5)) : await verifyIdToken(token, nonce);
     if (who === 'FORBIDDEN') return fail('FORBIDDEN', 'У этого аккаунта нет доступа к кабинету');
     if (typeof who === 'string') return fail('AUTH_INVALID', 'Не получилось войти — попробуйте ещё раз');
     const session = `mock-${randomUUID()}`;

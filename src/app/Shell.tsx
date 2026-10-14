@@ -108,8 +108,10 @@ function Me() {
   return (
     <span className="me">
       <span className="avatar avatar--sm" aria-hidden="true">{initials}</span>
-      <span className="me__text">{state.user.name}</span>
-      <button type="button" className="linklike me__out" onClick={() => auth?.signOut()}>Выйти</button>
+      <span className="me__who">
+        <span className="me__text">{state.user.name}</span>
+        <button type="button" className="linklike me__out" onClick={() => auth?.signOut()}>Выйти</button>
+      </span>
     </span>
   );
 }
