@@ -12,7 +12,7 @@ import type { Counters, OutboxEvent, OutboxItem } from './outbox';
 import { newRequestId } from './api';
 import type { CabinetApi, Change, WriteOp } from './api';
 import type { Activity, Client, Deadline, Payment, SaveState, Task } from './types';
-import { TODAY, daysBetween, fmtDate } from '../lib/dates';
+import { TODAY, addDays, fmtDate } from '../lib/dates';
 import { play } from '../lib/sound';
 
 // Адаптер данных: сейчас выдуманный сервер; на этапе 4 здесь будет живой адаптер к Apps Script.
@@ -51,11 +51,11 @@ interface Store {
   conflict: Conflict | null;
   client: (id: string) => Client | undefined;
   /** hideAfterMs — убрать строку с экрана не сразу (успеть показать анимацию); в очередь запись встаёт сразу. */
-  closeDeadline: (id: string, onSaved?: (next: Deadline | null) => void, hideAfterMs?: number) => CloseResult;
+  closeDeadline: (id: string, onSaved?: (next: Deadline | null, notifyAt: string | null) => void, hideAfterMs?: number) => CloseResult;
   reopenDeadline: (id: string) => void;
   addPayment: (p: Omit<Payment, 'id' | 'source' | 'save'>, onSaved?: () => void) => string;
   removePayment: (id: string) => void;
-  addClient: (c: Omit<Client, 'id' | 'version'>, onSaved?: (created: Deadline[]) => void) => Client;
+  addClient: (c: Omit<Client, 'id' | 'version'>, onSaved?: (created: Deadline[], client: Client) => void) => Client;
   /** baseVersion — версия, которую мама видела, когда начала править (бриф, п. 6: конфликт). */
   updatePhone: (clientId: string, phone: string, baseVersion: number) => void;
   addTask: (t: Omit<Task, 'id' | 'version' | 'done'>) => void;
@@ -68,6 +68,8 @@ interface Store {
   external: (kind: ExternalKind) => string;
   setOnline: (on: boolean) => void;
   failNextWrite: () => void;
+  setSlow: (on: boolean) => void;
+  setMaintenance: (on: boolean) => void;
 }
 
 const Ctx = createContext<Store | null>(null);
@@ -96,7 +98,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [cursor, setCursor] = useState(0);
   const cursorRef = useRef(0);
   const mine = useRef(new Set<string>());
-  const callbacks = useRef(new Map<string, (changes: Change[]) => void>());
+  const callbacks = useRef(new Map<string, (changes: Change[], result: { notifyAt?: string }) => void>());
   const outboxRef = useRef<Outbox | null>(null);
   const handlerRef = useRef<(e: OutboxEvent) => void>(() => undefined);
 
@@ -116,14 +118,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (ch.op === 'delete') setClients((xs) => xs.filter((x) => x.id !== ch.id));
         else setClients((xs) => upsert(xs, ch.record as Client));
       } else if (ch.entity === 'deadline') {
+        const rec = ch.record as Deadline | undefined;
         if (ch.op === 'delete') {
-          setDeadlines((xs) => {
-            const gone = xs.find((x) => x.id === ch.id);
-            // Закрыли не с этого сайта (бот, таблица) — тоже попадает в «Закрыто сегодня».
-            if (gone && !own) setClosed((cs) => [{ deadline: gone, next: null, save: 'saved', requestId: `${ch.origin}-${ch.cursor}`, by: 'бот' }, ...cs]);
-            return xs.filter((x) => x.id !== ch.id);
-          });
-        } else setDeadlines((xs) => upsert(xs, ch.record as Deadline));
+          // Ушёл в архив (через 3 дня после закрытия) — из открытых убрать; «Закрыто сегодня» не трогаем.
+          setDeadlines((xs) => xs.filter((x) => x.id !== ch.id));
+        } else if (rec?.status === 'done') {
+          // Закрыт (с сайта, в таблице или ботом): из открытых — в «Закрыто сегодня».
+          setDeadlines((xs) => xs.filter((x) => x.id !== ch.id));
+          setClosed((cs) => (cs.some((c) => c.deadline.id === ch.id)
+            ? cs.map((c) => (c.deadline.id === ch.id ? { ...c, save: 'saved' } : c))
+            : [{ deadline: rec, next: null, save: 'saved', requestId: own ? ch.origin : `${ch.origin}-${ch.cursor}`, by: own ? 'сайт' : 'бот' }, ...cs]));
+        } else if (rec) {
+          // Открытый срок: новый, изменённый или возвращённый после отмены закрытия.
+          setDeadlines((xs) => upsert(xs, rec));
+          setClosed((cs) => cs.filter((c) => c.deadline.id !== ch.id));
+        }
       } else if (ch.entity === 'payment') {
         if (ch.op === 'delete') setPayments((xs) => xs.filter((x) => x.id !== ch.id));
         else {
@@ -179,7 +188,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (e.type === 'applied') {
         setOnlineState(true);
         applyChanges(e.result.changes);
-        callbacks.current.get(op.requestId)?.(e.result.changes);
+        callbacks.current.get(op.requestId)?.(e.result.changes, e.result);
         callbacks.current.delete(op.requestId);
         return;
       }
@@ -217,7 +226,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       try {
         const snap = await api.snapshot();
         if (!alive) return;
-        setClients(snap.clients); setDeadlines(snap.deadlines); setPayments(snap.payments); setActivity(snap.activity); setTasks(snap.tasks);
+        setClients(snap.clients); setPayments(snap.payments); setActivity(snap.activity); setTasks(snap.tasks);
+        setDeadlines(snap.deadlines.filter((d) => d.status !== 'done'));
+        setClosed(snap.deadlines.filter((d) => d.status === 'done' && d.closedAt === TODAY)
+          .map((d) => ({ deadline: d, next: null, save: 'saved', requestId: `snap-${d.id}`, by: 'бот' })));
         cursorRef.current = snap.cursor; setCursor(snap.cursor);
       } catch {
         setOnlineState(false);
@@ -251,7 +263,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => { window.clearInterval(t); document.removeEventListener('visibilitychange', tick); window.removeEventListener('online', tick); };
   }, [syncNow]);
 
-  const send = useCallback((op: WriteOp, label: string, onApplied?: (changes: Change[]) => void, showAfterMs = 0) => {
+  const send = useCallback((op: WriteOp, label: string, onApplied?: (changes: Change[], result: { notifyAt?: string }) => void, showAfterMs = 0) => {
     mine.current.add(op.requestId);
     if (onApplied) callbacks.current.set(op.requestId, onApplied);
     // Запись — в очередь сразу; на экране — сразу или после короткой анимации (таймер, не кадры анимации:
@@ -263,19 +275,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const client = useCallback((id: string) => clients.find((c) => c.id === id), [clients]);
 
-  const closeDeadline = useCallback((id: string, onSaved?: (next: Deadline | null) => void, hideAfterMs = 0): CloseResult => {
+  const closeDeadline = useCallback((id: string, onSaved?: (next: Deadline | null, notifyAt: string | null) => void, hideAfterMs = 0): CloseResult => {
     const d = deadlines.find((x) => x.id === id);
     if (!d) return { ok: false, reason: 'Срок не найден — обновите страницу' };
     // Проверка периода — и здесь, и на сервере (бриф, п. 3: баг с декларациями III кв., закрытыми в июле).
-    if (d.periodEnds && daysBetween(TODAY, d.periodEnds) > 0) {
-      return { ok: false, reason: `Период ещё не закончился — закрыть можно с ${fmtDate(d.periodEnds)}` };
+    // periodEnd — последний день периода (контракт v2, п. 22): закрыть можно со следующего дня.
+    if (d.periodEnd && TODAY <= d.periodEnd) {
+      return { ok: false, reason: `Период ещё не закончился — закрыть можно с ${fmtDate(addDays(d.periodEnd, 1))}` };
     }
     const requestId = newRequestId();
-    send({ kind: 'closeDeadline', requestId, id, baseVersion: d.version }, `Закрыть «${d.what}»`, (changes) => {
-      const next = (changes.find((c) => c.entity === 'deadline' && c.op === 'upsert')?.record as Deadline | undefined) ?? null;
+    send({ kind: 'closeDeadline', requestId, id, baseVersion: d.version }, `Закрыть «${d.what}»`, (changes, result) => {
+      const next = (changes.find((c) => c.entity === 'deadline' && c.op === 'upsert' && (c.record as Deadline).status !== 'done')?.record as Deadline | undefined) ?? null;
       setClosed((cs) => cs.map((c) => (c.requestId === requestId ? { ...c, save: 'saved', next } : c)));
       if (next) markFresh([next.id]);
-      onSaved?.(next);
+      onSaved?.(next, result.notifyAt ?? null);
     }, hideAfterMs);
     return { ok: true };
   }, [deadlines, send, markFresh]);
@@ -302,13 +315,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     send({ kind: 'cancelPayment', requestId: newRequestId(), id }, 'Отменить платёж');
   }, [send]);
 
-  const addClient = useCallback((data: Omit<Client, 'id' | 'version'>, onSaved?: (created: Deadline[]) => void) => {
+  const addClient = useCallback((data: Omit<Client, 'id' | 'version'>, onSaved?: (created: Deadline[], client: Client) => void) => {
     const requestId = newRequestId();
-    const c: Client = { ...data, id: `c-${requestId.slice(0, 8)}`, version: 1 };
-    send({ kind: 'addClient', requestId, client: c }, `Новый клиент ${c.name}`, (changes) => {
-      onSaved?.(changes.filter((ch) => ch.entity === 'deadline').map((ch) => ch.record as Deadline));
+    // Временный id только для экрана; настоящий выдаёт сервер (контракт v2, п. 8) — подменяем по ответу.
+    const temp: Client = { ...data, id: `tmp-${requestId.slice(0, 8)}`, version: 0 };
+    send({ kind: 'addClient', requestId, client: temp }, `Новый клиент ${temp.name}`, (changes) => {
+      const real = changes.find((ch) => ch.entity === 'client')?.record as Client | undefined;
+      setClients((xs) => xs.filter((x) => x.id !== temp.id));
+      onSaved?.(changes.filter((ch) => ch.entity === 'deadline').map((ch) => ch.record as Deadline), real ?? temp);
     });
-    return c;
+    return temp;
   }, [send]);
 
   const updatePhone = useCallback((clientId: string, phone: string, baseVersion: number) => {
@@ -355,14 +371,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [syncNow]);
 
   const failNextWrite = useCallback(() => { fakeServer.failNext = 'SERVER'; }, []);
+  const setSlow = useCallback((on: boolean) => { fakeServer.slow = on; }, []);
+  const setMaintenance = useCallback((on: boolean) => { fakeServer.maintenance = on; if (!on) void outboxRef.current?.kick(true); }, []);
 
   const value = useMemo<Store>(() => ({
     loaded, online, clients, deadlines, payments, activity, tasks, closed, fresh, pending, counters, cursor, conflict,
     client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, addTask, toggleTask, resolveConflict,
-    retry, discard, syncNow, external, setOnline, failNextWrite,
+    retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance,
   }), [loaded, online, clients, deadlines, payments, activity, tasks, closed, fresh, pending, counters, cursor, conflict,
     client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, addTask, toggleTask, resolveConflict,
-    retry, discard, syncNow, external, setOnline, failNextWrite]);
+    retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

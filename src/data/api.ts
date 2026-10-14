@@ -32,14 +32,18 @@ export type WriteOp =
   | { kind: 'addPayment'; requestId: string; payment: Payment }
   | { kind: 'cancelPayment'; requestId: string; id: string }
   | { kind: 'addClient'; requestId: string; client: Client }
-  | { kind: 'updateClient'; requestId: string; id: string; baseVersion: number; patch: Partial<Pick<Client, 'phone' | 'bank' | 'keyUntil'>> }
+  | { kind: 'updateClient'; requestId: string; id: string; baseVersion: number; patch: Partial<Pick<Client, 'phone' | 'keyIssuer' | 'keyUntil'>> }
   | { kind: 'createTask'; requestId: string; task: Task }
   | { kind: 'completeTask'; requestId: string; id: string; done: boolean };
 
-export type ErrorCode = 'NETWORK' | 'CONFLICT' | 'PERIOD_OPEN' | 'NOT_FOUND' | 'SERVER' | 'AUTH';
+export type ErrorCode = 'NETWORK' | 'CONFLICT' | 'PERIOD_OPEN' | 'NOT_FOUND' | 'SERVER' | 'VALIDATION' | 'UNDO_TOO_LATE'
+  | 'DUPLICATE' | 'BUSY' | 'MAINTENANCE' | 'QUOTA' | 'RATE_LIMIT' | 'AUTH_EXPIRED' | 'AUTH_REQUIRED' | 'FORBIDDEN';
+
+/** Коды, при которых сайт повторяет запись сам, с паузой (контракт v2, раздел 9). */
+export const RETRYABLE: ReadonlySet<ErrorCode> = new Set<ErrorCode>(['NETWORK', 'BUSY', 'MAINTENANCE', 'QUOTA', 'RATE_LIMIT', 'AUTH_EXPIRED']);
 
 export type WriteResult =
-  | { ok: true; changes: Change[]; cursor: number }
+  | { ok: true; changes: Change[]; cursor: number; /** закрытие срока: когда уйдут уведомления (через 2 мин) */ notifyAt?: string }
   | { ok: false; code: ErrorCode; message: string; current?: Client | Deadline };
 
 export interface CabinetApi {

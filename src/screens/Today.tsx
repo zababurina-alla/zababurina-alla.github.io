@@ -71,7 +71,6 @@ export function Today() {
   const overdue = withDays.filter((x) => x.days < 0);
   const burning = withDays.filter((x) => x.days >= 0 && x.days <= 3);
   const week = withDays.filter((x) => x.days <= 7);
-  const dueWeekKop = week.reduce((s, x) => s + (x.d.kopecks ?? 0), 0);
   const keys = store.clients.filter((c) => c.keyUntil && daysBetween(TODAY, c.keyUntil) <= 14)
     .sort((a, b) => (a.keyUntil ?? '').localeCompare(b.keyUntil ?? ''));
   const received = store.payments.filter((p) => p.date.startsWith('2026-10')).reduce((s, p) => s + p.kopecks, 0);
@@ -117,9 +116,9 @@ export function Today() {
 
       <section className="kpis reveal" aria-label="Сводка дня">
         <div className="kpi kpi--wide" onPointerMove={spotlight}>
-          <p className="kpi__label">К оплате клиентами до {fmtDate('2026-10-21').slice(0, 5)}</p>
-          <p className="kpi__value"><RollingNumber value={dueWeekKop} format={(n) => formatMoney(n)} /></p>
-          <p className="kpi__note">Получено в октябре <RollingNumber value={received} format={(n) => formatMoney(n)} /> <span className="up"><Icon name="arrowUp" size={14} />{growth}{' '}% к{' '}сентябрю</span></p>
+          <p className="kpi__label">Получено от клиентов в октябре</p>
+          <p className="kpi__value"><RollingNumber value={received} format={(n) => formatMoney(n)} /></p>
+          <p className="kpi__note">в сентябре {formatMoney(SEPTEMBER_TOTAL * 100)} <span className="up"><Icon name="arrowUp" size={14} />{growth}{' '}% к{' '}сентябрю</span></p>
           <AreaChart />
         </div>
         <button type="button" className="kpi kpi--btn" onPointerMove={spotlight} onClick={() => setFilter('overdue')}>

@@ -48,6 +48,8 @@ export function DebugDock() {
       <button type="button" className="btn btn--secondary btn--sm" onClick={() => { store.failNextWrite(); toast({ text: 'Следующая запись получит отказ сервера', tone: 'info' }); }}>
         Отказ на следующей записи
       </button>
+      <label className="check"><input type="checkbox" onChange={(e) => store.setSlow(e.target.checked)} />Медленная таблица (12 с)</label>
+      <label className="check"><input type="checkbox" onChange={(e) => store.setMaintenance(e.target.checked)} />Ночное обслуживание</label>
       <button type="button" className="btn btn--secondary btn--sm" onClick={() => void store.syncNow()}>Синхронизировать сейчас</button>
       <p className="debug__h">Ступени записи</p>
       <dl className="debug__counters num">

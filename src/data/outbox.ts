@@ -2,6 +2,7 @@
 // Отправляет строго по одной и по порядку (отмена не обгонит закрытие). Нет связи — ждёт и повторяет с паузой
 // 2 → 4 → 8 → … 30 с. Повтор безопасен: у каждой записи свой requestId, сервер не создаёт дубль.
 // Счётчики ступеней (правило владельца, п. 2.8): введено → в очереди → отправлено → принято → применено → видно в таблице.
+import { RETRYABLE } from './api';
 import type { CabinetApi, WriteOp, WriteResult } from './api';
 
 export type ItemState = 'queued' | 'sending' | 'failed' | 'conflict';
@@ -12,6 +13,8 @@ export interface OutboxItem {
   createdAt: number;
   attempts: number;
   state: ItemState;
+  /** Когда началась текущая отправка — для «таблица отвечает дольше обычного» (> 5 с). */
+  sentAt?: number;
   error?: string;
 }
 
@@ -99,6 +102,7 @@ export class Outbox {
     if (!next) return;
     this.busy = true;
     next.state = 'sending';
+    next.sentAt = Date.now();
     next.attempts++;
     this.counters.sent++;
     this.emit({ type: 'changed' });
@@ -119,11 +123,11 @@ export class Outbox {
       void this.kick();
       return;
     }
-    if (result.code === 'NETWORK') {
+    if (RETRYABLE.has(result.code)) {
       next.state = 'queued';
       next.error = result.message;
       await this.storage.set(next.op.requestId, next);
-      this.emit({ type: 'offline', item: next });
+      if (result.code === 'NETWORK') this.emit({ type: 'offline', item: next });
       this.emit({ type: 'changed' });
       const pause = BACKOFF_MS[Math.min(next.attempts - 1, BACKOFF_MS.length - 1)] ?? 30000;
       this.timer = setTimeout(() => { this.timer = null; void this.kick(); }, pause);

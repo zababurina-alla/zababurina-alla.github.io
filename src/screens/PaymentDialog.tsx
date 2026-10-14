@@ -2,6 +2,8 @@
 // Проверка на месте простыми словами. После записи — уведомление с «Отменить» и честный статус в списке.
 import { useEffect, useId, useRef, useState } from 'react';
 import { useStore } from '../data/store';
+import { METHOD_LABEL } from '../data/types';
+import type { PayMethod } from '../data/types';
 import { useDraft } from '../data/drafts';
 import { TODAY, addDays, endOfMonth, fmtDate, parseUserDate } from '../lib/dates';
 import { formatMoney, parseMoney } from '../lib/money';
@@ -13,13 +15,16 @@ import { Modal } from '../ui/Modal';
 import { useToast } from '../ui/toast';
 
 const PERIODS = ['Октябрь 2026', 'Сентябрь 2026', 'III квартал 2026'];
-const METHODS = ['на счёт', 'наличными', 'на карту'];
+// [п. 24] Способы — как в таблице («📱 Монобанк», не «карта»).
+const METHODS: PayMethod[] = ['bank', 'cash', 'mono', 'diia'];
 
-function Segmented({ options, value, onChange, label }: { options: string[]; value: string; onChange: (v: string) => void; label: string }) {
+function Segmented<T extends string>({ options, value, onChange, label, text = (o) => o }: {
+  options: T[]; value: T; onChange: (v: T) => void; label: string; text?: (o: T) => string;
+}) {
   return (
     <div className="seg" role="group" aria-label={label}>
       {options.map((o) => (
-        <button key={o} type="button" aria-pressed={value === o} className="seg__opt" onClick={() => onChange(o)}>{o}</button>
+        <button key={o} type="button" aria-pressed={value === o} className="seg__opt" onClick={() => onChange(o)}>{text(o)}</button>
       ))}
     </div>
   );
@@ -35,7 +40,7 @@ export function PaymentDialog({ open, clientId, onClose }: { open: boolean; clie
   const [active, setActive] = useState(0);
   const [amount, setAmount] = useState('');
   const [period, setPeriod] = useState(PERIODS[0] ?? '');
-  const [method, setMethod] = useState(METHODS[0] ?? '');
+  const [method, setMethod] = useState<PayMethod>('bank');
   const [date, setDate] = useState(fmtDate(TODAY));
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const amountRef = useRef<HTMLInputElement>(null);
@@ -48,7 +53,7 @@ export function PaymentDialog({ open, clientId, onClose }: { open: boolean; clie
   if (open !== lastOpen) {
     setLastOpen(open);
     if (open) {
-      setWho(clientId); setQ(''); setAmount(''); setPeriod(PERIODS[0] ?? ''); setMethod(METHODS[0] ?? '');
+      setWho(clientId); setQ(''); setAmount(''); setPeriod(PERIODS[0] ?? ''); setMethod('bank');
       setDate(fmtDate(TODAY)); setTouched({}); setActive(0);
     }
   }
@@ -178,7 +183,7 @@ export function PaymentDialog({ open, clientId, onClose }: { open: boolean; clie
 
         <div className="field">
           <span className="field__label">Способ</span>
-          <Segmented label="Способ оплаты" options={METHODS} value={method} onChange={setMethod} />
+          <Segmented label="Способ оплаты" options={METHODS} value={method} onChange={setMethod} text={(m) => METHOD_LABEL[m]} />
         </div>
 
         <div className="field">

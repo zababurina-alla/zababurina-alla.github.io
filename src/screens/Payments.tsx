@@ -4,6 +4,7 @@ import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { SEPTEMBER_TOTAL } from '../data/fake';
 import { useStore } from '../data/store';
+import { METHOD_LABEL } from '../data/types';
 import { fmtDate, fmtDayMonth, plural, weekday } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 import { Icon } from '../ui/Icon';
@@ -66,7 +67,7 @@ export function Payments() {
                 return (
                   <li key={p.id} className={`paylist__row${p.save === 'saving' ? ' is-saving' : ''}${store.fresh.includes(p.id) ? ' is-fresh' : ''}`}>
                     <button type="button" className="linklike paylist__who" onClick={() => ui.openClient(p.clientId)}>
-                      <Avatar name={c?.name ?? '?'} /><span><strong>{c?.name.split(' ').slice(0, 2).join(' ')}</strong><span className="sub">{p.period}, {p.method}</span></span>
+                      <Avatar name={c?.name ?? '?'} /><span><strong>{c?.name.split(' ').slice(0, 2).join(' ')}</strong><span className="sub">{p.period}, {METHOD_LABEL[p.method]}</span></span>
                     </button>
                     <span className="paylist__src sub"><Icon name={src.icon} size={16} />{src.text}</span>
                     {p.save ? <SaveBadge state={p.save} offline={!store.online} onRetry={() => store.retry(p.id)} /> : <span className="sub num">{fmtDate(p.date)}</span>}

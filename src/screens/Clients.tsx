@@ -40,12 +40,12 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
     return m;
   }, [deadlines]);
 
-  const byKind = (k: ClientKind) => kind === 'all' || k === kind || (kind === 'other' && (k === 'general' || k === 'tov'));
+  const byKind = (k: ClientKind) => kind === 'all' || k === kind || (kind === 'other' && !['fop1', 'fop2', 'fop3'].includes(k));
   const found = search(
     store.clients.filter((c) => byKind(c.kind)).map((c) => ({ ...c, extra: [...c.kved.map((k) => k.code), c.phone] })),
     q,
   );
-  const count = (f: KindFilter) => store.clients.filter((c) => f === 'all' || c.kind === f || (f === 'other' && (c.kind === 'general' || c.kind === 'tov'))).length;
+  const count = (f: KindFilter) => store.clients.filter((c) => f === 'all' || c.kind === f || (f === 'other' && !['fop1', 'fop2', 'fop3'].includes(c.kind))).length;
 
   return (
     <div ref={scope} className="page">
@@ -71,7 +71,7 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
             { id: 'fop1', label: '1 гр.', count: count('fop1') },
             { id: 'fop2', label: '2 гр.', count: count('fop2') },
             { id: 'fop3', label: '3 гр.', count: count('fop3') },
-            { id: 'other', label: 'ТОВ и общая', count: count('other') },
+            { id: 'other', label: 'ТОВ, общая и др.', count: count('other') },
           ]} />
         </div>
         {q && <p className="found sub" role="status">Найдено {found.length} из {store.clients.length}</p>}
@@ -85,7 +85,7 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
             <span role="columnheader">Ближайший срок</span>
           </div>
           {found.map((c) => {
-            const month = c.monthly.reduce((s, m) => s + m.kopecks, 0);
+            const month = c.monthly.reduce((s, m) => s + (m.kopecks ?? 0), 0);
             const keyDays = c.keyUntil ? daysBetween(TODAY, c.keyUntil) : null;
             const next = nextByClient.get(c.id);
             const nextDays = next ? daysBetween(TODAY, next.due) : null;

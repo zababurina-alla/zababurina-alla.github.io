@@ -66,14 +66,29 @@ function SoundSettings({ on, setOn }: { on: boolean; setOn: (v: boolean) => void
 }
 
 /** Честный статус связи с таблицей: сколько записей ещё не в таблице и почему. */
+// Ответ таблицы может идти до 10–12 с (оценка архитектора «Мамы CRM», не замер): после 5 с говорим, что всё в порядке.
+const SLOW_HINT_MS = 5000;
+
 function SyncStatus() {
   const { pending, online } = useStore();
+  const [now, setNow] = useState(() => Date.now());
+  const sending = pending.some((p) => p.state === 'sending');
+  useEffect(() => {
+    if (!sending) return;
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, [sending]);
+  const slow = pending.some((p) => p.state === 'sending' && p.sentAt && now - p.sentAt > SLOW_HINT_MS);
   const failed = pending.filter((p) => p.state === 'failed' || p.state === 'conflict').length;
   const waiting = pending.length - failed;
+  // Сервер попросил подождать (ночное обслуживание, занято) — говорим его словами.
+  const waitReason = online ? pending.find((p) => p.state === 'queued' && p.error)?.error : undefined;
   const state = failed ? 'is-failed' : !online && waiting ? 'is-offline' : waiting ? 'is-saving' : '';
   const text = failed ? `Не сохранилось: ${failed}`
     : !online && waiting ? `Нет связи — ждут отправки: ${waiting}`
-      : waiting ? `Сохраняется в таблицу: ${waiting}` : !online ? 'Нет связи с таблицей' : 'Всё сохранено в таблице';
+      : waitReason ? waitReason
+      : slow ? 'Таблица отвечает дольше обычного — запись не потеряется'
+        : waiting ? `Сохраняется в таблицу: ${waiting}` : !online ? 'Нет связи с таблицей' : 'Всё сохранено в таблице';
   return (
     <p className={`sync ${state}`} role="status">
       <span className="sync__dot" aria-hidden="true" />

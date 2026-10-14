@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import gsap from 'gsap';
 import { useStore } from '../data/store';
-import { TODAY, fmtDate } from '../lib/dates';
+import { TODAY, addDays, fmtDate } from '../lib/dates';
 import { play } from '../lib/sound';
 import { reducedMotion } from '../ui/kit';
 import { useToast } from '../ui/toast';
@@ -19,8 +19,8 @@ export function useCloseDeadline(rowSelector = '[data-row]') {
     const d = store.deadlines.find((x) => x.id === id);
     if (!d || closing) return;
     // Проверка периода до анимации: если нельзя — мягкое предупреждение в строке, ничего не уезжает.
-    if (d.periodEnds && d.periodEnds > TODAY) {
-      setWarn((w) => ({ ...w, [id]: `Период ещё не закончился — закрыть можно с ${fmtDate(d.periodEnds ?? '')}` }));
+    if (d.periodEnd && TODAY <= d.periodEnd) {
+      setWarn((w) => ({ ...w, [id]: `Период ещё не закончился — закрыть можно с ${fmtDate(addDays(d.periodEnd ?? TODAY, 1))}` }));
       play('attention');
       return;
     }
@@ -29,10 +29,12 @@ export function useCloseDeadline(rowSelector = '[data-row]') {
     const animate = Boolean(row) && !reducedMotion();
     const name = store.client(d.clientId)?.name.split(' ').slice(0, 2).join(' ') ?? '';
     // Запись уходит в очередь сразу по нажатию. «Закрыто в таблице» — только после ответа сервера (бриф, п. 6).
-    const res = store.closeDeadline(id, (next) => {
+    const res = store.closeDeadline(id, (next, notifyAt) => {
       play('closed');
+      // Уведомление клиенту уходит через 2 мин (контракт v2, п. 31) — «Отменить» успевает его остановить.
+      const notice = notifyAt ? ' Клиенту сообщим через 2 мин — можно отменить.' : '';
       toast({
-        text: next ? `Закрыто в таблице: ${name}. Следующий срок создан — до ${fmtDate(next.due)}` : `Закрыто в таблице: ${name}`,
+        text: (next ? `Закрыто в таблице: ${name}. Следующий срок создан — до ${fmtDate(next.due)}.` : `Закрыто в таблице: ${name}.`) + notice,
         action: { label: 'Отменить', run: () => store.reopenDeadline(id) },
       });
     }, animate ? 600 : 0);

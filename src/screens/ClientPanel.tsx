@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { KIND_LABEL } from '../data/fake';
 import { useStore } from '../data/store';
+import { MARK_LABEL, METHOD_LABEL } from '../data/types';
 import { TODAY, daysBetween, daysLabel, fmtDate, statusByDays } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 import { Icon } from '../ui/Icon';
@@ -102,7 +103,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
             <span className="vt-avatar"><Avatar name={c.name} size="lg" /></span>
             <div className="cp__who">
               <h2 id="cp-name" className="cp__name"><span className="vt-name">{c.name}</span></h2>
-              <p className="cp__kind"><span className="tag">{KIND_LABEL[c.kind]}</span>{c.employer && <span className="tag">работодатель</span>}</p>
+              <p className="cp__kind"><span className="tag">{KIND_LABEL[c.kind]}</span>{c.employer && <span className="tag">работодатель</span>}{c.marks.map((m) => <span key={m} className="tag">{MARK_LABEL[m]}</span>)}</p>
             </div>
             <div className="cp__actions">
               <a className="btn btn--secondary btn--sm" href={`tel:${c.phone.replace(/\s/g, '')}`}><Icon name="phone" />Позвонить</a>
@@ -127,7 +128,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                       {c.monthly.map((m) => (
                         <div key={m.name} className="charges__item">
                           <dt>{m.name}</dt>
-                          <dd className="charges__sum num">{m.kopecks ? formatMoney(m.kopecks) : 'по доходу'}</dd>
+                          <dd className="charges__sum num">{m.kopecks !== null ? formatMoney(m.kopecks) : 'по доходу'}</dd>
                           <dd className="sub">{m.note}</dd>
                         </div>
                       ))}
@@ -137,7 +138,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                 <section className="cp__block cp__facts">
                   <div><h3 className="cp__h">Ключ ЭЦП</h3>{keyDays === null ? <p className="sub">Нет данных</p>
                     : <p className="row-gap"><span className="num">до {fmtDate(c.keyUntil ?? '')}</span><StatusPill status={statusByDays(keyDays)}>{daysLabel(keyDays)}</StatusPill></p>}</div>
-                  <div><h3 className="cp__h">Банк</h3><p>{c.bank}</p></div>
+                  <div><h3 className="cp__h">Ключ выпущен</h3><p>{c.keyIssuer || '—'}</p></div>
                   <div><h3 className="cp__h">Телефон</h3><PhoneField clientId={c.id} phone={c.phone} version={c.version} /></div>
                   <div><h3 className="cp__h">Пароль от кабинета</h3><PasswordReveal /></div>
                 </section>
@@ -154,7 +155,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
             {tab === 'deadlines' && <DeadlineTable items={own} showClient={false} empty="Открытых сроков нет" />}
             {tab === 'payments' && (pays.length ? (
               <ul className="plist">{pays.map((p) => (
-                <li key={p.id} className="plist__row"><span><strong className="num">{formatMoney(p.kopecks)}</strong><span className="sub">{p.period}, {p.method}</span></span><span className="num sub">{fmtDate(p.date)}</span></li>
+                <li key={p.id} className="plist__row"><span><strong className="num">{formatMoney(p.kopecks)}</strong><span className="sub">{p.period}, {METHOD_LABEL[p.method]}</span></span><span className="num sub">{fmtDate(p.date)}</span></li>
               ))}</ul>
             ) : <p className="empty">Платежей пока нет</p>)}
             {tab === 'history' && (history.length ? (

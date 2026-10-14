@@ -4,7 +4,8 @@ import gsap from 'gsap';
 import { KIND_LABEL } from '../data/fake';
 import { useStore } from '../data/store';
 import { useDraft } from '../data/drafts';
-import type { Client, ClientKind, Deadline } from '../data/types';
+import { MARK_LABEL, marksProblem } from '../data/types';
+import type { Client, ClientKind, ClientMark, Deadline } from '../data/types';
 import { TODAY, addDays, fmtDate } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 import { fold } from '../lib/search';
@@ -34,8 +35,8 @@ function charges(kind: ClientKind): Client['monthly'] {
   const esv = { name: 'ЄСВ', kopecks: 190234, note: '22 % МЗП' };
   if (kind === 'fop1') return [{ name: 'ЄП', kopecks: 33280, note: '10 % ПМ' }, esv, { name: 'ВЗ', kopecks: 86470, note: '10 % МЗП' }];
   if (kind === 'fop2') return [{ name: 'ЄП', kopecks: 172940, note: '20 % МЗП' }, esv, { name: 'ВЗ', kopecks: 86470, note: '10 % МЗП' }];
-  if (kind === 'fop3') return [{ name: 'ЄП', kopecks: 0, note: '5 % дохода' }, esv];
-  if (kind === 'general') return [esv];
+  if (kind === 'fop3') return [{ name: 'ЄП', kopecks: null, note: '5 % дохода — введите оборот' }, esv];
+  if (kind === 'fopGeneral') return [esv];
   return [];
 }
 
@@ -43,9 +44,12 @@ const KINDS: { id: ClientKind; icon: IconName; hint: string }[] = [
   { id: 'fop1', icon: 'clients', hint: 'рынок, бытовые услуги' },
   { id: 'fop2', icon: 'clients', hint: 'услуги, торговля' },
   { id: 'fop3', icon: 'clients', hint: 'процент с дохода' },
-  { id: 'general', icon: 'book', hint: 'налог на прибыль' },
-  { id: 'tov', icon: 'building', hint: 'юридическое лицо' },
+  { id: 'fopGeneral', icon: 'fopGeneral', hint: 'налог с прибыли' },
+  { id: 'tov3', icon: 'tov', hint: 'ТОВ на едином налоге' },
+  { id: 'tovGeneral', icon: 'tov', hint: 'ТОВ, налог на прибыль' },
 ];
+
+const MARKS: ClientMark[] = ['pensioner', 'employed', 'allUkraine'];
 
 // На телефоне не открываем клавиатуру сразу: она закрыла бы плитки и шаги.
 const finePointer = typeof window !== 'undefined' && window.matchMedia('(pointer: fine)').matches;
@@ -63,14 +67,15 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
   const [kved, setKved] = useState<string | null>(null);
   const [phone, setPhone] = useState('');
   const [bank, setBank] = useState('ПриватБанк');
+  const [marks, setMarks] = useState<ClientMark[]>([]);
   const [keyUntil, setKeyUntil] = useState<string | null>(null);
   const [tried, setTried] = useState(false);
   // created = null, пока таблица не подтвердила запись; потом — сроки, которые создала система.
   const [result, setResult] = useState<{ client: Client; created: Deadline[] | null } | null>(null);
   const savedClient = Boolean(result?.created);
   // Черновик в IndexedDB: незаконченный ввод переживает закрытие окна и перезагрузку страницы.
-  const draft = useDraft('addClient', open && step < 4, { step, name, kind, employer, kved, phone, bank, keyUntil },
-    (v) => { setStep(Math.min(v.step, 3)); setName(v.name); setKind(v.kind); setEmployer(v.employer); setKved(v.kved); setPhone(v.phone); setBank(v.bank); setKeyUntil(v.keyUntil); },
+  const draft = useDraft('addClient', open && step < 4, { step, name, kind, employer, marks, kved, phone, bank, keyUntil },
+    (v) => { setStep(Math.min(v.step, 3)); setName(v.name); setKind(v.kind); setEmployer(v.employer); setMarks(v.marks ?? []); setKved(v.kved); setPhone(v.phone); setBank(v.bank); setKeyUntil(v.keyUntil); },
     (v) => !v.name && !v.kind);
 
   // Звук «сохранено» — в момент подтверждения сервером, не раньше.
@@ -80,7 +85,7 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
   if (open !== lastOpen) {
     setLastOpen(open);
     // Незаконченный ввод не теряется: окно открывается там, где остановились. (Переживёт перезагрузку — этап 2, IndexedDB.)
-    if (open && (result || !name)) { setStep(1); setName(''); setKind(null); setEmployer(false); setKq(''); setKved(null); setPhone(''); setKeyUntil(null); setTried(false); setResult(null); }
+    if (open && (result || !name)) { setStep(1); setName(''); setKind(null); setEmployer(false); setMarks([]); setKq(''); setKved(null); setPhone(''); setKeyUntil(null); setTried(false); setResult(null); }
   }
 
   // Смена шага: новый шаг въезжает справа (24 px) и проявляется — видно направление движения по шагам.
@@ -90,7 +95,7 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
   }, [step]);
 
   const kveds = KVEDS.filter(([code, title, words]) => !kq || code.startsWith(kq.trim()) || fold(`${title} ${words}`).includes(fold(kq)));
-  const err1 = !name.trim() ? 'Напишите ФИО или название' : !kind ? 'Выберите тип' : '';
+  const err1 = !name.trim() ? 'Напишите ФИО или название' : !kind ? 'Выберите тип' : marksProblem(kind, marks) ?? '';
   const err2 = !kved ? 'Выберите КВЕД — можно искать по словам' : '';
 
   function next() {
@@ -106,9 +111,9 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
     if (step < 3) { setStep(step + 1); return; }
     const k = KVEDS.find(([code]) => code === kved);
     const added = store.addClient({
-      name: name.trim(), kind: kind ?? 'fop2', employer, kved: k ? [{ code: k[0], title: k[1] }] : [], phone: phone || '—', bank,
-      keyUntil, monthly: charges(kind ?? 'fop2'),
-    }, (created) => setResult((r) => (r ? { ...r, created } : r)));
+      name: name.trim(), kind: kind ?? 'fop2', marks, employer, kved: k ? [{ code: k[0], title: k[1] }] : [], phone: phone || '—',
+      keyIssuer: bank, keyUntil, monthly: charges(kind ?? 'fop2'),
+    }, (created, client) => setResult((r) => (r ? { client, created } : r)));
     setResult({ client: added, created: null });
     void draft.clear();
     setStep(4);
@@ -163,7 +168,19 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
                 ))}
               </div>
             </fieldset>
-            <label className="check"><input type="checkbox" checked={employer} onChange={(e) => setEmployer(e.target.checked)} />Есть работники (работодатель)</label>
+            <fieldset className="field">
+              <legend className="field__label">Пометки</legend>
+              <div className="checks">
+                <label className="check"><input type="checkbox" checked={employer} onChange={(e) => setEmployer(e.target.checked)} />Есть работники (работодатель)</label>
+                {MARKS.map((m) => (
+                  <label key={m} className="check">
+                    <input type="checkbox" checked={marks.includes(m)}
+                      onChange={(e) => setMarks((xs) => (e.target.checked ? [...xs, m] : xs.filter((x) => x !== m)))} />
+                    {MARK_LABEL[m].replace(/^./, (c) => c.toUpperCase())}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
             {tried && err1 && <p id="ac-err1" className="field__error" role="alert">{err1}</p>}
           </>
         )}
@@ -190,7 +207,7 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
                 <p className="field__label">Начисления в месяц ({KIND_LABEL[kind]})</p>
                 <dl className="charges charges--sm">
                   {charges(kind).map((m) => (
-                    <div key={m.name} className="charges__item"><dt>{m.name}</dt><dd className="charges__sum num">{m.kopecks ? formatMoney(m.kopecks) : 'по доходу'}</dd><dd className="sub">{m.note}</dd></div>
+                    <div key={m.name} className="charges__item"><dt>{m.name}</dt><dd className="charges__sum num">{m.kopecks !== null ? formatMoney(m.kopecks) : 'по доходу'}</dd><dd className="sub">{m.note}</dd></div>
                   ))}
                 </dl>
                 <p className="sub">Ставки 2026 из справочника. Ставку ЄП по рішенню Миколаївської міськради сервер подставит сам.</p>
@@ -207,9 +224,9 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
               <p className="field__hint">Можно оставить пустым и добавить потом.</p>
             </div>
             <div className="field">
-              <span className="field__label">Банк</span>
-              <div className="seg" role="group" aria-label="Банк">
-                {['ПриватБанк', 'Монобанк', 'Ощадбанк', 'другой'].map((b) => (
+              <span className="field__label">Где выпущен ключ ЭЦП</span>
+              <div className="seg" role="group" aria-label="Где выпущен ключ ЭЦП">
+                {['ПриватБанк', 'Монобанк', 'Ощадбанк', 'ДПС', 'Дія'].map((b) => (
                   <button key={b} type="button" aria-pressed={bank === b} className="seg__opt" onClick={() => setBank(b)}>{b}</button>
                 ))}
               </div>
