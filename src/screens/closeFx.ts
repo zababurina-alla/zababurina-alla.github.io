@@ -44,7 +44,9 @@ export function flyToCounter(from: HTMLElement, text: string): Promise<void> {
   const dx = b.left + b.width / 2 - (a.left + gw / 2);
   const dy = b.top + b.height / 2 - (a.top + a.height / 2);
   return new Promise((resolve) => {
-    gsap.timeline({ onComplete: () => { ghost.remove(); resolve(); } })
+    // Страховка: если кадры анимации не идут (фоновая вкладка), плашка всё равно исчезнет.
+    const safety = window.setTimeout(() => { ghost.remove(); resolve(); }, 1500);
+    gsap.timeline({ onComplete: () => { window.clearTimeout(safety); ghost.remove(); resolve(); } })
       .fromTo(ghost, { opacity: 0, scale: 0.96 }, { opacity: 1, scale: 1, duration: 0.14, ease: 'power2.out' })
       // Дуга: по X — ровно, по Y — сначала чуть вниз, потом вверх к счётчику; к концу плашка сжимается в точку.
       .to(ghost, { x: dx, duration: 0.62, ease: 'power2.inOut' }, 0.1)

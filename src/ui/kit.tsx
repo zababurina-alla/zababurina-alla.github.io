@@ -89,11 +89,15 @@ export function Avatar({ name, size = 'md', clientId }: { name: string; size?: '
 }
 
 /** Честный статус записи: «сохраняется…» → «в таблице» → «не сохранилось». */
-export function SaveBadge({ state }: { state: SaveState | undefined }) {
+export function SaveBadge({ state, offline = false, onRetry }: { state: SaveState | undefined; offline?: boolean; onRetry?: () => void }) {
   if (!state) return null;
+  if (state === 'failed' && onRetry) {
+    return <button type="button" className="save save--failed save--btn" onClick={onRetry}><Icon name="alert" size={16} />не сохранилось — повторить</button>;
+  }
   return (
-    <span className={`save save--${state}`} role="status">
-      {state === 'saving' && <><span className="save__pulse" aria-hidden="true" />сохраняется…</>}
+    <span className={`save save--${state}${state === 'saving' && offline ? ' save--offline' : ''}`} role="status">
+      {state === 'saving' && offline && <><Icon name="offline" size={16} />ждёт связи</>}
+      {state === 'saving' && !offline && <><span className="save__pulse" aria-hidden="true" />сохраняется…</>}
       {state === 'saved' && <><Icon name="check" size={16} />в таблице</>}
       {state === 'failed' && <><Icon name="alert" size={16} />не сохранилось</>}
     </span>

@@ -17,6 +17,7 @@ import { IconGallery } from './screens/IconGallery';
 import { Skeleton } from './app/Skeleton';
 import { DebugDock } from './app/DebugDock';
 import { CommandPalette } from './app/CommandPalette';
+import { ConflictDialog, FailureWatcher, OfflineBanner } from './app/SyncUi';
 
 function Screens() {
   const route = useRoute();
@@ -44,6 +45,7 @@ function Screens() {
   return (
     <UiCtx.Provider value={ui}>
       <Shell route={route.name}>
+        <OfflineBanner />
         {!store.loaded && <Skeleton />}
         {store.loaded && <>
         {route.name === 'today' && <Today />}
@@ -59,6 +61,8 @@ function Screens() {
       </Shell>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <DebugDock />
+      <ConflictDialog />
+      <FailureWatcher />
       <ClientPanel id={clientId} onClose={() => setClientId(null)} />
       <PaymentDialog open={payFor.open} clientId={payFor.clientId} onClose={() => setPayFor((p) => ({ ...p, open: false }))} />
       <AddClientDialog open={addOpen} onClose={() => setAddOpen(false)} />

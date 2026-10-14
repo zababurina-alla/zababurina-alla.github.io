@@ -32,13 +32,19 @@ function useTheme(): [string, () => void] {
   return [theme, toggle];
 }
 
+/** Честный статус связи с таблицей: сколько записей ещё не в таблице и почему. */
 function SyncStatus() {
-  const { saving } = useStore();
-  const pending = Object.values(saving).filter((s) => s === 'saving').length;
+  const { pending, online } = useStore();
+  const failed = pending.filter((p) => p.state === 'failed' || p.state === 'conflict').length;
+  const waiting = pending.length - failed;
+  const state = failed ? 'is-failed' : !online && waiting ? 'is-offline' : waiting ? 'is-saving' : '';
+  const text = failed ? `Не сохранилось: ${failed}`
+    : !online && waiting ? `Нет связи — ждут отправки: ${waiting}`
+      : waiting ? `Сохраняется в таблицу: ${waiting}` : !online ? 'Нет связи с таблицей' : 'Всё сохранено в таблице';
   return (
-    <p className={`sync${pending ? ' is-saving' : ''}`} role="status">
+    <p className={`sync ${state}`} role="status">
       <span className="sync__dot" aria-hidden="true" />
-      <span className="sync__text">{pending ? `Сохраняется в таблицу: ${pending}` : 'Всё сохранено в таблице'}</span>
+      <span className="sync__text">{text}</span>
     </p>
   );
 }

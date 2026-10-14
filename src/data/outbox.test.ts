@@ -1,0 +1,79 @@
+import { describe, expect, it, vi } from 'vitest';
+import { Outbox } from './outbox';
+import type { OutboxEvent, OutboxItem } from './outbox';
+import type { CabinetApi, WriteOp, WriteResult } from './api';
+
+function memStorage() {
+  const m = new Map<string, OutboxItem>();
+  return {
+    m,
+    set: async (k: string, v: OutboxItem) => { m.set(k, structuredClone(v)); },
+    del: async (k: string) => { m.delete(k); },
+    all: async () => [...m.values()].map((v) => structuredClone(v)),
+  };
+}
+
+const op = (id: string): WriteOp => ({ kind: 'cancelPayment', requestId: id, id: `p-${id}` });
+const ok: WriteResult = { ok: true, changes: [], cursor: 1 };
+
+function apiWith(write: (o: WriteOp) => Promise<WriteResult>): CabinetApi {
+  return { snapshot: vi.fn(), changesSince: vi.fn(), write };
+}
+
+const flush = () => new Promise((r) => setTimeout(r, 0));
+
+describe('очередь записей', () => {
+  it('отправляет по порядку и считает ступени', async () => {
+    const order: string[] = [];
+    const store = memStorage();
+    const ob = new Outbox(apiWith(async (o) => { order.push(o.requestId); return ok; }), store, () => undefined);
+    await ob.enqueue(op('a'), 'A');
+    await ob.enqueue(op('b'), 'B');
+    for (let i = 0; i < 5; i++) await flush();
+    expect(order).toEqual(['a', 'b']);
+    expect(store.m.size).toBe(0);
+    expect(ob.counters).toMatchObject({ entered: 2, sent: 2, accepted: 2, applied: 2, rejected: 0 });
+  });
+
+  it('без связи — запись остаётся в хранилище и уходит, когда связь вернулась', async () => {
+    vi.useFakeTimers();
+    let online = false;
+    const store = memStorage();
+    const events: OutboxEvent['type'][] = [];
+    const ob = new Outbox(apiWith(async () => (online ? ok : { ok: false, code: 'NETWORK', message: 'нет связи' })), store, (e) => events.push(e.type));
+    await ob.enqueue(op('a'), 'A');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(store.m.get('a')?.state).toBe('queued');
+    expect(events).toContain('offline');
+    online = true;
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(store.m.size).toBe(0);
+    expect(events).toContain('applied');
+    vi.useRealTimers();
+  });
+
+  it('после перезагрузки подхватывает недоотправленное', async () => {
+    const store = memStorage();
+    store.m.set('x', { op: op('x'), label: 'X', createdAt: 1, attempts: 1, state: 'sending' });
+    const sent: string[] = [];
+    const ob = new Outbox(apiWith(async (o) => { sent.push(o.requestId); return ok; }), store, () => undefined);
+    await ob.load();
+    for (let i = 0; i < 5; i++) await flush();
+    expect(sent).toEqual(['x']);
+  });
+
+  it('конфликт и отказ не теряют запись и не держат очередь', async () => {
+    const store = memStorage();
+    const ob = new Outbox(apiWith(async (o) => (o.requestId === 'a'
+      ? { ok: false, code: 'CONFLICT', message: 'изменилась' }
+      : o.requestId === 'b' ? { ok: false, code: 'SERVER', message: 'сбой' } : ok)), store, () => undefined);
+    await ob.enqueue(op('a'), 'A');
+    await ob.enqueue(op('b'), 'B');
+    await ob.enqueue(op('c'), 'C');
+    for (let i = 0; i < 10; i++) await flush();
+    expect(store.m.get('a')?.state).toBe('conflict');
+    expect(store.m.get('b')?.state).toBe('failed');
+    expect(store.m.has('c')).toBe(false);
+    expect(ob.counters.rejected).toBe(2);
+  });
+});

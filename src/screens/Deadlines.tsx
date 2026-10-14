@@ -117,12 +117,12 @@ export function Deadlines() {
         <section className="panel reveal" aria-labelledby="closed-title">
           <header className="panel__head"><h2 id="closed-title" className="panel__title">Закрыто сегодня</h2><span className="sub">{store.closed.length}</span></header>
           <ul className="closed">
-            {store.closed.map(({ deadline, next, save }) => (
+            {store.closed.map(({ deadline, next, save, requestId }) => (
               <li key={deadline.id} className="closed__row">
                 <span className="closed__check"><Icon name="check" size={16} /></span>
                 <span className="closed__text"><strong>{store.client(deadline.clientId)?.name.split(' ').slice(0, 2).join(' ')}</strong> — {deadline.what}
                   {next && <span className="sub">Система создала следующий: {next.what}, до {next.due.split('-').reverse().join('.')}</span>}</span>
-                <SaveBadge state={save} />
+                <SaveBadge state={save} offline={!store.online} onRetry={() => store.retry(requestId)} />
                 <button type="button" className="btn btn--ghost btn--sm" onClick={() => store.reopenDeadline(deadline.id)}><Icon name="undo" size={16} />Вернуть</button>
               </li>
             ))}

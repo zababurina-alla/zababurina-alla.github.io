@@ -78,3 +78,40 @@ export function plural(n: number, one: string, few: string, many: string): strin
   if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
   return many;
 }
+
+// ── Разбор даты, которую ввела мама. Это читалка: корпус и «верно N из M» — в dates.test.ts.
+const MONTH_WORDS: [RegExp, number][] = [
+  [/^(янв|січ)/, 1], [/^(фев|лют)/, 2], [/^(мар|бер)/, 3], [/^(апр|кві)/, 4], [/^(мая|май|тра)/, 5], [/^(июн|чер)/, 6],
+  [/^(июл|лип)/, 7], [/^(авг|сер)/, 8], [/^(сен|вер)/, 9], [/^(окт|жов)/, 10], [/^(ноя|лис)/, 11], [/^(дек|гру)/, 12],
+];
+
+function valid(y: number, m: number, d: number): string | null {
+  if (m < 1 || m > 12 || d < 1) return null;
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  if (d > last) return null;
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+/** «14.10.2026», «14.10.26», «14/10», «2026-10-14», «14 окт», «14 жовтня», «сегодня», «завтра», «вчера» → ISO или null. */
+export function parseUserDate(input: string, today = TODAY): string | null {
+  const s = input.trim().toLowerCase().replace(/\s+/g, ' ').replace(/г\.?$|р\.?$/, '').trim();
+  if (!s) return null;
+  if (/^(сегодня|сьогодні)$/.test(s)) return today;
+  if (/^(завтра)$/.test(s)) return addDays(today, 1);
+  if (/^(вчера|вчора)$/.test(s)) return addDays(today, -1);
+  const [ty] = parts(today);
+  const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s);
+  if (iso) return valid(Number(iso[1]), Number(iso[2]), Number(iso[3]));
+  const num = /^(\d{1,2})[./\-\s](\d{1,2})(?:[./\-\s](\d{2}|\d{4}))?$/.exec(s);
+  if (num) {
+    const y = num[3] ? (num[3].length === 2 ? 2000 + Number(num[3]) : Number(num[3])) : ty;
+    return valid(y, Number(num[2]), Number(num[1]));
+  }
+  const word = /^(\d{1,2}) ([а-яіїєґ]+)\.?(?: (\d{4}))?$/.exec(s);
+  if (word?.[2]) {
+    const m = MONTH_WORDS.find(([re]) => re.test(word[2] ?? ''))?.[1];
+    if (!m) return null;
+    return valid(word[3] ? Number(word[3]) : ty, m, Number(word[1]));
+  }
+  return null;
+}

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { KIND_LABEL } from '../data/fake';
 import { useStore } from '../data/store';
+import { useDraft } from '../data/drafts';
 import type { Client, ClientKind, Deadline } from '../data/types';
 import { TODAY, addDays, fmtDate } from '../lib/dates';
 import { formatMoney } from '../lib/money';
@@ -61,8 +62,14 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
   const [bank, setBank] = useState('ПриватБанк');
   const [keyUntil, setKeyUntil] = useState<string | null>(null);
   const [tried, setTried] = useState(false);
-  const [result, setResult] = useState<{ client: Client; created: Deadline[] } | null>(null);
-  const savedClient = result ? store.saving[result.client.id] === 'saved' : false;
+  // created = null, пока таблица не подтвердила запись; потом — сроки, которые создала система.
+  const [result, setResult] = useState<{ client: Client; created: Deadline[] | null } | null>(null);
+  const savedClient = Boolean(result?.created);
+  // Черновик в IndexedDB: незаконченный ввод переживает закрытие окна и перезагрузку страницы.
+  const draft = useDraft('addClient', open && step < 4, { step, name, kind, employer, kved, phone, bank, keyUntil },
+    (v) => { setStep(Math.min(v.step, 3)); setName(v.name); setKind(v.kind); setEmployer(v.employer); setKved(v.kved); setPhone(v.phone); setBank(v.bank); setKeyUntil(v.keyUntil); },
+    (v) => !v.name && !v.kind);
+
   // Звук «сохранено» — в момент подтверждения сервером, не раньше.
   useEffect(() => { if (savedClient) play('saved'); }, [savedClient]);
 
@@ -90,11 +97,12 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
     setTried(false);
     if (step < 3) { setStep(step + 1); return; }
     const k = KVEDS.find(([code]) => code === kved);
-    const res = store.addClient({
+    const added = store.addClient({
       name: name.trim(), kind: kind ?? 'fop2', employer, kved: k ? [{ code: k[0], title: k[1] }] : [], phone: phone || '—', bank,
       keyUntil, monthly: charges(kind ?? 'fop2'),
-    });
-    setResult(res);
+    }, (created) => setResult((r) => (r ? { ...r, created } : r)));
+    setResult({ client: added, created: null });
+    void draft.clear();
     setStep(4);
   }
 
@@ -112,8 +120,14 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
   );
 
   return (
-    <Modal open={open} onClose={() => { if (step === 4 || (!name && !kind)) onClose(); else { toast({ text: 'Введённое не потеряется — нажмите «Добавить клиента», чтобы продолжить', tone: 'info' }); onClose(); } }}
+    <Modal open={open} onClose={() => { if (step === 4 || (!name && !kind)) onClose(); else { toast({ text: 'Черновик сохранён — нажмите «Добавить клиента», чтобы продолжить', tone: 'info' }); onClose(); } }}
       title={step === 4 ? (savedClient ? 'Клиент добавлен' : 'Добавляю клиента…') : 'Новый клиент'} footer={footer}>
+      {step < 4 && draft.restoredAt && (
+        <p className="draft-note" role="status">
+          <Icon name="edited" size={16} />Продолжаем с того места, где остановились
+          <button type="button" className="link" onClick={() => { void draft.clear(); setStep(1); setName(''); setKind(null); setKved(null); setPhone(''); setKeyUntil(null); }}>Начать заново</button>
+        </p>
+      )}
       {step < 4 && (
         <ol className="steps" aria-label={`Шаг ${step} из 3`}>
           {['Кто это', 'Чем занимается', 'Связь и ключ'].map((t, i) => (
@@ -206,7 +220,7 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
           <div className="created">
             <p className="created__lead"><span className="created__ok"><Icon name="check" /></span><span><strong>{result.client.name}</strong> записан в таблицу. Система сама создала сроки:</span></p>
             <ul className="created__list">
-              {result.created.map((d, i) => (
+              {(result.created ?? []).map((d, i) => (
                 <li key={d.id} className="created__item" style={{ animationDelay: `${120 * i + 150}ms` }}><Icon name="calendar" size={18} /><span>{d.what}</span><span className="num sub">до {fmtDate(d.due)}</span></li>
               ))}
             </ul>

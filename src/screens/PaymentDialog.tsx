@@ -2,7 +2,8 @@
 // Проверка на месте простыми словами. После записи — уведомление с «Отменить» и честный статус в списке.
 import { useEffect, useId, useRef, useState } from 'react';
 import { useStore } from '../data/store';
-import { TODAY, addDays, endOfMonth, fmtDate } from '../lib/dates';
+import { useDraft } from '../data/drafts';
+import { TODAY, addDays, endOfMonth, fmtDate, parseUserDate } from '../lib/dates';
 import { formatMoney, parseMoney } from '../lib/money';
 import { search } from '../lib/search';
 import { play } from '../lib/sound';
@@ -24,12 +25,6 @@ function Segmented({ options, value, onChange, label }: { options: string[]; val
   );
 }
 
-function parseDate(s: string): string | null {
-  const m = /^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/.exec(s.trim());
-  if (!m) return null;
-  const iso = `${m[3]}-${m[2]?.padStart(2, '0')}-${m[1]?.padStart(2, '0')}`;
-  return Number.isNaN(Date.parse(iso)) ? null : iso;
-}
 
 export function PaymentDialog({ open, clientId, onClose }: { open: boolean; clientId: string | null; onClose: () => void }) {
   const store = useStore();
@@ -61,6 +56,11 @@ export function PaymentDialog({ open, clientId, onClose }: { open: boolean; clie
     return () => window.clearTimeout(t);
   }, [open, clientId]);
 
+  // Черновик: всё введённое переживает закрытие окна, обрыв связи и перезагрузку.
+  const draft = useDraft('payment', open, { who, amount, period, method, date },
+    (v) => { setWho(v.who); setAmount(v.amount); setPeriod(v.period); setMethod(v.method); setDate(v.date); },
+    (v) => !v.amount && (!v.who || v.who === clientId));
+
   const client = who ? store.client(who) : undefined;
   // Фокус в сумму — сразу, в том же нажатии: иначе первая набранная цифра теряется («4200» → «200»).
   function pick(id: string) {
@@ -70,11 +70,11 @@ export function PaymentDialog({ open, clientId, onClose }: { open: boolean; clie
   const recent = [...new Set(store.payments.map((p) => p.clientId))].slice(0, 5).map((id) => store.client(id)).filter(Boolean);
   const suggestions = (q ? search(store.clients.map((c) => ({ ...c, extra: [c.phone] })), q) : recent).slice(0, 5);
   const money = parseMoney(amount);
-  const dateIso = parseDate(date);
+  const dateIso = parseUserDate(date);
   const errors = {
     client: client ? '' : 'Выберите клиента',
     amount: money.ok ? '' : money.error,
-    date: dateIso ? '' : 'Дата — в виде 14.10.2026',
+    date: dateIso ? '' : 'Не понял дату — напишите, например, 14.10.2026 или «14 октября»',
   };
   const lastPay = client ? store.payments.find((p) => p.clientId === client.id) : undefined;
 
@@ -92,6 +92,7 @@ export function PaymentDialog({ open, clientId, onClose }: { open: boolean; clie
       play('saved');
       toast({ text: `Платёж ${sum} записан в таблицу — ${short}`, action: { label: 'Отменить', run: () => store.removePayment(id) } });
     });
+    void draft.clear();
     onClose();
   }
 
@@ -102,11 +103,17 @@ export function PaymentDialog({ open, clientId, onClose }: { open: boolean; clie
   return (
     <Modal open={open} onClose={onClose} title="Записать платёж" footer={
       <>
-        <button type="button" className="btn btn--secondary" onClick={onClose}>Отмена</button>
+        <button type="button" className="btn btn--secondary" onClick={() => { void draft.clear(); onClose(); }}>Отмена</button>
         <button type="submit" form={`${ids}-form`} className="btn btn--primary btn--grow">Записать платёж</button>
       </>
     }>
       <form id={`${ids}-form`} className="form" onSubmit={submit} noValidate>
+        {draft.restoredAt && (
+          <p className="draft-note" role="status">
+            <Icon name="edited" size={16} />Восстановлен черновик от {new Date(draft.restoredAt).toTimeString().slice(0, 5)}
+            <button type="button" className="link" onClick={() => { void draft.clear(); setWho(clientId); setAmount(''); setDate(fmtDate(TODAY)); }}>Очистить</button>
+          </p>
+        )}
         <div className="field">
           <label className="field__label" htmlFor={`${ids}-client`}>Клиент</label>
           {client ? (
@@ -173,7 +180,8 @@ export function PaymentDialog({ open, clientId, onClose }: { open: boolean; clie
           <div className="date-row">
             <input id={`${ids}-date`} className="input input--date num" value={date} inputMode="numeric"
               aria-invalid={Boolean(touched.date && errors.date)}
-              onChange={(e) => setDate(e.target.value)} onBlur={() => setTouched((t) => ({ ...t, date: true }))} />
+              onChange={(e) => setDate(e.target.value)}
+              onBlur={() => { setTouched((t) => ({ ...t, date: true })); if (dateIso) setDate(fmtDate(dateIso)); }} />
             <div className="chips">
               {quick.map(([label, iso]) => (
                 <button key={label} type="button" className="chip" aria-pressed={dateIso === iso} onClick={() => setDate(fmtDate(iso))}>{label}</button>

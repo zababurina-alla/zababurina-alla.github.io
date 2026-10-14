@@ -1,201 +1,348 @@
-// Хранилище прототипа. Имитирует сервер-таблицу: задержку подтверждения записи и автоцикл сроков.
-// На этапе 2 станет адаптером с тем же интерфейсом, что API; на этапе 4 заменится живым адаптером.
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+// Состояние экранов поверх API. Таблица — источник правды: экран показывает снимок таблицы плюс
+// ещё не подтверждённые записи (с пометкой «сохраняется» / «ждёт связи» / «не сохранилось»).
+// Каждое действие — запись в очередь (outbox.ts) → api.write → ответ сервера с изменениями → экран.
+// Обратно: изменения из таблицы и бота приходят по курсору (changesSince) — при открытии, при возврате во
+// вкладку и раз в 30 с (бриф, п. 6).
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ACTIVITY, CLIENTS, DEADLINES, PAYMENTS } from './fake';
+import { fakeServer } from './fakeServer';
+import { kvAll, kvDelete, kvSet } from './idb';
+import { Outbox } from './outbox';
+import type { Counters, OutboxEvent, OutboxItem } from './outbox';
+import { newRequestId } from './api';
+import type { CabinetApi, Change, WriteOp } from './api';
 import type { Activity, Client, Deadline, Payment, SaveState } from './types';
-import { TODAY, addDays, daysBetween, fmtDate } from '../lib/dates';
-import { formatMoney } from '../lib/money';
+import { TODAY, daysBetween, fmtDate } from '../lib/dates';
 import { play } from '../lib/sound';
 
-// Задержка «записи в таблицу» в прототипе. Замер у Apps Script — на этапе 3; сейчас число наше, не проверено.
-const FAKE_SAVE_MS = 900;
-// Имитация первой загрузки из таблицы (прототип). Живое время ответа API — замер на этапе 4.
-const FAKE_LOAD_MS = 700;
-// Сколько подсвечивается запись, пришедшая из таблицы или бота.
+// Адаптер данных: сейчас выдуманный сервер; на этапе 4 здесь будет живой адаптер к Apps Script.
+const api: CabinetApi = fakeServer;
+
+// Опрос изменений из таблицы: бриф — раз в 30–60 с. Квоты Apps Script дневного лимита на запросы не задают
+// (developers.google.com/apps-script/guides/services/quotas), но одновременных выполнений — 30 на владельца.
+const POLL_MS = 30_000;
 const FRESH_MS = 2600;
 
-export type IncomingKind = 'payment' | 'key' | 'close';
+export type CloseResult = { ok: true } | { ok: false; reason: string };
+export type ExternalKind = 'payment' | 'key' | 'close' | 'phone';
 
-export type CloseResult =
-  | { ok: true; next: Deadline | null }
-  | { ok: false; reason: string };
+export interface Conflict {
+  requestId: string;
+  clientId: string;
+  mine: string;
+  theirs: string;
+}
+
+export interface ClosedEntry { deadline: Deadline; next: Deadline | null; save: SaveState; requestId: string; by: 'сайт' | 'бот' }
 
 interface Store {
+  loaded: boolean;
+  online: boolean;
   clients: Client[];
   deadlines: Deadline[];
   payments: Payment[];
   activity: Activity[];
-  closed: { deadline: Deadline; next: Deadline | null; save: SaveState }[];
-  saving: Record<string, SaveState>;
+  closed: ClosedEntry[];
+  fresh: string[];
+  pending: OutboxItem[];
+  counters: Counters;
+  cursor: number;
+  conflict: Conflict | null;
   client: (id: string) => Client | undefined;
-  closeDeadline: (id: string, onSaved?: () => void) => CloseResult;
+  /** hideAfterMs — убрать строку с экрана не сразу (успеть показать анимацию); в очередь запись встаёт сразу. */
+  closeDeadline: (id: string, onSaved?: (next: Deadline | null) => void, hideAfterMs?: number) => CloseResult;
   reopenDeadline: (id: string) => void;
   addPayment: (p: Omit<Payment, 'id' | 'source' | 'save'>, onSaved?: () => void) => string;
   removePayment: (id: string) => void;
-  addClient: (c: Omit<Client, 'id' | 'version'>) => { client: Client; created: Deadline[] };
-  /** Данные загружены из таблицы (в прототипе — через FAKE_LOAD_MS). */
-  loaded: boolean;
-  /** id записей, которые только что пришли из таблицы или бота — экран их мягко подсвечивает. */
-  fresh: string[];
-  /** Режим отладки: имитация правки в таблице или через бота. Возвращает текст для уведомления. */
-  simulateIncoming: (kind: IncomingKind) => string;
+  addClient: (c: Omit<Client, 'id' | 'version'>, onSaved?: (created: Deadline[]) => void) => Client;
+  /** baseVersion — версия, которую мама видела, когда начала править (бриф, п. 6: конфликт). */
+  updatePhone: (clientId: string, phone: string, baseVersion: number) => void;
+  resolveConflict: (keep: 'mine' | 'theirs') => void;
+  retry: (requestId: string) => void;
+  discard: (requestId: string) => void;
+  syncNow: () => Promise<void>;
+  /** Режим отладки: правка «извне» (в таблице или через бота) и рычаги сети. */
+  external: (kind: ExternalKind) => string;
+  setOnline: (on: boolean) => void;
+  failNextWrite: () => void;
 }
 
 const Ctx = createContext<Store | null>(null);
 
-const MONTHS = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
-const QUARTERS = ['I', 'II', 'III', 'IV'];
-
-/** Автоцикл (как в таблице): после закрытия создаётся следующий период того же обязательства. */
-function nextPeriod(d: Deadline): Deadline | null {
-  const q = /(I{1,3}|IV) (квартал|кв\.)/.exec(d.what);
-  if (q?.[1]) {
-    const i = QUARTERS.indexOf(q[1]);
-    const nextQ = QUARTERS[(i + 1) % 4] ?? 'I';
-    return { ...d, id: `${d.id}-n`, what: d.what.replace(q[1], nextQ), due: addDays(d.due, 92), periodEnds: null, version: 1 };
-  }
-  const m = MONTHS.findIndex((name) => d.what.toLowerCase().includes(name));
-  if (m >= 0) {
-    const nextName = MONTHS[(m + 1) % 12] ?? '';
-    return { ...d, id: `${d.id}-n`, what: d.what.replace(new RegExp(MONTHS[m] ?? '', 'i'), nextName), due: addDays(d.due, 30), periodEnds: null, version: 1 };
-  }
-  return null;
+function upsert<T extends { id: string }>(xs: T[], rec: T): T[] {
+  const i = xs.findIndex((x) => x.id === rec.id);
+  if (i < 0) return [rec, ...xs];
+  const copy = xs.slice();
+  copy[i] = rec;
+  return copy;
 }
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [clients, setClients] = useState(CLIENTS);
-  const [deadlines, setDeadlines] = useState(DEADLINES);
-  const [payments, setPayments] = useState(PAYMENTS);
-  const [activity, setActivity] = useState(ACTIVITY);
-  const [closed, setClosed] = useState<Store['closed']>([]);
-  const [saving, setSaving] = useState<Record<string, SaveState>>({});
   const [loaded, setLoaded] = useState(false);
+  const [online, setOnlineState] = useState(true);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [deadlines, setDeadlines] = useState<Deadline[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [activity, setActivity] = useState<Activity[]>([]);
+  const [closed, setClosed] = useState<ClosedEntry[]>([]);
   const [fresh, setFresh] = useState<string[]>([]);
+  const [pending, setPending] = useState<OutboxItem[]>([]);
+  const [counters, setCounters] = useState<Counters>({ entered: 0, sent: 0, accepted: 0, rejected: 0, applied: 0, seenInTable: 0 });
+  const [conflict, setConflict] = useState<Conflict | null>(null);
+  const [cursor, setCursor] = useState(0);
+  const cursorRef = useRef(0);
+  const mine = useRef(new Set<string>());
+  const callbacks = useRef(new Map<string, (changes: Change[]) => void>());
+  const outboxRef = useRef<Outbox | null>(null);
+  const handlerRef = useRef<(e: OutboxEvent) => void>(() => undefined);
 
+  const markFresh = useCallback((ids: string[]) => {
+    if (!ids.length) return;
+    setFresh((xs) => [...xs, ...ids]);
+    window.setTimeout(() => setFresh((xs) => xs.filter((x) => !ids.includes(x))), FRESH_MS);
+  }, []);
+
+  /** Применить изменения таблицы к экрану. Чужие (из таблицы, бота) — подсветить и тихо звякнуть. */
+  const applyChanges = useCallback((changes: Change[]) => {
+    const foreign: string[] = [];
+    for (const ch of changes) {
+      const own = mine.current.has(ch.origin);
+      if (own) outboxRef.current?.markSeen(ch.origin); else foreign.push(ch.id);
+      if (ch.entity === 'client') {
+        if (ch.op === 'delete') setClients((xs) => xs.filter((x) => x.id !== ch.id));
+        else setClients((xs) => upsert(xs, ch.record as Client));
+      } else if (ch.entity === 'deadline') {
+        if (ch.op === 'delete') {
+          setDeadlines((xs) => {
+            const gone = xs.find((x) => x.id === ch.id);
+            // Закрыли не с этого сайта (бот, таблица) — тоже попадает в «Закрыто сегодня».
+            if (gone && !own) setClosed((cs) => [{ deadline: gone, next: null, save: 'saved', requestId: `${ch.origin}-${ch.cursor}`, by: 'бот' }, ...cs]);
+            return xs.filter((x) => x.id !== ch.id);
+          });
+        } else setDeadlines((xs) => upsert(xs, ch.record as Deadline));
+      } else if (ch.entity === 'payment') {
+        if (ch.op === 'delete') setPayments((xs) => xs.filter((x) => x.id !== ch.id));
+        else {
+          const rec = { ...(ch.record as Payment) };
+          if (own) rec.save = 'saved'; else delete rec.save;
+          setPayments((xs) => upsert(xs, rec));
+        }
+      } else if (ch.op === 'upsert') {
+        setActivity((xs) => (xs.some((a) => a.id === ch.id) ? xs : [ch.record as Activity, ...xs]));
+      }
+    }
+    const last = changes.at(-1);
+    if (last && last.cursor > cursorRef.current) { cursorRef.current = last.cursor; setCursor(last.cursor); }
+    if (foreign.length) { markFresh(foreign); play('incoming'); }
+  }, [markFresh]);
+
+  /** Показать запись сразу — с пометкой, что она ещё не в таблице. */
+  const applyOptimistic = useCallback((op: WriteOp) => {
+    if (op.kind === 'closeDeadline') {
+      setDeadlines((xs) => {
+        const d = xs.find((x) => x.id === op.id);
+        if (d) setClosed((cs) => [{ deadline: d, next: null, save: 'saving', requestId: op.requestId, by: 'сайт' }, ...cs.filter((c) => c.requestId !== op.requestId)]);
+        return xs.filter((x) => x.id !== op.id);
+      });
+    } else if (op.kind === 'addPayment') {
+      setPayments((xs) => upsert(xs, { ...op.payment, save: 'saving' }));
+    } else if (op.kind === 'cancelPayment') {
+      setPayments((xs) => xs.filter((x) => x.id !== op.id));
+    } else if (op.kind === 'addClient') {
+      setClients((xs) => upsert(xs, op.client));
+    } else if (op.kind === 'updateClient') {
+      setClients((xs) => xs.map((c) => (c.id === op.id ? { ...c, ...op.patch } : c)));
+    }
+  }, []);
+
+  // Отклик очереди: подтверждение, отказ, конфликт, нет связи.
   useEffect(() => {
-    const t = window.setTimeout(() => setLoaded(true), FAKE_LOAD_MS);
-    return () => window.clearTimeout(t);
-  }, []);
+    handlerRef.current = (e: OutboxEvent) => {
+      const ob = outboxRef.current;
+      if (e.type === 'changed') {
+        if (ob) { setPending(ob.list()); setCounters({ ...ob.counters }); }
+        return;
+      }
+      if (e.type === 'offline') { setOnlineState(false); return; }
+      const op = e.item.op;
+      if (e.type === 'applied') {
+        setOnlineState(true);
+        applyChanges(e.result.changes);
+        callbacks.current.get(op.requestId)?.(e.result.changes);
+        callbacks.current.delete(op.requestId);
+        return;
+      }
+      if (e.type === 'conflict' && op.kind === 'updateClient' && e.result.current && 'phone' in e.result.current) {
+        setConflict({ requestId: op.requestId, clientId: op.id, mine: op.patch.phone ?? '', theirs: e.result.current.phone });
+        play('attention');
+        return;
+      }
+      // Отказ: показать честно. SERVER — запись остаётся «не сохранилось — повторить»;
+      // PERIOD_OPEN / NOT_FOUND — повтор не поможет: экран возвращается к правде таблицы.
+      const final = e.result.code !== 'SERVER';
+      if (op.kind === 'closeDeadline') {
+        setClosed((cs) => {
+          const entry = cs.find((c) => c.requestId === op.requestId);
+          if (entry && final) setDeadlines((xs) => upsert(xs, entry.deadline));
+          return final ? cs.filter((c) => c.requestId !== op.requestId) : cs.map((c) => (c.requestId === op.requestId ? { ...c, save: 'failed' } : c));
+        });
+      }
+      if (op.kind === 'addPayment') setPayments((xs) => xs.map((p) => (p.id === op.payment.id ? { ...p, save: 'failed' } : p)));
+      if (final) void outboxRef.current?.discard(op.requestId);
+      play('attention');
+    };
+  }, [applyChanges]);
 
-  const markFresh = useCallback((id: string) => {
-    setFresh((xs) => [...xs, id]);
-    window.setTimeout(() => setFresh((xs) => xs.filter((x) => x !== id)), FRESH_MS);
-  }, []);
+  // Загрузка: снимок таблицы, затем очередь, оставшаяся с прошлого раза (показываем её поверх снимка).
+  useEffect(() => {
+    let alive = true;
+    const ob = new Outbox(api, {
+      set: (k, v) => kvSet('outbox', k, v),
+      del: (k) => kvDelete('outbox', k),
+      all: () => kvAll<OutboxItem>('outbox'),
+    }, (e) => handlerRef.current(e));
+    outboxRef.current = ob;
+    void (async () => {
+      try {
+        const snap = await api.snapshot();
+        if (!alive) return;
+        setClients(snap.clients); setDeadlines(snap.deadlines); setPayments(snap.payments); setActivity(snap.activity);
+        cursorRef.current = snap.cursor; setCursor(snap.cursor);
+      } catch {
+        setOnlineState(false);
+      }
+      const left = await ob.load();
+      for (const it of left) { mine.current.add(it.op.requestId); applyOptimistic(it.op); }
+      if (alive) setLoaded(true);
+    })();
+    return () => { alive = false; };
+  }, [applyOptimistic]);
+
+  const syncNow = useCallback(async () => {
+    try {
+      const res = await api.changesSince(cursorRef.current);
+      setOnlineState(true);
+      applyChanges(res.changes);
+      cursorRef.current = Math.max(cursorRef.current, res.cursor);
+      setCursor(cursorRef.current);
+      void outboxRef.current?.kick(true);
+    } catch {
+      setOnlineState(false);
+    }
+  }, [applyChanges]);
+
+  // Обратная связь из таблицы: каждые 30 с на открытой вкладке и сразу при возврате во вкладку / появлении сети.
+  useEffect(() => {
+    const tick = () => { if (!document.hidden) void syncNow(); };
+    const t = window.setInterval(tick, POLL_MS);
+    document.addEventListener('visibilitychange', tick);
+    window.addEventListener('online', tick);
+    return () => { window.clearInterval(t); document.removeEventListener('visibilitychange', tick); window.removeEventListener('online', tick); };
+  }, [syncNow]);
+
+  const send = useCallback((op: WriteOp, label: string, onApplied?: (changes: Change[]) => void, showAfterMs = 0) => {
+    mine.current.add(op.requestId);
+    if (onApplied) callbacks.current.set(op.requestId, onApplied);
+    // Запись — в очередь сразу; на экране — сразу или после короткой анимации (таймер, не кадры анимации:
+    // в фоновой вкладке кадры почти не идут, а запись ждать не должна).
+    if (showAfterMs > 0) window.setTimeout(() => applyOptimistic(op), showAfterMs);
+    else applyOptimistic(op);
+    void outboxRef.current?.enqueue(op, label);
+  }, [applyOptimistic]);
 
   const client = useCallback((id: string) => clients.find((c) => c.id === id), [clients]);
 
-  const log = useCallback((text: string) => {
-    setActivity((xs) => [{ id: `a${Date.now()}`, when: `${TODAY}T${new Date().toTimeString().slice(0, 5)}`, source: 'сайт', text }, ...xs]);
-  }, []);
-
-  const confirm = useCallback((id: string, after?: () => void) => {
-    setSaving((s) => ({ ...s, [id]: 'saving' }));
-    window.setTimeout(() => {
-      setSaving((s) => ({ ...s, [id]: 'saved' }));
-      after?.();
-    }, FAKE_SAVE_MS);
-  }, []);
-
-  const closeDeadline = useCallback((id: string, onSaved?: () => void): CloseResult => {
+  const closeDeadline = useCallback((id: string, onSaved?: (next: Deadline | null) => void, hideAfterMs = 0): CloseResult => {
     const d = deadlines.find((x) => x.id === id);
     if (!d) return { ok: false, reason: 'Срок не найден — обновите страницу' };
+    // Проверка периода — и здесь, и на сервере (бриф, п. 3: баг с декларациями III кв., закрытыми в июле).
     if (d.periodEnds && daysBetween(TODAY, d.periodEnds) > 0) {
-      return { ok: false, reason: `Период ещё не закончился — закрыть этот срок можно с ${fmtDate(d.periodEnds)}` };
+      return { ok: false, reason: `Период ещё не закончился — закрыть можно с ${fmtDate(d.periodEnds)}` };
     }
-    const next = nextPeriod(d);
-    setDeadlines((xs) => [...xs.filter((x) => x.id !== id), ...(next ? [next] : [])]);
-    setClosed((xs) => [{ deadline: d, next, save: 'saving' }, ...xs]);
-    confirm(id, () => {
-      setClosed((xs) => xs.map((x) => (x.deadline.id === id ? { ...x, save: 'saved' } : x)));
-      onSaved?.();
-    });
-    const name = clients.find((c) => c.id === d.clientId)?.name ?? '';
-    log(`Закрыт срок «${d.what}» — ${name}${next ? `. Следующий создан: до ${fmtDate(next.due)}` : ''}`);
-    return { ok: true, next };
-  }, [deadlines, clients, confirm, log]);
+    const requestId = newRequestId();
+    send({ kind: 'closeDeadline', requestId, id, baseVersion: d.version }, `Закрыть «${d.what}»`, (changes) => {
+      const next = (changes.find((c) => c.entity === 'deadline' && c.op === 'upsert')?.record as Deadline | undefined) ?? null;
+      setClosed((cs) => cs.map((c) => (c.requestId === requestId ? { ...c, save: 'saved', next } : c)));
+      if (next) markFresh([next.id]);
+      onSaved?.(next);
+    }, hideAfterMs);
+    return { ok: true };
+  }, [deadlines, send, markFresh]);
 
   const reopenDeadline = useCallback((id: string) => {
-    const entry = closed.find((x) => x.deadline.id === id);
+    const entry = closed.find((c) => c.deadline.id === id);
     if (!entry) return;
-    setClosed((xs) => xs.filter((x) => x.deadline.id !== id));
-    setDeadlines((xs) => [...xs.filter((x) => x.id !== entry.next?.id), entry.deadline]);
-    confirm(`${id}-undo`);
-    log(`Отменено закрытие «${entry.deadline.what}»`);
-  }, [closed, confirm, log]);
+    setClosed((cs) => cs.filter((c) => c !== entry));
+    setDeadlines((xs) => upsert(xs.filter((x) => x.id !== entry.next?.id), entry.deadline));
+    // Отмена — тоже запись в таблицу; если закрытие ещё в очереди — просто убираем его оттуда.
+    if (outboxRef.current?.has(entry.requestId)) { void outboxRef.current.discard(entry.requestId); return; }
+    send({ kind: 'reopenDeadline', requestId: newRequestId(), id, undoOf: entry.requestId }, `Отменить закрытие «${entry.deadline.what}»`);
+  }, [closed, send]);
 
   const addPayment = useCallback((p: Omit<Payment, 'id' | 'source' | 'save'>, onSaved?: () => void) => {
-    const id = `p${Date.now()}`;
-    setPayments((xs) => [{ ...p, id, source: 'сайт', save: 'saving' }, ...xs]);
-    confirm(id, () => {
-      setPayments((xs) => xs.map((x) => (x.id === id ? { ...x, save: 'saved' } : x)));
-      onSaved?.();
-    });
-    const name = clients.find((c) => c.id === p.clientId)?.name ?? '';
-    log(`Платёж ${formatMoney(p.kopecks)} от ${name} записан`);
-    return id;
-  }, [clients, confirm, log]);
+    const requestId = newRequestId();
+    // id платежа создаёт браузер (= requestId): повтор из очереди не создаст второй платёж.
+    send({ kind: 'addPayment', requestId, payment: { ...p, id: requestId, source: 'сайт' } }, 'Платёж', () => onSaved?.());
+    return requestId;
+  }, [send]);
 
   const removePayment = useCallback((id: string) => {
-    setPayments((xs) => xs.filter((x) => x.id !== id));
-    confirm(`${id}-undo`);
-    log('Платёж отменён');
-  }, [confirm, log]);
+    if (outboxRef.current?.has(id)) { void outboxRef.current.discard(id); setPayments((xs) => xs.filter((x) => x.id !== id)); return; }
+    send({ kind: 'cancelPayment', requestId: newRequestId(), id }, 'Отменить платёж');
+  }, [send]);
 
-  const addClient = useCallback((data: Omit<Client, 'id' | 'version'>) => {
-    const newClient: Client = { ...data, id: `c${Date.now()}`, version: 1 };
-    // Что создаст система (автоцикл) для нового клиента — в прототипе по типу; на живых данных это ответ сервера.
-    const base = { clientId: newClient.id, kopecks: null, periodEnds: null, version: 1 };
-    const created: Deadline[] = data.kind === 'tov'
-      ? [{ ...base, id: `${newClient.id}-1`, what: 'Податковий розрахунок, IV квартал', due: '2027-02-09' }]
-      : [
-        { ...base, id: `${newClient.id}-1`, what: 'ЄП за ноябрь', due: '2026-11-20' },
-        { ...base, id: `${newClient.id}-2`, what: 'ЄСВ за IV квартал', due: '2027-01-20' },
-        { ...base, id: `${newClient.id}-3`, what: 'Декларація платника ЄП, 2026 рік', due: '2027-03-01' },
-      ];
-    setClients((xs) => [newClient, ...xs]);
-    setDeadlines((xs) => [...xs, ...created]);
-    confirm(newClient.id);
-    log(`Добавлен клиент ${newClient.name}. Создано сроков: ${created.length}`);
-    return { client: newClient, created };
-  }, [confirm, log]);
+  const addClient = useCallback((data: Omit<Client, 'id' | 'version'>, onSaved?: (created: Deadline[]) => void) => {
+    const requestId = newRequestId();
+    const c: Client = { ...data, id: `c-${requestId.slice(0, 8)}`, version: 1 };
+    send({ kind: 'addClient', requestId, client: c }, `Новый клиент ${c.name}`, (changes) => {
+      onSaved?.(changes.filter((ch) => ch.entity === 'deadline').map((ch) => ch.record as Deadline));
+    });
+    return c;
+  }, [send]);
 
-  const simulateIncoming = useCallback((kind: IncomingKind): string => {
-    const now = `${TODAY}T${new Date().toTimeString().slice(0, 5)}`;
-    play('incoming');
-    if (kind === 'payment') {
-      const id = `p${Date.now()}`;
-      setPayments((xs) => [{ id, clientId: 'c5', kopecks: 320000, period: 'III квартал 2026', method: 'на счёт', date: TODAY, source: 'бот' }, ...xs]);
-      setActivity((xs) => [{ id: `a${id}`, when: now, source: 'бот', text: 'Платёж 3 200,00 ₴ от Ясенко Миколы записан' }, ...xs]);
-      markFresh(id); markFresh(`a${id}`);
-      return 'Через бота: платёж 3 200,00 ₴ от Ясенко Миколы';
-    }
-    if (kind === 'key') {
-      setClients((xs) => xs.map((c) => (c.id === 'c1' ? { ...c, keyUntil: '2027-10-19', version: c.version + 1 } : c)));
-      const aid = `a${Date.now()}`;
-      setActivity((xs) => [{ id: aid, when: now, source: 'таблица', text: 'Ключ ЭЦП Ромашко Олены продлён до 19.10.2027' }, ...xs]);
-      markFresh('c1'); markFresh(aid);
-      return 'Из таблицы: ключ ЭЦП Ромашко Олены продлён до 19.10.2027';
-    }
-    // Бот закрыл срок: строка сначала подсвечивается, потом уходит (видно, что изменилось и где).
-    const d = deadlines.filter((x) => !x.periodEnds).sort((a, b) => a.due.localeCompare(b.due))[0];
-    if (!d) return 'Нет сроков, которые можно закрыть';
-    markFresh(d.id);
-    const name = clients.find((c) => c.id === d.clientId)?.name.split(' ').slice(0, 2).join(' ') ?? '';
-    window.setTimeout(() => {
-      setDeadlines((xs) => xs.filter((x) => x.id !== d.id));
-      setClosed((xs) => [{ deadline: d, next: null, save: 'saved' }, ...xs]);
-      const aid = `a${Date.now()}`;
-      setActivity((xs) => [{ id: aid, when: now, source: 'бот', text: `Закрыт срок «${d.what}» — ${name}` }, ...xs]);
-      markFresh(aid);
-    }, 1100);
-    return `Через бота: закрыт срок «${d.what}» — ${name}`;
-  }, [clients, deadlines, markFresh]);
+  const updatePhone = useCallback((clientId: string, phone: string, baseVersion: number) => {
+    send({ kind: 'updateClient', requestId: newRequestId(), id: clientId, baseVersion, patch: { phone } }, 'Телефон клиента');
+  }, [send]);
+
+  /** «Запись изменилась в таблице»: оставить своё (отправить поверх новой версии) или взять из таблицы. */
+  const resolveConflict = useCallback((keep: 'mine' | 'theirs') => {
+    const cf = conflict;
+    if (!cf) return;
+    setConflict(null);
+    void outboxRef.current?.discard(cf.requestId);
+    void syncNow().then(() => {
+      if (keep !== 'mine') return;
+      void api.snapshot().then((snap) => {
+        const c = snap.clients.find((x) => x.id === cf.clientId);
+        if (c) send({ kind: 'updateClient', requestId: newRequestId(), id: c.id, baseVersion: c.version, patch: { phone: cf.mine } }, 'Телефон клиента');
+      });
+    });
+  }, [conflict, send, syncNow]);
+
+  const retry = useCallback((rid: string) => { void outboxRef.current?.retry(rid); }, []);
+  const discard = useCallback((rid: string) => { void outboxRef.current?.discard(rid); }, []);
+
+  const external = useCallback((kind: ExternalKind) => {
+    const text = fakeServer.external(kind);
+    void syncNow();
+    return text;
+  }, [syncNow]);
+
+  const setOnline = useCallback((on: boolean) => {
+    fakeServer.online = on;
+    setOnlineState(on);
+    if (on) void syncNow();
+  }, [syncNow]);
+
+  const failNextWrite = useCallback(() => { fakeServer.failNext = 'SERVER'; }, []);
 
   const value = useMemo<Store>(() => ({
-    clients, deadlines, payments, activity, closed, saving, client,
-    closeDeadline, reopenDeadline, addPayment, removePayment, addClient, loaded, fresh, simulateIncoming,
-  }), [clients, deadlines, payments, activity, closed, saving, client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, loaded, fresh, simulateIncoming]);
+    loaded, online, clients, deadlines, payments, activity, closed, fresh, pending, counters, cursor, conflict,
+    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, resolveConflict,
+    retry, discard, syncNow, external, setOnline, failNextWrite,
+  }), [loaded, online, clients, deadlines, payments, activity, closed, fresh, pending, counters, cursor, conflict,
+    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, resolveConflict,
+    retry, discard, syncNow, external, setOnline, failNextWrite]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

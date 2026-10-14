@@ -6,7 +6,7 @@ import { useStore } from '../data/store';
 import { TODAY, daysBetween, daysLabel, fmtDate, statusByDays } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 import { Icon } from '../ui/Icon';
-import { Avatar, StatusPill, Tabs, reducedMotion } from '../ui/kit';
+import { Avatar, SaveBadge, StatusPill, Tabs, reducedMotion } from '../ui/kit';
 import { Modal } from '../ui/Modal';
 import { useUi } from '../app/ui-context';
 import { DeadlineTable } from './DeadlineTable';
@@ -48,6 +48,29 @@ function PasswordReveal() {
     );
   }
   return <button type="button" className="btn btn--secondary btn--sm" onClick={() => setStage('confirm')}><Icon name="eye" />Показать пароль</button>;
+}
+
+function PhoneField({ clientId, phone, version }: { clientId: string; phone: string; version: number }) {
+  const store = useStore();
+  const [edit, setEdit] = useState<string | null>(null);
+  // Версия, которую мама видела в момент начала правки — с ней правка и уйдёт в таблицу.
+  const [base, setBase] = useState(version);
+  const saving = store.pending.some((p) => p.op.kind === 'updateClient' && p.op.id === clientId);
+  if (edit === null) {
+    return (
+      <p className="row-gap">
+        <span className="num">{phone}</span>
+        {saving ? <SaveBadge state="saving" offline={!store.online} /> : <button type="button" className="link" onClick={() => { setBase(version); setEdit(phone); }}>Изменить</button>}
+      </p>
+    );
+  }
+  return (
+    <form className="inline-edit" onSubmit={(e) => { e.preventDefault(); if (edit.trim() && edit !== phone) store.updatePhone(clientId, edit.trim(), base); setEdit(null); }}>
+      <input className="input num" value={edit} onChange={(e) => setEdit(e.target.value)} inputMode="tel" autoFocus aria-label="Телефон" />
+      <button type="submit" className="btn btn--primary btn--sm">Сохранить</button>
+      <button type="button" className="btn btn--ghost btn--sm" onClick={() => setEdit(null)}>Отмена</button>
+    </form>
+  );
 }
 
 export function ClientPanel({ id, onClose }: { id: string | null; onClose: () => void }) {
@@ -115,7 +138,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                   <div><h3 className="cp__h">Ключ ЭЦП</h3>{keyDays === null ? <p className="sub">Нет данных</p>
                     : <p className="row-gap"><span className="num">до {fmtDate(c.keyUntil ?? '')}</span><StatusPill status={statusByDays(keyDays)}>{daysLabel(keyDays)}</StatusPill></p>}</div>
                   <div><h3 className="cp__h">Банк</h3><p>{c.bank}</p></div>
-                  <div><h3 className="cp__h">Телефон</h3><p className="num">{c.phone}</p></div>
+                  <div><h3 className="cp__h">Телефон</h3><PhoneField clientId={c.id} phone={c.phone} version={c.version} /></div>
                   <div><h3 className="cp__h">Пароль от кабинета</h3><PasswordReveal /></div>
                 </section>
                 <section className="cp__block">

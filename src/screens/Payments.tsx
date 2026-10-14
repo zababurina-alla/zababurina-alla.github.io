@@ -69,7 +69,7 @@ export function Payments() {
                       <Avatar name={c?.name ?? '?'} /><span><strong>{c?.name.split(' ').slice(0, 2).join(' ')}</strong><span className="sub">{p.period}, {p.method}</span></span>
                     </button>
                     <span className="paylist__src sub"><Icon name={src.icon} size={16} />{src.text}</span>
-                    {p.save ? <SaveBadge state={p.save} /> : <span className="sub num">{fmtDate(p.date)}</span>}
+                    {p.save ? <SaveBadge state={p.save} offline={!store.online} onRetry={() => store.retry(p.id)} /> : <span className="sub num">{fmtDate(p.date)}</span>}
                     <span className="paylist__sum num">{formatMoney(p.kopecks)}</span>
                   </li>
                 );
