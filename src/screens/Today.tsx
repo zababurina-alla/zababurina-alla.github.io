@@ -10,6 +10,8 @@ import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
 import { RollingNumber, StatusPill, Tabs, reducedMotion } from '../ui/kit';
 import { useUi } from '../app/ui-context';
+import { useToast } from '../ui/toast';
+import type { Question } from '../data/types';
 import { DeadlineTable } from './DeadlineTable';
 
 type Filter = 'all' | 'overdue' | 'burning' | 'week';
@@ -58,6 +60,32 @@ function AreaChart({ cumulative, month }: { cumulative: number[]; month: string 
         </>
       )}
     </div>
+  );
+}
+
+/** Ответ на вопрос: варианты — кнопками, текст или число — полем. Записывается в таблицу, вопрос уходит из списка. */
+function QuestionAnswer({ q }: { q: Question }) {
+  const store = useStore();
+  const toast = useToast();
+  const [text, setText] = useState('');
+  const send = (value: string) => {
+    const v = value.trim();
+    if (!v) return;
+    store.answerQuestion(q.id, v, () => toast({ text: `Ответ «${v}» записан в таблицу` }));
+  };
+  if (q.type === 'choice') {
+    return (
+      <div className="question__answers" role="group" aria-label="Варианты ответа">
+        {q.options.map((o) => <button key={o} type="button" className="btn btn--secondary btn--sm" onClick={() => send(o)}>{o}</button>)}
+      </div>
+    );
+  }
+  return (
+    <form className="question__answers" onSubmit={(e) => { e.preventDefault(); send(text); }}>
+      <input className="input input--sm" value={text} onChange={(e) => setText(e.target.value)} aria-label="Ваш ответ"
+        inputMode={q.type === 'number' ? 'decimal' : 'text'} placeholder={q.type === 'number' ? 'Число' : 'Ответ'} autoComplete="off" />
+      <button type="submit" className="btn btn--primary btn--sm" disabled={!text.trim()}>Ответить</button>
+    </form>
   );
 }
 
@@ -181,8 +209,8 @@ export function Today() {
             {store.questions.map((q) => (
               <div key={q.id} className="question">
                 <p>{q.text}</p>
-                {q.type === 'choice' && q.options.length > 0 && <p className="sub">Варианты: {q.options.join(', ')}</p>}
-                <div className="question__foot"><span className="sub">{fmtDayMonth(q.askedAt.slice(0, 10))}, {q.askedAt.slice(11, 16)}</span><span className="sub">Ответить — в Telegram-боте</span></div>
+                <QuestionAnswer q={q} />
+                <div className="question__foot"><span className="sub">{fmtDayMonth(q.askedAt.slice(0, 10))}, {q.askedAt.slice(11, 16)}</span><span className="sub">или в Telegram-боте</span></div>
               </div>
             ))}
           </section>

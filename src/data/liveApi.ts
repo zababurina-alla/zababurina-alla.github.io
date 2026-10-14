@@ -14,7 +14,7 @@ export interface SessionProvider {
 
 interface ServerChange { rev: number; entity: string; op: 'upsert' | 'delete'; id: string; origin: string; record?: unknown }
 
-const ENTITIES: ReadonlySet<string> = new Set<Entity>(['client', 'deadline', 'payment', 'activity', 'task']);
+const ENTITIES: ReadonlySet<string> = new Set<Entity>(['client', 'deadline', 'payment', 'activity', 'task', 'question']);
 const SITE_CODES: ReadonlySet<string> = new Set<ErrorCode>(['NETWORK', 'CONFLICT', 'PERIOD_OPEN', 'NOT_FOUND', 'SERVER', 'VALIDATION',
   'UNDO_TOO_LATE', 'DUPLICATE', 'BUSY', 'MAINTENANCE', 'QUOTA', 'RATE_LIMIT', 'AUTH_EXPIRED', 'AUTH_REQUIRED', 'FORBIDDEN']);
 const MAX_PAGES = 20;
@@ -26,11 +26,11 @@ function normClient(raw: unknown): Client {
 }
 
 function normRecord(entity: Entity, raw: unknown): NonNullable<Change['record']> {
-  return entity === 'client' ? normClient(raw) : raw as Deadline | Payment | Activity | Task;
+  return entity === 'client' ? normClient(raw) : raw as Deadline | Payment | Activity | Task | Question;
 }
 
 function toChange(c: ServerChange): Change | null {
-  if (!ENTITIES.has(c.entity)) return null; // question — пока не показываем на сайте
+  if (!ENTITIES.has(c.entity)) return null; // незнакомая сущность (новая на сервере) — пропускаем
   const entity = c.entity as Entity;
   const change: Change = { cursor: c.rev, entity, op: c.op, id: c.id, origin: c.origin };
   if (c.op === 'upsert' && c.record !== undefined) change.record = normRecord(entity, c.record);
@@ -129,6 +129,10 @@ export class LiveApi implements CabinetApi {
           }, o);
           return { ok: true, changes: [up('task', env.data.task, env.cursor)], cursor: env.cursor };
         }
+        case 'answerQuestion': {
+          const env = await this.rpc<{ question: Question }>('questions.answer', { id: op.id, text: op.text }, o);
+          return { ok: true, changes: [up('question', env.data.question, env.cursor)], cursor: env.cursor };
+        }
         case 'completeTask': {
           const env = await this.rpc<{ task: Task }>('tasks.complete', { id: op.id, done: op.done }, o);
           return { ok: true, changes: [up('task', env.data.task, env.cursor)], cursor: env.cursor };
@@ -141,7 +145,7 @@ export class LiveApi implements CabinetApi {
       const res: WriteResult = { ok: false, code, message: e.message };
       if (e.retryAt) res.retryAt = e.retryAt;
       if (e.current && typeof e.current === 'object') {
-        res.current = 'kind' in e.current ? normClient(e.current) : e.current as Deadline | Payment;
+        res.current = 'kind' in e.current ? normClient(e.current) : e.current as Deadline | Payment | Question;
       }
       return res;
     }

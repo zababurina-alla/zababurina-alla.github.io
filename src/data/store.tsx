@@ -25,6 +25,9 @@ const FRESH_MS = 2600;
 export type CloseResult = { ok: true } | { ok: false; reason: string };
 export type ExternalKind = 'payment' | 'key' | 'close' | 'phone';
 
+/** Окончательный отказ таблицы (повтор не поможет): маме — что случилось, её словами. */
+export interface Notice { id: string; text: string }
+
 export interface Conflict {
   requestId: string;
   clientId: string;
@@ -43,6 +46,7 @@ interface Store {
   activity: Activity[];
   tasks: Task[];
   questions: Question[];
+  notices: Notice[];
   closed: ClosedEntry[];
   fresh: string[];
   pending: OutboxItem[];
@@ -59,6 +63,9 @@ interface Store {
   /** baseVersion — версия, которую мама видела, когда начала править (бриф, п. 6: конфликт). */
   updatePhone: (clientId: string, phone: string, baseVersion: number) => void;
   addTask: (t: Omit<Task, 'id' | 'version' | 'done'>) => void;
+  /** Ответ на вопрос маме (questions.answer). */
+  answerQuestion: (id: string, text: string, onSaved?: () => void) => void;
+  dismissNotice: (id: string) => void;
   toggleTask: (id: string, done: boolean) => void;
   resolveConflict: (keep: 'mine' | 'theirs') => void;
   retry: (requestId: string) => void;
@@ -93,6 +100,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [activity, setActivity] = useState<Activity[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [notices, setNotices] = useState<Notice[]>([]);
+  /** Вопросы, убранные с экрана до ответа сервера, — вернуть, если ответ не записался. */
+  const answering = useRef(new Map<string, Question>());
   const [closed, setClosed] = useState<ClosedEntry[]>([]);
   const [fresh, setFresh] = useState<string[]>([]);
   const [pending, setPending] = useState<OutboxItem[]>([]);
@@ -105,6 +115,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => { paymentsRef.current = payments; }, [payments]);
   const callbacks = useRef(new Map<string, (changes: Change[], result: { notifyAt?: string | null }) => void>());
   const outboxRef = useRef<Outbox | null>(null);
+  const syncSoon = useRef<number | null>(null);
+  const syncRef = useRef<() => Promise<void>>(async () => undefined);
   const handlerRef = useRef<(e: OutboxEvent) => void>(() => undefined);
 
   const markFresh = useCallback((ids: string[]) => {
@@ -114,7 +126,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /** Применить изменения таблицы к экрану. Чужие (из таблицы, бота) — подсветить и тихо звякнуть. */
-  const applyChanges = useCallback((changes: Change[]) => {
+  /** advance — сдвигать курсор журнала. Ответ на запись курсор не сдвигает: запись могла породить в таблице больше,
+   *  чем вернул сервер (строка «Что изменилось», пересчёт системы), — это заберёт следующий опрос по курсору. */
+  const applyChanges = useCallback((changes: Change[], advance = true) => {
     const foreign: string[] = [];
     for (const ch of changes) {
       const own = mine.current.has(ch.origin);
@@ -148,12 +162,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       } else if (ch.entity === 'task') {
         if (ch.op === 'delete') setTasks((xs) => xs.filter((x) => x.id !== ch.id));
         else setTasks((xs) => upsert(xs, ch.record as Task));
+      } else if (ch.entity === 'question') {
+        // На сайте — только открытые: отвеченный (здесь или в Telegram) уходит из списка.
+        const rec = ch.record as Question | undefined;
+        if (ch.op === 'delete' || (rec && rec.answer !== null)) setQuestions((xs) => xs.filter((x) => x.id !== ch.id));
+        else if (rec) setQuestions((xs) => upsert(xs, rec));
       } else if (ch.op === 'upsert') {
         setActivity((xs) => (xs.some((a) => a.id === ch.id) ? xs : [ch.record as Activity, ...xs]));
       }
     }
     const last = changes.at(-1);
-    if (last && last.cursor > cursorRef.current) { cursorRef.current = last.cursor; setCursor(last.cursor); }
+    if (advance && last && last.cursor > cursorRef.current) { cursorRef.current = last.cursor; setCursor(last.cursor); }
     if (foreign.length) { markFresh(foreign); play('incoming'); }
   }, [markFresh]);
 
@@ -177,6 +196,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setTasks((xs) => upsert(xs, op.task));
     } else if (op.kind === 'completeTask') {
       setTasks((xs) => xs.map((t) => (t.id === op.id ? { ...t, done: op.done } : t)));
+    } else if (op.kind === 'answerQuestion') {
+      setQuestions((xs) => {
+        const q = xs.find((x) => x.id === op.id);
+        if (q) answering.current.set(op.requestId, q);
+        return xs.filter((x) => x.id !== op.id);
+      });
     }
   }, []);
 
@@ -192,7 +217,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const op = e.item.op;
       if (e.type === 'applied') {
         setOnlineState(true);
-        applyChanges(e.result.changes);
+        applyChanges(e.result.changes, false);
+        // Следствия записи (журнал, пересчёты) — сразу, не ждать 30 с; несколько записей подряд — один опрос.
+        if (syncSoon.current) window.clearTimeout(syncSoon.current);
+        syncSoon.current = window.setTimeout(() => { syncSoon.current = null; void syncRef.current(); }, 800);
         callbacks.current.get(op.requestId)?.(e.result.changes, e.result);
         callbacks.current.delete(op.requestId);
         return;
@@ -218,7 +246,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setPayments((xs) => upsert(xs, cur));
       }
       if (op.kind === 'addPayment') setPayments((xs) => xs.map((p) => (p.id === op.payment.id ? { ...p, save: 'failed' } : p)));
-      if (final) void outboxRef.current?.discard(op.requestId);
+      // Ответ не записался: вопрос возвращается, если он всё ещё открыт (уже отвечен в Telegram — не возвращаем).
+      if (op.kind === 'answerQuestion' && final) {
+        const q = answering.current.get(op.requestId);
+        const answered = e.result.current && 'options' in e.result.current && e.result.current.answer !== null;
+        if (q && !answered) setQuestions((xs) => upsert(xs, q));
+        answering.current.delete(op.requestId);
+      }
+      if (final) {
+        void outboxRef.current?.discard(op.requestId);
+        // Повтор не поможет — сказать, что случилось (иначе экран молча вернулся бы к таблице).
+        setNotices((ns) => [...ns, { id: op.requestId, text: `${e.item.label}: ${e.result.message}` }]);
+      }
       play('attention');
     };
   }, [applyChanges]);
@@ -277,6 +316,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setOnlineState(false);
     }
   }, [applyChanges, applySnapshot, applyOptimistic]);
+  useEffect(() => { syncRef.current = syncNow; }, [syncNow]);
 
   // Обратная связь из таблицы: каждые 30 с на открытой вкладке и сразу при возврате во вкладку / появлении сети.
   useEffect(() => {
@@ -400,16 +440,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     ? liveApi.revealPassword(clientId)
     : { login: 'демо-логин', password: 'демо-пароль-не-настоящий', ttlSeconds: 30 }), []);
 
+  const answerQuestion = useCallback((id: string, text: string, onSaved?: () => void) => {
+    send({ kind: 'answerQuestion', requestId: newRequestId(), id, text }, 'Ответ на вопрос', () => onSaved?.());
+  }, [send]);
+
+  const dismissNotice = useCallback((id: string) => setNotices((ns) => ns.filter((n) => n.id !== id)), []);
+
   const failNextWrite = useCallback(() => { fakeServer.failNext = 'SERVER'; }, []);
   const setSlow = useCallback((on: boolean) => { fakeServer.slow = on; }, []);
   const setMaintenance = useCallback((on: boolean) => { fakeServer.maintenance = on; if (!on) void outboxRef.current?.kick(true); }, []);
 
   const value = useMemo<Store>(() => ({
-    loaded, online, clients, deadlines, payments, activity, tasks, questions, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, addTask, toggleTask, resolveConflict, revealPassword,
+    loaded, online, clients, deadlines, payments, activity, tasks, questions, notices, closed, fresh, pending, counters, cursor, conflict,
+    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance,
-  }), [loaded, online, clients, deadlines, payments, activity, tasks, questions, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, addTask, toggleTask, resolveConflict, revealPassword,
+  }), [loaded, online, clients, deadlines, payments, activity, tasks, questions, notices, closed, fresh, pending, counters, cursor, conflict,
+    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

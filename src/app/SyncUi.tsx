@@ -20,11 +20,17 @@ export function OfflineBanner() {
   );
 }
 
-/** Отказ сервера — уведомление с «Повторить» (один раз на запись). */
+/** Отказ сервера — уведомление с «Повторить» (один раз на запись); окончательный отказ — объяснение без повтора. */
 export function FailureWatcher() {
-  const { pending, retry } = useStore();
+  const { pending, retry, notices, dismissNotice } = useStore();
   const toast = useToast();
   const shown = useRef(new Set<string>());
+  useEffect(() => {
+    for (const n of notices) {
+      toast({ key: `notice-${n.id}`, text: n.text, tone: 'error' });
+      dismissNotice(n.id);
+    }
+  }, [notices, dismissNotice, toast]);
   useEffect(() => {
     for (const it of pending) {
       if (it.state !== 'failed' || shown.current.has(it.op.requestId)) continue;

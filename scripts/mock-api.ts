@@ -87,6 +87,7 @@ async function handle(ctx: Ctx, body: { action: string; payload?: Record<string,
     'clients.update': () => ({ kind: 'updateClient', id: p.id, baseVersion: p.baseVersion, patch: p.patch }),
     'tasks.create': () => ({ kind: 'createTask', task: { ...(p.task as object), version: 1, done: false } }),
     'tasks.complete': () => ({ kind: 'completeTask', id: p.id, done: p.done }),
+    'questions.answer': () => ({ kind: 'answerQuestion', id: p.id, text: p.text }),
   };
   const make = ops[body.action];
   if (!make) return fail('SERVER', `Неизвестное действие ${body.action}`);
@@ -101,6 +102,7 @@ async function handle(ctx: Ctx, body: { action: string; payload?: Record<string,
     case 'deadlines.reopen': return env({ reopened: recs('deadline').find((d) => d?.id === p.id) }, r.cursor);
     case 'payments.create': return env({ payment: recs('payment')[0] }, r.cursor);
     case 'payments.cancel': return env({ cancelled: p.id }, r.cursor);
+    case 'questions.answer': return env({ question: recs('question')[0] }, r.cursor);
     case 'clients.create':
     case 'clients.update': return env({ client: recs('client')[0], createdDeadlines: recs('deadline') }, r.cursor);
     default: return env({ task: recs('task')[0] }, r.cursor);

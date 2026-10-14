@@ -129,12 +129,22 @@ describe('живой адаптер: записи', () => {
     expect(a.refreshed).toBe(1);
     expect(s.sent.map((x) => [x.session, x.requestId])).toEqual([['S1', 'R9'], ['S2', 'R9']]);
   });
+  it('ответ на вопрос: questions.answer, вопрос с ответом приходит изменением; «уже отвечен» — с current', async () => {
+    const q = { id: 'Q-1', version: 4, text: 'Добавить КВЕД?', type: 'choice', options: ['Да', 'Нет'], clientId: 'C-1', status: 'asked', askedAt: '2026-10-14T10:00', answer: 'Да' };
+    const s = server(ok({ question: q }, 21), fail('VALIDATION', 'Уже ответили в Telegram: Нет', {}, { ...q, answer: 'Нет' }));
+    const api = new LiveApi(URL_, auth(), s.fetchImpl);
+    const a = await api.write({ kind: 'answerQuestion', requestId: 'R10', id: 'Q-1', text: 'Да' });
+    expect(s.sent[0]).toMatchObject({ action: 'questions.answer', requestId: 'R10', payload: { id: 'Q-1', text: 'Да' } });
+    expect(a.ok && a.changes[0]).toMatchObject({ entity: 'question', op: 'upsert', id: 'Q-1', origin: 'R10' });
+    const b = await api.write({ kind: 'answerQuestion', requestId: 'R11', id: 'Q-1', text: 'Да' });
+    expect(b).toMatchObject({ ok: false, code: 'VALIDATION', current: { id: 'Q-1', answer: 'Нет' } });
+  });
 });
 
 describe('живой адаптер: чтение', () => {
-  it('изменения страницами до hasMore=false; вопросы пока пропускаем', async () => {
+  it('изменения страницами до hasMore=false; незнакомую сущность пропускаем', async () => {
     const s = server(
-      ok({ changes: [{ rev: 11, entity: 'payment', op: 'upsert', id: 'P-1', origin: 'таблица', record: { id: 'P-1' } }, { rev: 12, entity: 'question', op: 'upsert', id: 'Q-1', origin: 'таблица', record: {} }], cursor: 12, hasMore: true }),
+      ok({ changes: [{ rev: 11, entity: 'payment', op: 'upsert', id: 'P-1', origin: 'таблица', record: { id: 'P-1' } }, { rev: 12, entity: 'secret', op: 'upsert', id: 'X-1', origin: 'таблица', record: {} }], cursor: 12, hasMore: true }),
       ok({ changes: [{ rev: 13, entity: 'deadline', op: 'delete', id: 'D-1', origin: 'таблица' }], cursor: 13, hasMore: false }),
     );
     const r = await new LiveApi(URL_, auth(), s.fetchImpl).changesSince(10);

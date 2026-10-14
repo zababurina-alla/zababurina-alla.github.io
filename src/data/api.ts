@@ -14,7 +14,7 @@ export interface Snapshot {
   cursor: number;
 }
 
-export type Entity = 'client' | 'deadline' | 'payment' | 'activity' | 'task';
+export type Entity = 'client' | 'deadline' | 'payment' | 'activity' | 'task' | 'question';
 
 /** Одно изменение в таблице после курсора: запись появилась/изменилась или удалена (закрыта). */
 export interface Change {
@@ -22,7 +22,7 @@ export interface Change {
   entity: Entity;
   op: 'upsert' | 'delete';
   id: string;
-  record?: Client | Deadline | Payment | Activity | Task;
+  record?: Client | Deadline | Payment | Activity | Task | Question;
   /** Откуда изменение: requestId записи с этого сайта, или 'таблица' / 'бот'. */
   origin: string;
 }
@@ -36,7 +36,8 @@ export type WriteOp =
   | { kind: 'addClient'; requestId: string; client: Client }
   | { kind: 'updateClient'; requestId: string; id: string; baseVersion: number; patch: Partial<Pick<Client, 'phone' | 'keyIssuer' | 'keyUntil'>> }
   | { kind: 'createTask'; requestId: string; task: Task }
-  | { kind: 'completeTask'; requestId: string; id: string; done: boolean };
+  | { kind: 'completeTask'; requestId: string; id: string; done: boolean }
+  | { kind: 'answerQuestion'; requestId: string; id: string; text: string };
 
 export type ErrorCode = 'NETWORK' | 'CONFLICT' | 'PERIOD_OPEN' | 'NOT_FOUND' | 'SERVER' | 'VALIDATION' | 'UNDO_TOO_LATE'
   | 'DUPLICATE' | 'BUSY' | 'MAINTENANCE' | 'QUOTA' | 'RATE_LIMIT' | 'AUTH_EXPIRED' | 'AUTH_REQUIRED' | 'FORBIDDEN';
@@ -49,7 +50,7 @@ export type WriteResult =
   | { ok: true; changes: Change[]; cursor: number;
       /** Закрытие срока: когда уйдут уведомления (через 2 мин); null — у клиента нет Telegram, уведомления не будет. */
       notifyAt?: string | null }
-  | { ok: false; code: ErrorCode; message: string; current?: Client | Deadline | Payment;
+  | { ok: false; code: ErrorCode; message: string; current?: Client | Deadline | Payment | Question;
       /** MAINTENANCE: когда ночные задачи закончатся (флаг сервера, не часы) — раньше не повторять. */
       retryAt?: string };
 

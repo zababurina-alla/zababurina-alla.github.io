@@ -913,6 +913,22 @@ body {
   justify-content: space-between;
 }
 
+/* Ответ на вопрос: варианты кнопками в строку (переносятся), текст — поле и «Ответить». */
+.question__answers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.question__answers .input {
+  flex: 1 1 10rem;
+  width: auto;
+}
+
+.input--sm {
+  min-height: 2.5rem;
+}
+
 .feed {
   list-style: none;
   margin: 0;

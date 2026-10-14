@@ -4,7 +4,7 @@
 // Рычаги отладки (обрыв связи, отказ, правка извне) — для кнопок в режиме отладки.
 import { ACTIVITY, CLIENTS, DEADLINES, PAYMENTS, QUESTIONS, TASKS } from './fake';
 import type { CabinetApi, Change, Entity, Snapshot, WriteOp, WriteResult } from './api';
-import type { Activity, Client, Deadline, Payment, Task } from './types';
+import type { Activity, Client, Deadline, Payment, Question, Task } from './types';
 import { TODAY, addDays, endOfMonth, fmtDate } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 
@@ -46,6 +46,7 @@ class FakeServer implements CabinetApi {
   private payments = new Map<string, Payment>(PAYMENTS.map((p) => [p.id, { ...p }]));
   private activity: Activity[] = ACTIVITY.map((a) => ({ ...a }));
   private tasks = new Map<string, Task>(TASKS.map((t) => [t.id, { ...t }]));
+  private questions = new Map<string, Question>(QUESTIONS.map((q) => [q.id, { ...q, options: [...q.options] }]));
   private log: Change[] = [];
   private cursor = 100;
   /** Ответы на уже выполненные requestId — повтор из очереди возвращает тот же ответ (идемпотентность). */
@@ -81,7 +82,7 @@ class FakeServer implements CabinetApi {
       payments: [...this.payments.values()].map((p) => ({ ...p })),
       activity: this.activity.map((a) => ({ ...a })),
       tasks: [...this.tasks.values()].map((t) => ({ ...t })),
-      questions: QUESTIONS.map((q) => ({ ...q, options: [...q.options] })),
+      questions: [...this.questions.values()].filter((q) => q.answer === null).map((q) => ({ ...q, options: [...q.options] })),
       cursor: this.cursor,
     };
   }
@@ -184,6 +185,17 @@ class FakeServer implements CabinetApi {
         const t = { ...op.task, version: 1 };
         this.tasks.set(t.id, t);
         return { ok: true, changes: [this.record('task', 'upsert', t.id, o, t)], cursor: this.cursor };
+      }
+      case 'answerQuestion': {
+        // Как сервер (контракт v2.1, у. 6): уже отвечен в Telegram — отказ с текущим ответом; choice — только из вариантов.
+        const q = this.questions.get(op.id);
+        if (!q) return { ok: false, code: 'NOT_FOUND', message: 'Этого вопроса уже нет' };
+        if (q.answer !== null) return { ok: false, code: 'VALIDATION', message: `Уже ответили в Telegram: ${q.answer}`, current: { ...q } };
+        if (q.type === 'choice' && !q.options.includes(op.text)) return { ok: false, code: 'VALIDATION', message: 'Выберите один из вариантов' };
+        if (q.type === 'number' && !/^-?\d+([.,]\d+)?$/.test(op.text.trim())) return { ok: false, code: 'VALIDATION', message: 'Здесь нужно число' };
+        const upd: Question = { ...q, answer: op.text, version: this.cursor + 1 };
+        this.questions.set(q.id, upd);
+        return { ok: true, changes: [this.record('question', 'upsert', q.id, o, upd), this.act(`Ответ на вопрос: ${op.text}`, o, 'сайт')], cursor: this.cursor };
       }
       case 'completeTask': {
         const t = this.tasks.get(op.id);
