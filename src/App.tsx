@@ -20,6 +20,10 @@ import { CommandPalette } from './app/CommandPalette';
 import { ConflictDialog, FailureWatcher, OfflineBanner } from './app/SyncUi';
 import { Login } from './app/Login';
 import { auth, useAuth } from './data/session';
+import { ServerDown, ReadOnlyBanner } from './app/SyncUi';
+import { canWrite } from './config';
+import { roMessage } from './ui/readonly';
+import { useToast } from './ui/toast';
 
 function Screens() {
   const route = useRoute();
@@ -29,9 +33,16 @@ function Screens() {
   const [addOpen, setAddOpen] = useState(false);
   const [clientId, setClientId] = useState<string | null>(null);
 
+  const toast = useToast();
   const ui = useMemo<UiApi>(() => ({
-    openPayment: (id) => setPayFor({ open: true, clientId: id ?? null }),
-    openAddClient: () => setAddOpen(true),
+    openPayment: (id) => {
+      if (!canWrite('payments')) { toast({ text: roMessage('payments') }); return; }
+      setPayFor({ open: true, clientId: id ?? null });
+    },
+    openAddClient: () => {
+      if (!canWrite('clients')) { toast({ text: roMessage('clients') }); return; }
+      setAddOpen(true);
+    },
     openPalette: () => setPaletteOpen(true),
     // Строка → карточка: инициалы из строки перелетают в заголовок карточки, панель выезжает (View Transitions).
     openClient: (id) => {
@@ -42,14 +53,16 @@ function Screens() {
         setClientId(id);
       }, src ? 'card' : 'panel');
     },
-  }), []);
+  }), [toast]);
 
   return (
     <UiCtx.Provider value={ui}>
       <Shell route={route.name}>
         <OfflineBanner />
-        {!store.loaded && <Skeleton />}
-        {store.loaded && <>
+        <ReadOnlyBanner />
+        {store.loadError && <ServerDown message={store.loadError} onRetry={store.reload} />}
+        {!store.loaded && !store.loadError && <Skeleton />}
+        {store.loaded && !store.loadError && <>
         {route.name === 'today' && <Today />}
         {route.name === 'clients' && <Clients focusSearch={route.params[0] === 'search'} />}
         {route.name === 'deadlines' && <Deadlines />}

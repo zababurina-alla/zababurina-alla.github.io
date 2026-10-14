@@ -11,6 +11,7 @@ import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
 import { Avatar, RollingNumber, SaveBadge, reducedMotion } from '../ui/kit';
 import { useUi } from '../app/ui-context';
+import { roAttrs } from '../ui/readonly';
 
 const SOURCE: Record<string, { icon: IconName; text: string }> = {
   'сайт': { icon: 'globe', text: 'с сайта' }, 'бот': { icon: 'bot', text: 'через бота' }, 'таблица': { icon: 'sheet', text: 'в таблице' },
@@ -38,7 +39,7 @@ export function Payments() {
     <div ref={scope} className="page">
       <header className="page__head reveal">
         <div><h1 className="page__title">Платежи</h1><p className="page__sub">{monthName(stats.key, 'nom')} {stats.key.slice(0, 4)}</p></div>
-        <button type="button" className="btn btn--primary" onClick={() => ui.openPayment()}><Icon name="plus" />Записать платёж</button>
+        <button type="button" className="btn btn--primary" onClick={() => ui.openPayment()} {...roAttrs('payments')}><Icon name="plus" />Записать платёж</button>
       </header>
 
       <section className="panel panel--pad pay-summary reveal" aria-label="Итог месяца">

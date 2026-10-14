@@ -1,14 +1,15 @@
 // Один на страницу вход и один API: живой (когда задан адрес Apps Script) или выдуманный сервер.
 import { useSyncExternalStore } from 'react';
-import { API_URL, GOOGLE_CLIENT_ID, isLive } from '../config';
+import { GOOGLE_CLIENT_ID, apiUrl, isLive } from '../config';
 import { Auth } from './auth';
 import type { AuthState } from './auth';
 import { LiveApi } from './liveApi';
 import { fakeServer } from './fakeServer';
 import type { CabinetApi } from './api';
 
-export const auth: Auth | null = isLive() ? new Auth(API_URL, GOOGLE_CLIENT_ID) : null;
-export const liveApi: LiveApi | null = auth ? new LiveApi(API_URL, auth) : null;
+// Модуль загружается после config.json (main.tsx): адрес уже известен.
+export const auth: Auth | null = isLive() ? new Auth(apiUrl(), GOOGLE_CLIENT_ID) : null;
+export const liveApi: LiveApi | null = auth ? new LiveApi(apiUrl(), auth) : null;
 export const api: CabinetApi = liveApi ?? fakeServer;
 
 const DEMO: AuthState = { status: 'signedIn', user: null, error: null };

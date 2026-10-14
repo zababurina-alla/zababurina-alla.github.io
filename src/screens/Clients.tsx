@@ -11,6 +11,7 @@ import { search } from '../lib/search';
 import { Icon } from '../ui/Icon';
 import { Avatar, StatusPill, Tabs, reducedMotion } from '../ui/kit';
 import { useUi } from '../app/ui-context';
+import { roAttrs } from '../ui/readonly';
 
 type KindFilter = 'all' | 'fop1' | 'fop2' | 'fop3' | 'other';
 
@@ -54,7 +55,7 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
           <h1 className="page__title">Клиенты</h1>
           <p className="page__sub">{store.clients.length} {plural(store.clients.length, 'клиент', 'клиента', 'клиентов')} в таблице</p>
         </div>
-        <button type="button" className="btn btn--primary" onClick={ui.openAddClient}><Icon name="userPlus" />Добавить клиента</button>
+        <button type="button" className="btn btn--primary" onClick={ui.openAddClient} {...roAttrs('clients')}><Icon name="userPlus" />Добавить клиента</button>
       </header>
 
       <section className="panel reveal" aria-label="Список клиентов">

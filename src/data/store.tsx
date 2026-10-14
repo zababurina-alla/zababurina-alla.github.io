@@ -8,6 +8,9 @@ import type { ReactNode } from 'react';
 import { fakeServer } from './fakeServer';
 import { api, liveApi } from './session';
 import { ApiError } from './transport';
+import { canWrite, isLive } from '../config';
+import { roMessage } from '../ui/readonly';
+import type { WriteArea } from '../config';
 import { kvAll, kvDelete, kvSet } from './idb';
 import { Outbox } from './outbox';
 import type { Counters, OutboxEvent, OutboxItem } from './outbox';
@@ -47,6 +50,9 @@ interface Store {
   tasks: Task[];
   questions: Question[];
   notices: Notice[];
+  /** Таблица не отдала данные при открытии (живой режим): текст для мамы; null — всё в порядке. */
+  loadError: string | null;
+  reload: () => void;
   closed: ClosedEntry[];
   fresh: string[];
   pending: OutboxItem[];
@@ -83,6 +89,11 @@ interface Store {
 
 const Ctx = createContext<Store | null>(null);
 
+const AREA_OF: Record<WriteOp['kind'], WriteArea> = {
+  closeDeadline: 'deadlines', reopenDeadline: 'deadlines', addPayment: 'payments', cancelPayment: 'payments',
+  addClient: 'clients', updateClient: 'clients', createTask: 'tasks', completeTask: 'tasks', answerQuestion: 'questions',
+};
+
 function upsert<T extends { id: string }>(xs: T[], rec: T): T[] {
   const i = xs.findIndex((x) => x.id === rec.id);
   if (i < 0) return [rec, ...xs];
@@ -101,6 +112,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   /** Вопросы, убранные с экрана до ответа сервера, — вернуть, если ответ не записался. */
   const answering = useRef(new Map<string, Question>());
   const [closed, setClosed] = useState<ClosedEntry[]>([]);
@@ -284,15 +297,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const snap = await api.snapshot();
         if (!alive) return;
         applySnapshot(snap);
-      } catch {
+        setLoadError(null);
+      } catch (e) {
         setOnlineState(false);
+        // Живой режим без снимка — пустые экраны вводили бы в заблуждение: показать, что случилось.
+        if (alive && isLive()) setLoadError(e instanceof ApiError ? e.message : 'Таблица не ответила');
       }
       const left = await ob.load();
       for (const it of left) { mine.current.add(it.op.requestId); applyOptimistic(it.op); }
       if (alive) setLoaded(true);
     })();
     return () => { alive = false; };
-  }, [applyOptimistic, applySnapshot]);
+  }, [applyOptimistic, applySnapshot, attempt]);
+
+  const reload = useCallback(() => { setLoadError(null); setLoaded(false); setAttempt((n) => n + 1); }, []);
 
   const syncNow = useCallback(async () => {
     try {
@@ -328,6 +346,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [syncNow]);
 
   const send = useCallback((op: WriteOp, label: string, onApplied?: (changes: Change[], result: { notifyAt?: string | null }) => void, showAfterMs = 0) => {
+    // Раздел ещё только для просмотра (config.json → writes): в таблицу не пишем, говорим, где сделать.
+    const area = AREA_OF[op.kind];
+    if (!canWrite(area)) {
+      setNotices((ns) => [...ns, { id: op.requestId, text: `${label}: ${roMessage(area)}` }]);
+      return;
+    }
     mine.current.add(op.requestId);
     if (onApplied) callbacks.current.set(op.requestId, onApplied);
     // Запись — в очередь сразу; на экране — сразу или после короткой анимации (таймер, не кадры анимации:
@@ -451,11 +475,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const setMaintenance = useCallback((on: boolean) => { fakeServer.maintenance = on; if (!on) void outboxRef.current?.kick(true); }, []);
 
   const value = useMemo<Store>(() => ({
-    loaded, online, clients, deadlines, payments, activity, tasks, questions, notices, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice,
+    loaded, online, clients, deadlines, payments, activity, tasks, questions, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
+    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance,
-  }), [loaded, online, clients, deadlines, payments, activity, tasks, questions, notices, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice,
+  }), [loaded, online, clients, deadlines, payments, activity, tasks, questions, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
+    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

@@ -8,6 +8,8 @@ import { play } from '../lib/sound';
 import { reducedMotion } from '../ui/kit';
 import { useToast } from '../ui/toast';
 import { burst, flyToCounter } from './closeFx';
+import { canWrite } from '../config';
+import { roMessage } from '../ui/readonly';
 
 export function useCloseDeadline(rowSelector = '[data-row]') {
   const store = useStore();
@@ -18,6 +20,11 @@ export function useCloseDeadline(rowSelector = '[data-row]') {
   function close(id: string) {
     const d = store.deadlines.find((x) => x.id === id);
     if (!d || closing) return;
+    // Сроки с сайта пока не закрываются (только просмотр) — подпись в строке, как с периодом.
+    if (!canWrite('deadlines')) {
+      setWarn((w) => ({ ...w, [id]: roMessage('deadlines') }));
+      return;
+    }
     // Проверка периода до анимации: если нельзя — мягкое предупреждение в строке, ничего не уезжает.
     if (d.periodEnd && TODAY <= d.periodEnd) {
       setWarn((w) => ({ ...w, [id]: `Период ещё не закончился — закрыть можно с ${fmtDate(addDays(d.periodEnd ?? TODAY, 1))}` }));

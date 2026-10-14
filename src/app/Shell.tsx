@@ -1,6 +1,7 @@
 // Оболочка: левое меню на ноутбуке; верхняя полоса, нижние вкладки и кнопка «+» на телефоне.
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { auth, useAuth } from '../data/session';
+import { roAttrs } from '../ui/readonly';
 import { getTheme, subscribeTheme, toggleTheme } from '../lib/theme';
 import type { ReactNode } from 'react';
 import { useStore } from '../data/store';
@@ -172,7 +173,7 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
           <span className="brand__mark" aria-hidden="true">Б</span>
           <span className="brand__name">Бухгалтерия</span>
         </a>
-        <button type="button" className="btn btn--primary rail__cta" onClick={() => ui.openPayment()} aria-keyshortcuts="Alt+N">
+        <button type="button" className="btn btn--primary rail__cta" onClick={() => ui.openPayment()} aria-keyshortcuts="Alt+N" {...roAttrs('payments')}>
           <Icon name="plus" />Записать платёж<kbd className="kbd kbd--on-accent">Alt N</kbd>
         </button>
         <nav ref={navRef} className="nav" aria-label="Разделы">
@@ -208,7 +209,7 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
         <div key={route} className="screen">{children}</div>
       </main>
 
-      <button type="button" className="fab" onClick={() => ui.openPayment()} aria-label="Записать платёж"><Icon name="plus" size={26} /></button>
+      <button type="button" className="fab" onClick={() => ui.openPayment()} aria-label="Записать платёж" {...roAttrs('payments')}><Icon name="plus" size={26} /></button>
 
       <nav className="tabbar" aria-label="Разделы">
         {PHONE_NAV.map((id) => {

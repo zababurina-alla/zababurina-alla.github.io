@@ -3622,3 +3622,31 @@ body {
   margin: 0;
   color: var(--st-red-ink);
 }
+
+/* Только просмотр (config.json → writes): нейтральная плашка вместо оранжевой «нет связи». */
+.offline--info {
+  background: var(--surface-sunk);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+/* Таблица не отдала данные при открытии — вместо пустых экранов. */
+.down {
+  max-width: 40rem;
+  margin: var(--space-6) auto;
+  display: grid;
+  justify-items: start;
+  gap: var(--space-4);
+}
+
+.down p {
+  margin: 0;
+}
+
+/* Кнопка записи в разделе «только просмотр»: видна, но неактивна; подпись — в title. */
+.btn[aria-disabled='true'],
+.fab[aria-disabled='true'],
+.quick input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

@@ -11,6 +11,7 @@ import type { IconName } from '../ui/Icon';
 import { RollingNumber, StatusPill, Tabs, reducedMotion } from '../ui/kit';
 import { useUi } from '../app/ui-context';
 import { useToast } from '../ui/toast';
+import { canWrite } from '../config';
 import type { Question } from '../data/types';
 import { DeadlineTable } from './DeadlineTable';
 
@@ -68,6 +69,7 @@ function QuestionAnswer({ q }: { q: Question }) {
   const store = useStore();
   const toast = useToast();
   const [text, setText] = useState('');
+  if (!canWrite('questions')) return null;
   const send = (value: string) => {
     const v = value.trim();
     if (!v) return;

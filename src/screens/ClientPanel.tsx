@@ -1,5 +1,6 @@
 // Карточка клиента — выезжает справа (на телефоне — во весь экран). Вкладки: обзор, сроки, платежи, история.
 import { useEffect, useRef, useState } from 'react';
+import { canWrite } from '../config';
 import gsap from 'gsap';
 import { KIND_LABEL } from '../data/fake';
 import { useStore } from '../data/store';
@@ -88,7 +89,7 @@ function PhoneField({ clientId, phone, version }: { clientId: string; phone: str
     return (
       <p className="row-gap">
         <span className="num">{phone}</span>
-        {saving ? <SaveBadge state="saving" offline={!store.online} /> : <button type="button" className="link" onClick={() => { setBase(version); setEdit(phone); }}>Изменить</button>}
+        {saving ? <SaveBadge state="saving" offline={!store.online} /> : (canWrite('clients') ? <button type="button" className="link" onClick={() => { setBase(version); setEdit(phone); }}>Изменить</button> : <span className="sub">изменить — в таблице</span>)}
       </p>
     );
   }

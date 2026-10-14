@@ -1,20 +1,61 @@
-// Настройки подключения к живой таблице. Оба значения публичные по природе: адрес веб-приложения и client ID
-// всё равно видны в коде страницы. Секретов здесь нет и быть не должно (контракт, раздел 3: список почт — на сервере).
-// Пока API_URL пуст — сайт работает на выдуманном сервере (src/data/fakeServer.ts).
+// Настройки подключения к живой таблице. Читаются при запуске из config.json рядом с сайтом — включить живые данные
+// или открыть запись в разделе можно правкой этого файла, без пересборки. Значения публичные по природе (адрес
+// веб-приложения и client ID всё равно видны в коде страницы); секретов здесь нет и быть не должно.
+// Пустой адрес — сайт на выдуманном сервере (src/data/fakeServer.ts).
 
-/** POST-адрес Apps Script: https://script.google.com/macros/s/<DEPLOYMENT_ID>/exec.
- *  Для проверки у себя можно задать при запуске: VITE_API_URL=http://localhost:8787 npm run dev */
-export const API_URL: string = import.meta.env.VITE_API_URL ?? '';
+/** Разделы, запись в которых можно включать по одному (сервер готовит их по очереди). */
+export type WriteArea = 'payments' | 'tasks' | 'questions' | 'deadlines' | 'clients';
+export const WRITE_AREAS: readonly WriteArea[] = ['payments', 'tasks', 'questions', 'deadlines', 'clients'];
 
 /** OAuth client ID проекта Google Cloud «zababurina-alla» (…apps.googleusercontent.com). */
 export const GOOGLE_CLIENT_ID = '1078049272948-bnvonl9qah7npdq63gktbio1rm2lbgvb.apps.googleusercontent.com';
 
+interface Runtime { apiUrl: string; writes: WriteArea[] }
+let runtime: Runtime = { apiUrl: '', writes: [...WRITE_AREAS] };
+
+const isArea = (x: unknown): x is WriteArea => typeof x === 'string' && (WRITE_AREAS as readonly string[]).includes(x);
+
+/** config.json: { "apiUrl": "https://script.google.com/macros/s/…/exec", "writes": ["payments", "tasks"] }.
+ *  Нет файла или он битый — выдуманные данные; нет "writes" — запись во всех разделах; [] — только просмотр. */
+export async function loadRuntimeConfig(fetchImpl: typeof fetch = fetch): Promise<void> {
+  try {
+    const r = await fetchImpl('./config.json', { cache: 'no-store' });
+    if (!r.ok) return;
+    const j = await r.json() as { apiUrl?: unknown; writes?: unknown };
+    runtime = {
+      apiUrl: typeof j.apiUrl === 'string' ? j.apiUrl.trim() : '',
+      writes: Array.isArray(j.writes) ? j.writes.filter(isArea) : [...WRITE_AREAS],
+    };
+  } catch {
+    // нет связи или файл битый — остаёмся на выдуманных данных
+  }
+}
+
+/** POST-адрес Apps Script. Для проверки у себя — npm run dev:mock (адрес учебного сервера задаёт vite.config.ts). */
+export function apiUrl(): string {
+  return runtime.apiUrl || (import.meta.env.VITE_API_URL ?? '');
+}
+
 /** Живой режим: адрес задан и не включён показ на выдуманных данных (?demo=1). */
 export function isLive(): boolean {
-  if (!API_URL || !GOOGLE_CLIENT_ID) return false;
+  if (!apiUrl() || !GOOGLE_CLIENT_ID) return false;
   try {
     return new URLSearchParams(window.location.search).get('demo') !== '1';
   } catch {
     return true;
   }
 }
+
+/** Можно ли записывать с сайта в этот раздел. На выдуманных данных — всегда. */
+export function canWrite(area: WriteArea): boolean {
+  return !isLive() || runtime.writes.includes(area);
+}
+
+/** Разделы, где на живых данных пока только просмотр. */
+export function readOnlyAreas(): WriteArea[] {
+  return isLive() ? WRITE_AREAS.filter((a) => !runtime.writes.includes(a)) : [];
+}
+
+export const AREA_LABEL: Record<WriteArea, string> = {
+  payments: 'платежи', tasks: 'задачи', questions: 'ответы на вопросы', deadlines: 'сроки', clients: 'клиенты',
+};

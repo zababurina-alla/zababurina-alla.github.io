@@ -1,5 +1,6 @@
 // Ключи ЭЦП, Справочник, Задачи и «Ещё» (телефон). Короче основных экранов, но рабочие.
 import { useState } from 'react';
+import { canWrite } from '../config';
 import { useStore } from '../data/store';
 import { TODAY, addDays, daysBetween, daysLabel, fmtDate, statusByDays } from '../lib/dates';
 import { parseQuickTask } from '../lib/quickTask';
@@ -111,7 +112,8 @@ export function Tasks() {
         <label className="quick__row">
           <Icon name="plus" />
           <span className="visually-hidden">Новая задача</span>
-          <input value={line} onChange={(e) => setLine(e.target.value)} placeholder="Например: Позвонить Ромашко завтра" autoComplete="off" />
+          <input value={line} onChange={(e) => setLine(e.target.value)} autoComplete="off"
+            disabled={!canWrite('tasks')} placeholder={canWrite('tasks') ? 'Например: Позвонить Ромашко завтра' : 'Задачи пока — в таблице'} />
           <button type="submit" className="btn btn--primary btn--sm" disabled={!parsed?.text}>Добавить</button>
         </label>
         {parsed && (
