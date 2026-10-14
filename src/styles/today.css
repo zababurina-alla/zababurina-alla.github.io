@@ -1,0 +1,420 @@
+/* «Сегодня»: первый экран (фраза дня + плашки срочности), список сроков по дням, боковая колонка. */
+
+/* ═════════ Первый экран ═════════ */
+.hero {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-6) var(--space-5);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--edge), 0 0 0 1px var(--line), var(--shadow-1);
+  overflow: hidden;
+}
+
+/* Свечение внутри первого экрана: синее слева, пшеничное справа — как у «Вставьте две таблицы» */
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(42rem 22rem at 0% 0%, var(--glow-a), transparent 70%),
+    radial-gradient(30rem 18rem at 100% 100%, var(--glow-b), transparent 70%);
+}
+
+.hero .eyebrow::first-letter {
+  text-transform: uppercase;
+}
+
+.hero__title {
+  font-family: var(--display);
+  font-size: var(--text-hero);
+  font-weight: var(--weight-bold);
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.hero__title em {
+  color: var(--ink);
+}
+
+.hero__title em.is-red {
+  color: var(--st-red-ink);
+}
+
+.hero__lede {
+  max-width: 60ch;
+  color: var(--ink-2);
+  font-size: 1.1875rem;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+/* ═════════ Плашки срочности (они же фильтр списка) ═════════ */
+.tallies {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+@media (min-width: 760px) {
+  .tallies {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.tally {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  min-height: 7.25rem;
+  padding: var(--space-4);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink);
+  text-align: left;
+  text-decoration: none;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  transition: transform var(--dur-press) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), background-color var(--dur-base) ease;
+}
+
+.tally__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.tally__n {
+  font-size: 2.75rem;
+  line-height: 1;
+}
+
+.tally__l {
+  margin-top: var(--space-2);
+  font-weight: var(--weight-semibold);
+}
+
+.tally__note {
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+
+.tally.is-zero .tally__n {
+  color: var(--ink-2);
+}
+
+.tally--red:not(.is-zero) .tally__n { color: var(--st-red-ink); }
+.tally--orange:not(.is-zero) .tally__n { color: var(--st-orange-ink); }
+
+.tally:active {
+  transform: scale(0.98);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .tally:hover {
+    background: var(--surface);
+    box-shadow: inset 0 0 0 1px var(--line-strong), var(--shadow-2);
+  }
+}
+
+/* Выбранная плашка — рамка цветом её срочности */
+.tally[aria-pressed='true'] {
+  background: var(--surface);
+  box-shadow: inset 0 0 0 2px var(--tally-c, var(--accent)), var(--shadow-2);
+}
+
+.tally--red { --tally-c: var(--dot-red); }
+.tally--orange { --tally-c: var(--dot-orange); }
+.tally--yellow { --tally-c: var(--dot-yellow); }
+.tally--accent .icon { color: var(--accent); }
+
+/* ═════════ Сетка: список + боковая колонка ═════════ */
+.today-grid {
+  display: grid;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.today-side {
+  display: grid;
+  gap: var(--space-5);
+}
+
+@media (min-width: 1280px) {
+  .today-grid {
+    grid-template-columns: minmax(0, 1fr) 22.5rem;
+  }
+
+  .today-side {
+    position: sticky;
+    top: var(--space-5);
+  }
+}
+
+@media (min-width: 760px) and (max-width: 1279px) {
+  .today-side {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.today-list .panel__head {
+  padding-bottom: var(--space-2);
+}
+
+/* ═════════ Вопрос от Дмитрия — пшеничный лист: это действие для мамы ═════════ */
+.panel--wheat {
+  background:
+    linear-gradient(180deg, var(--wheat-soft), var(--surface) 70%);
+  box-shadow: inset 0 1px 0 var(--edge), 0 0 0 1px color-mix(in srgb, var(--wheat) 40%, var(--line)), var(--shadow-1);
+}
+
+.panel--wheat .panel__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.panel--wheat .icon-tile {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+.question {
+  display: grid;
+  gap: var(--space-3);
+  padding: 0 var(--space-5) var(--space-4);
+}
+
+.question + .question {
+  padding-top: var(--space-4);
+  box-shadow: inset 0 1px 0 var(--line);
+}
+
+.question__text {
+  font-size: var(--text-md);
+  line-height: 1.45;
+}
+
+/* Ответ на вопрос: варианты кнопками в строку (переносятся), текст — поле и «Ответить». */
+.question__answers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.question__answers .input {
+  flex: 1 1 10rem;
+  width: auto;
+}
+
+.input--sm {
+  min-height: 2.5rem;
+}
+
+/* Палец: цель нажатия не меньше 44 px. */
+@media (pointer: coarse) {
+  .question__answers .btn,
+  .question__answers .input {
+    min-height: 44px;
+  }
+}
+
+/* ═════════ Короткие списки сбоку (ключи) ═════════ */
+.mini {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--space-2) var(--space-2);
+}
+
+.mini__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 3.5rem;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  text-align: left;
+  transition: background-color var(--dur-fast) ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .mini__row:hover {
+    background: var(--surface-sunk);
+  }
+}
+
+.mini__text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+}
+
+.mini__text strong {
+  font-weight: var(--weight-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mini__when {
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+/* ═════════ Деньги месяца ═════════ */
+.money-card__body {
+  display: grid;
+  gap: var(--space-1);
+  padding: 0 var(--space-5) var(--space-4);
+}
+
+.money-card__sum {
+  font-size: var(--text-3xl);
+  line-height: 1.1;
+}
+
+.money-card .sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-1);
+}
+
+.chart-wrap {
+  position: relative;
+  margin-top: var(--space-3);
+}
+
+.chart {
+  width: 100%;
+  height: 5rem;
+  overflow: visible;
+  cursor: crosshair;
+}
+
+.chart__grid {
+  stroke: var(--line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart__area {
+  fill: var(--accent);
+  opacity: 0.1;
+}
+
+.chart__line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart__dot {
+  fill: var(--accent);
+  stroke: var(--surface);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart__cursor {
+  stroke: var(--ink-2);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart__hdot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--surface);
+  pointer-events: none;
+}
+
+.chart__tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  translate: -50% 0;
+  display: grid;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-s);
+  background: var(--toast);
+  color: var(--on-toast);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: var(--shadow-2);
+  animation: fade-in 120ms ease;
+}
+
+/* ═════════ Что изменилось ═════════ */
+.feed {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--space-5) var(--space-4);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.feed__item {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.feed__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--surface-sunk);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink-2);
+}
+
+.feed__text {
+  display: grid;
+  font-size: var(--text-md);
+  line-height: 1.4;
+}
+
+/* ═════════ Телефон ═════════ */
+@media (max-width: 759px) {
+  .hero {
+    padding: var(--space-5) var(--space-4) var(--space-4);
+    border-radius: var(--radius-lg);
+  }
+
+  .hero__lede {
+    font-size: var(--text-md);
+  }
+
+  .tally {
+    min-height: 6.25rem;
+    padding: var(--space-3);
+  }
+
+  .tally__n {
+    font-size: 2.25rem;
+  }
+}

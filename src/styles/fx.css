@@ -1,0 +1,297 @@
+/* Слой движения. Движение — с назначением: показать, куда ушло, что пришло, что нажато. Только transform и opacity,
+   пружины — токены --spring*. «Уменьшить движение» в системе — те же сигналы без перемещений (низ файла). */
+
+/* ═════════ Смена экрана (View Transitions): старый уходит вверх и тает, новый поднимается снизу ═════════ */
+.rail { view-transition-name: rail; }
+.main { view-transition-name: main; }
+.toasts { view-transition-name: toasts; }
+
+::view-transition-group(root),
+::view-transition-group(rail),
+::view-transition-group(toasts) {
+  animation-duration: 0s;
+}
+
+::view-transition-old(main) {
+  animation: vt-out 140ms ease-in both;
+}
+
+::view-transition-new(main) {
+  animation: vt-in var(--dur-spring) var(--spring) both;
+}
+
+[data-vt='card']::view-transition-old(main),
+[data-vt='card']::view-transition-new(main),
+[data-vt='panel']::view-transition-old(main),
+[data-vt='panel']::view-transition-new(main) {
+  animation: none;
+}
+
+@keyframes vt-out {
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes vt-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+/* Без View Transitions — запасной вариант */
+@supports not (view-transition-name: none) {
+  .screen {
+    animation: vt-in var(--dur-base) var(--ease-out);
+  }
+}
+
+/* Строка → карточка клиента: инициалы перелетают из строки в заголовок карточки, панель выезжает справа */
+.modal--panel .modal__box { view-transition-name: client-panel; }
+.modal--panel .vt-avatar { view-transition-name: client-avatar; }
+
+[data-vt='card'] .modal--panel .modal__box,
+[data-vt='panel'] .modal--panel .modal__box {
+  transition: none;
+}
+
+::view-transition-new(client-panel) {
+  animation: vt-panel-in var(--dur-move) var(--ease-drawer) both;
+}
+
+::view-transition-group(client-avatar) {
+  animation-duration: 380ms;
+  animation-timing-function: var(--ease-in-out);
+}
+
+.modal--panel .cp__who,
+.modal--panel .cp__actions {
+  animation: fade-in 260ms ease 120ms both;
+}
+
+@keyframes vt-panel-in {
+  from { transform: translateX(100%); }
+}
+
+.vt-avatar { display: inline-flex; }
+.vt-name { display: inline-block; }
+
+/* ═════════ Строки появляются по очереди: шаг 30 мс, первые 20 (как в образце) ═════════ */
+.screen .dtable__row:nth-child(-n + 21) {
+  animation: row-in 420ms var(--ease-out) both;
+  animation-delay: calc(min(var(--i, 0), 20) * var(--stagger) + 120ms);
+}
+
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* ═════════ Закрытие срока: кольцо от галочки, полёт плашки в «Закрыто сегодня» ═════════ */
+.is-closing .check-btn::after {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--dot-green);
+  animation: ring-out 520ms var(--ease-out) both;
+  pointer-events: none;
+}
+
+@keyframes ring-out {
+  to {
+    opacity: 0;
+    transform: scale(2.1);
+  }
+}
+
+.fx-dot {
+  position: fixed;
+  z-index: 80;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.fx-ghost {
+  position: fixed;
+  z-index: 80;
+  display: inline-flex;
+  align-items: center;
+  height: 2.25rem;
+  max-width: 22rem;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--st-green-bg);
+  color: var(--st-green-ink);
+  box-shadow: var(--shadow-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  transform-origin: 50% 50%;
+}
+
+/* ═════════ Пришло из таблицы или бота: мягкая подсветка 2,6 с ═════════
+   Подсветка — слой поверх строки (opacity), строка не прыгает и фокус в форме не теряется. */
+.is-fresh {
+  position: relative;
+}
+
+.is-fresh::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--accent);
+  opacity: 0;
+  pointer-events: none;
+  animation: fresh 2.6s ease-out;
+}
+
+@keyframes fresh {
+  0% { opacity: 0; }
+  12% { opacity: 0.14; }
+  100% { opacity: 0; }
+}
+
+.feed__item.is-fresh {
+  animation: rise-in var(--dur-spring) var(--spring) both;
+}
+
+.feed__item.is-fresh::after {
+  inset: -4px -8px;
+  border-radius: var(--radius-s);
+}
+
+/* ═════════ Свет за курсором: мягкое пятно и подсветка рамки у курсора (как у образца) ═════════
+   Координаты --mx / --my ставит src/ui/fx.ts только той поверхности, над которой мышь. */
+@media (hover: hover) and (pointer: fine) {
+  .tally::before,
+  .hero::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: var(--fx-on, 0);
+    transition: opacity 0.45s var(--ease-out);
+  }
+
+  .tally::before {
+    z-index: -1;
+    background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--tally-c, var(--accent)) 12%, transparent), transparent 70%);
+  }
+
+  .hero::after {
+    z-index: -1;
+    background: radial-gradient(560px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--accent) 7%, transparent), transparent 65%);
+  }
+}
+
+/* ═════════ Значки оживают при наведении на пункт меню, кнопку, пустое место ═════════ */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .nav__item .icon,
+  .btn .icon,
+  .icon-btn .icon {
+    transition: transform var(--dur-pop) var(--spring-pop);
+  }
+
+  .nav__item:hover [data-icon='today'] { transform: rotate(45deg); }
+  .nav__item:hover [data-icon='clients'] { transform: translateY(-1px) scale(1.06); }
+  .nav__item:hover [data-icon='calendar'] { transform: rotate(-8deg); }
+  .nav__item:hover [data-icon='wallet'] { transform: translateX(2px); }
+  .nav__item:hover [data-icon='tasks'] { transform: scale(1.08); }
+  .nav__item:hover [data-icon='key'] { transform: rotate(-25deg); }
+  .nav__item:hover [data-icon='book'] { transform: rotate(-6deg) translateY(-1px); }
+  .icon-btn:hover [data-icon='moon'] { transform: rotate(-20deg); }
+  .icon-btn:hover [data-icon='sun'] { transform: rotate(60deg); }
+  .icon-btn:hover [data-icon='sound'] { transform: scale(1.1); }
+  .btn:hover [data-icon='plus'] { transform: rotate(90deg); }
+
+  .empty:hover .pic__check { animation: pic-check 0.9s var(--ease-out); }
+  .empty:hover .pic__steam { animation: pic-steam 1.6s ease-in-out infinite; }
+  .empty:hover .pic__lens { animation: pic-lens 1.4s ease-in-out infinite; transform-origin: 66px 38px; }
+  .empty:hover .pic__coin { animation: pic-coin 0.9s var(--spring-pop); }
+}
+
+@keyframes pic-check {
+  from { stroke-dasharray: 30; stroke-dashoffset: 30; }
+  to { stroke-dasharray: 30; stroke-dashoffset: 0; }
+}
+
+@keyframes pic-steam {
+  50% { transform: translateY(-2px); opacity: 0.4; }
+}
+
+@keyframes pic-lens {
+  25% { transform: translate(-4px, -2px); }
+  75% { transform: translate(3px, 1px); }
+}
+
+@keyframes pic-coin {
+  from { transform: translateY(-10px); }
+}
+
+/* Рисунок пустого места: цвет — тихий, подложка — 16 % */
+.pic {
+  color: color-mix(in srgb, var(--accent) 55%, var(--ink-2));
+  margin-bottom: var(--space-2);
+}
+
+.pic__tone {
+  fill: currentColor;
+  stroke: none;
+  opacity: 0.16;
+}
+
+.empty[data-pic='calm'] .pic {
+  color: color-mix(in srgb, var(--dot-green) 60%, var(--ink-2));
+}
+
+/* ═════════ Меньше движения: те же сигналы, без перемещений ═════════ */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(main),
+  ::view-transition-new(main),
+  ::view-transition-new(client-panel) {
+    animation: none;
+  }
+
+  .screen {
+    animation: fade-in 120ms ease;
+  }
+
+  .screen .dtable__row,
+  .closed__row,
+  .feed__item.is-fresh {
+    animation: none;
+  }
+
+  .inline-warn,
+  .field__error {
+    animation: fade-in 120ms ease;
+  }
+
+  .sync.is-saving .sync__dot,
+  .save__pulse {
+    animation: none;
+  }
+
+  .roll__strip,
+  .nav__pill,
+  .tabs__ind {
+    transition: none;
+  }
+
+  .is-closing .check-btn__ring,
+  .is-closing .check-btn::after {
+    animation: none;
+  }
+}

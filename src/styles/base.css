@@ -1,4 +1,4 @@
-/* Базовые правила страницы. Значения — только из tokens.css. */
+/* Базовые правила страницы и материал: бумага с двумя мягкими свечениями и едва заметным зерном. Значения — только из tokens.css. */
 @import './tokens.css';
 
 *,
@@ -10,8 +10,9 @@
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  background: var(--canvas);
   /* Липкие панели телефона не закрывают элемент в фокусе */
-  scroll-padding: 3.5rem 0 calc(4rem + env(safe-area-inset-bottom));
+  scroll-padding: 4.5rem 0 calc(5rem + env(safe-area-inset-bottom));
 }
 
 /* Без задержки двойного касания и без серой вспышки при нажатии на телефоне */
@@ -24,13 +25,39 @@ button,
 
 body {
   margin: 0;
+  min-height: 100dvh;
   background: var(--canvas);
   color: var(--ink);
   font-family: var(--font);
   font-feature-settings: var(--font-features);
   font-size: var(--text-md);
   line-height: var(--leading-body);
+  letter-spacing: var(--tracking-tight);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Два свечения за листами: синее слева сверху, пшеничное справа. Неподвижный слой — при прокрутке не перерисовывается. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60rem 40rem at 8% -10%, var(--glow-a), transparent 70%),
+    radial-gradient(50rem 36rem at 100% 0%, var(--glow-b), transparent 70%);
+}
+
+/* Зерно бумаги 3,5 % (в тёмной 5 %): поверх всего, сквозное для мыши. Без смешивания слоёв — дёшево для видеокарты. */
+html::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1.4 -.35'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 160px;
 }
 
 h1,
@@ -46,6 +73,7 @@ select,
 textarea {
   font: inherit;
   color: inherit;
+  letter-spacing: inherit;
 }
 
 button {
@@ -57,8 +85,20 @@ button {
   outline-offset: 2px;
 }
 
+::selection {
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
 .num {
   font-variant-numeric: tabular-nums;
+}
+
+/* Крупные числа и заголовки — с засечками (цифры Newsreader). Табличные цифры, чтобы счётчики не прыгали. */
+.display {
+  font-family: var(--display);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: lining-nums tabular-nums;
+  letter-spacing: -0.02em;
 }
 
 .visually-hidden {

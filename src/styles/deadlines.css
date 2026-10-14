@@ -1,0 +1,488 @@
+/* Таблица сроков (одна на «Сегодня», «Сроки», карточку клиента), группы по дням, календарь месяца, «Закрыто сегодня». */
+
+/* ═════════ Группы по дням ═════════ */
+.dgroups {
+  display: grid;
+  padding-bottom: var(--space-2);
+}
+
+.dgroup__title {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5) var(--space-2);
+  background: linear-gradient(var(--surface) 70%, color-mix(in srgb, var(--surface) 0%, transparent));
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+
+@media (max-width: 1023px) {
+  .dgroup__title {
+    top: 3.75rem;
+  }
+}
+
+.dgroup__title > span:first-child::first-letter {
+  text-transform: uppercase;
+}
+
+.dgroup__count {
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.dgroup--overdue .dgroup__title > span:first-child {
+  color: var(--st-red-ink);
+}
+
+.dgroup--today .dgroup__title > span:first-child {
+  color: var(--accent);
+}
+
+.dgroup .dtable__head {
+  display: none;
+}
+
+.dgroup__more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(100% - var(--space-5) * 2);
+  min-height: var(--tap);
+  margin: var(--space-2) var(--space-5) var(--space-3);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--accent);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dgroup__more:hover {
+    border-style: solid;
+    background: var(--accent-soft);
+  }
+}
+
+/* ═════════ Таблица ═════════ */
+.dtable {
+  display: grid;
+  padding: 0 var(--space-2);
+}
+
+.dtable__head,
+.dtable__row {
+  display: grid;
+  grid-template-columns: 2.75rem minmax(10rem, 1fr) minmax(12rem, 1.5fr) 11rem;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-3) 0 var(--space-1);
+}
+
+.dtable--noclient .dtable__head,
+.dtable--noclient .dtable__row {
+  grid-template-columns: 2.75rem minmax(10rem, 1fr) 11rem;
+}
+
+.dtable__head {
+  min-height: 2.5rem;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+
+.dtable__row {
+  position: relative;
+  min-height: 4rem;
+  padding-top: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-radius: var(--radius-md);
+  transition: background-color var(--dur-fast) ease;
+}
+
+/* Разделитель — тонкая линия между строками, не до краёв листа */
+.dtable__row + .dtable__row::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 3.5rem;
+  right: var(--space-3);
+  height: 1px;
+  background: var(--line);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dtable__row:hover {
+    background: var(--surface-sunk);
+  }
+
+  .dtable__row:hover::before,
+  .dtable__row:hover + .dtable__row::before {
+    opacity: 0;
+  }
+}
+
+.dtable__client .linklike {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Длинное имя («ТОВ «Чайка Сервіс Плюс»») — в две строки, а не обрезка */
+.dtable__name {
+  font-weight: var(--weight-semibold);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dtable__client .linklike:hover .dtable__name {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+}
+
+.dtable__what {
+  display: grid;
+  gap: var(--space-2);
+  line-height: 1.35;
+}
+
+.dtable__due {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.dtable__when {
+  display: grid;
+  line-height: 1.3;
+}
+
+.dtable__when > :first-child {
+  white-space: nowrap;
+}
+
+.dtable__when .sub {
+  font-size: var(--text-sm);
+}
+
+/* ═════════ Круглая галочка «Сдано и оплачено» ═════════
+   Ждёт — пустой круг; наведение — круг синеет и проступает галочка; закрытие — заливка зелёным пружиной,
+   галочка дорисовывается, от круга расходится кольцо (styles/fx.css). */
+.check-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: transparent;
+}
+
+.check-btn__ring {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2px var(--field-border);
+  transition: box-shadow var(--dur-fast) ease, background-color var(--dur-base) ease, color var(--dur-fast) ease,
+    transform var(--dur-pop) var(--spring-pop);
+}
+
+.check-btn:active:not([aria-disabled='true']) .check-btn__ring {
+  transform: scale(0.86);
+  transition-duration: var(--dur-press);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .check-btn:hover:not([aria-disabled='true']) .check-btn__ring {
+    box-shadow: inset 0 0 0 2px var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+}
+
+.check-btn[aria-disabled='true'] {
+  cursor: default;
+}
+
+.is-closing .check-btn__ring {
+  background: var(--dot-green);
+  box-shadow: inset 0 0 0 2px var(--dot-green);
+  color: var(--surface);
+  animation: check-pop var(--dur-pop) var(--spring-pop);
+}
+
+.is-closing .check-btn__ring path {
+  stroke-dasharray: 24;
+  stroke-width: 2.5;
+  animation: draw 320ms var(--ease-out) both;
+}
+
+@keyframes check-pop {
+  0% { transform: scale(0.7); }
+}
+
+/* ═════════ Узкий лист (карточка, телефон) ═════════ */
+/* Средний лист (боковая колонка рядом): две строки — клиент и что сдать; срок — справа */
+@container (min-width: 480px) and (max-width: 639px) {
+  .dtable__head {
+    display: none;
+  }
+
+  .dtable__row,
+  .dtable--noclient .dtable__row {
+    grid-template-columns: 2.75rem minmax(0, 1fr) 11rem;
+    gap: 2px var(--space-3);
+  }
+
+  .dtable__row .c-act { grid-row: 1 / span 2; }
+  .dtable__row .c-client { grid-column: 2; grid-row: 1; }
+  .dtable__row .c-what { grid-column: 2; }
+  .dtable__row .c-due { grid-column: 3; grid-row: 1 / span 2; align-self: center; }
+  .dtable--noclient .dtable__row .c-what { grid-row: 1 / span 2; }
+  .dtable__row .avatar { display: none; }
+  .dtable__row + .dtable__row::before { left: 2.75rem; }
+}
+
+@container (max-width: 479px) {
+  .dtable__head {
+    display: none;
+  }
+
+  .dtable__row,
+  .dtable--noclient .dtable__row {
+    grid-template-columns: 2.75rem minmax(0, 1fr);
+    gap: 2px var(--space-2);
+    padding: var(--space-3) var(--space-2) var(--space-3) 0;
+  }
+
+  .dtable__row .c-act {
+    grid-row: 1 / span 3;
+    align-self: start;
+  }
+
+  .dtable__row .c-client,
+  .dtable__row .c-what,
+  .dtable__row .c-due {
+    grid-column: 2;
+  }
+
+  .dtable__due {
+    margin-top: var(--space-1);
+  }
+
+  .dtable__when {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 var(--space-2);
+    align-items: baseline;
+  }
+
+  .dtable__row + .dtable__row::before {
+    left: 2.75rem;
+  }
+}
+
+@container (min-width: 640px) and (max-width: 899px) {
+  .dtable:not(.dtable--noclient) .dtable__head,
+  .dtable:not(.dtable--noclient) .dtable__row {
+    grid-template-columns: 2.75rem minmax(8rem, 1fr) minmax(8rem, 1.2fr) 9.5rem;
+    gap: var(--space-2);
+  }
+}
+
+/* ═════════ «Сроки»: календарь и список ═════════ */
+.deadlines-grid {
+  display: grid;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+@media (min-width: 1200px) {
+  .deadlines-grid {
+    grid-template-columns: 22rem minmax(0, 1fr);
+  }
+
+  .deadlines-grid > aside {
+    position: sticky;
+    top: var(--space-5);
+  }
+}
+
+.month__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-3);
+}
+
+.month__title {
+  font-family: var(--display);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.02em;
+}
+
+.month__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.month__wd {
+  padding-bottom: var(--space-1);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.month__day {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  min-height: 2.625rem;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: 1.125rem;
+  font-weight: var(--weight-semibold);
+  transition: background-color var(--dur-fast) ease, transform var(--dur-pop) var(--spring-pop), box-shadow var(--dur-fast) ease;
+}
+
+.month__day:active {
+  transform: scale(0.92);
+  transition-duration: var(--dur-press);
+}
+
+/* Сколько сроков в этот день — маленькая цифра в углу (десятки сроков видно сразу) */
+.month__n {
+  position: absolute;
+  right: 3px;
+  bottom: 2px;
+  font-family: var(--font);
+  font-size: 0.6875rem;
+  font-weight: var(--weight-bold);
+  line-height: 1;
+  opacity: 0.85;
+}
+
+.month__day.is-today {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.month__day.is-past:not([class*='month__day--']) {
+  color: var(--ink-2);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .month__day:hover:not([aria-pressed='true']) {
+    box-shadow: inset 0 0 0 1px var(--line-strong);
+  }
+}
+
+/* День со сроками закрашен цветом самого срочного срока — как строки в таблице */
+.month__day--red { background: var(--st-red-bg); color: var(--st-red-ink); }
+.month__day--orange { background: var(--st-orange-bg); color: var(--st-orange-ink); }
+.month__day--yellow { background: var(--st-yellow-bg); color: var(--st-yellow-ink); }
+.month__day--green { background: var(--st-green-bg); color: var(--st-green-ink); }
+
+.month__day[aria-pressed='true'] {
+  background: var(--btn);
+  color: var(--on-btn);
+  box-shadow: var(--shadow-2);
+}
+
+.month__legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  flex-wrap: wrap;
+  margin-top: var(--space-4);
+}
+
+.month__legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* ═════════ Закрыто сегодня: что закрыла мама, с честным статусом записи ═════════ */
+.closed {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--space-2) var(--space-2);
+}
+
+.closed__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  animation: rise-in var(--dur-spring) var(--spring);
+}
+
+.closed__row + .closed__row {
+  box-shadow: inset 0 1px 0 var(--line);
+}
+
+.closed__check {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: var(--dot-green);
+  color: var(--surface);
+}
+
+.closed__text {
+  flex: 1 1 18rem;
+}
+
+.closed__text strong {
+  font-weight: var(--weight-semibold);
+}
+
+.month__title em {
+  font-style: italic;
+  font-weight: var(--weight-regular);
+  color: var(--ink-2);
+}
+
+.month__nav {
+  display: inline-flex;
+  margin-right: calc(var(--space-2) * -1);
+}
+
+.month__legend .icon {
+  margin-right: 2px;
+}
+
+.month__total {
+  margin-top: var(--space-2);
+}
+
+.month__total strong {
+  color: var(--ink);
+}

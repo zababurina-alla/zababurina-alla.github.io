@@ -8,7 +8,9 @@ import { MARK_LABEL, METHOD_LABEL } from '../data/types';
 import { TODAY, daysBetween, daysLabel, fmtDate, statusByDays } from '../lib/dates';
 import { formatMoney, formatPayMoney } from '../lib/money';
 import { Icon } from '../ui/Icon';
-import { Avatar, SaveBadge, StatusPill, Tabs, reducedMotion } from '../ui/kit';
+import { Avatar, Money, SaveBadge, Tabs, reducedMotion } from '../ui/kit';
+import { Empty } from '../ui/Empty';
+import { URGENCY_ICON } from './DeadlineTable';
 import { Modal } from '../ui/Modal';
 import { useUi } from '../app/ui-context';
 import { DeadlineTable } from './DeadlineTable';
@@ -131,7 +133,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
             <span className="vt-avatar"><Avatar name={c.name} size="lg" /></span>
             <div className="cp__who">
               <h2 id="cp-name" className="cp__name"><span className="vt-name">{c.name}</span></h2>
-              <p className="cp__kind"><span className="tag">{kindLabel(c.kind)}</span>{c.employer && <span className="tag">работодатель</span>}{c.marks.map((m) => <span key={m} className="tag">{MARK_LABEL[m]}</span>)}</p>
+              <p className="cp__kind"><span className="tag">{c.kind ? kindLabel(c.kind) : 'тип не указан'}</span>{c.employer && <span className="tag">работодатель</span>}{c.marks.map((m) => <span key={m} className="tag">{MARK_LABEL[m]}</span>)}</p>
             </div>
             <div className="cp__actions">
               <a className="btn btn--secondary btn--sm" href={`tel:${c.phone.replace(/\s/g, '')}`}><Icon name="phone" />Позвонить</a>
@@ -156,7 +158,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                       {c.monthly.map((m) => (
                         <div key={m.name} className="charges__item">
                           <dt>{m.name}</dt>
-                          <dd className="charges__sum num">{m.kopecks !== null ? formatMoney(m.kopecks) : 'по доходу'}</dd>
+                          <dd className="charges__sum display">{m.kopecks !== null ? <Money text={formatMoney(m.kopecks)} /> : 'по доходу'}</dd>
                           <dd className="sub">{m.note}</dd>
                         </div>
                       ))}
@@ -164,15 +166,15 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                   ) : <p className="sub">Начисления ТОВ считаются по отчётности.</p>}
                 </section>
                 <section className="cp__block cp__facts">
-                  <div><h3 className="cp__h">Ключ ЭЦП</h3>{keyDays === null ? <p className="sub">Нет данных</p>
-                    : <p className="row-gap"><span className="num">до {fmtDate(c.keyUntil ?? '')}</span><StatusPill status={statusByDays(keyDays)}>{daysLabel(keyDays)}</StatusPill></p>}</div>
-                  <div><h3 className="cp__h">Ключ выпущен</h3><p>{c.keyIssuer || '—'}</p></div>
+                  <div><h3 className="cp__h">Ключ ЭЦП</h3>{keyDays === null ? <p className="cp__key"><Icon name="inactive" size={18} className="urgency--grey" /><span className="nil">ключа нет в таблице</span></p>
+                    : <p className="cp__key"><Icon name={URGENCY_ICON[statusByDays(keyDays)]} size={18} className={`urgency--${statusByDays(keyDays)}`} /><span className="num">до {fmtDate(c.keyUntil ?? '')}</span><span className={`due--${statusByDays(keyDays)}`}>{daysLabel(keyDays)}</span></p>}</div>
+                  <div><h3 className="cp__h">Ключ выпущен</h3><p>{c.keyIssuer || <span className="nil">не указано</span>}</p></div>
                   <div><h3 className="cp__h">Телефон</h3><PhoneField clientId={c.id} phone={c.phone} version={c.version} /></div>
                   <div><h3 className="cp__h">Пароль от кабинета</h3><PasswordReveal clientId={c.id} /></div>
                 </section>
                 <section className="cp__block">
                   <h3 className="cp__h">КВЕД</h3>
-                  <ul className="kved">{c.kved.map((k) => <li key={k.code}><span className="num kved__code">{k.code}</span>{k.title}</li>)}</ul>
+                  {c.kved.length ? <ul className="kved">{c.kved.map((k) => <li key={k.code}><span className="num kved__code">{k.code}</span>{k.title}</li>)}</ul> : <p className="nil">КВЕД в таблице не указан</p>}
                 </section>
                 <section className="cp__block">
                   <h3 className="cp__h">Ближайшие сроки</h3>
@@ -183,9 +185,9 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
             {tab === 'deadlines' && <DeadlineTable items={own} showClient={false} empty="Открытых сроков нет" />}
             {tab === 'payments' && (pays.length ? (
               <ul className="plist">{pays.map((p) => (
-                <li key={p.id} className="plist__row"><span><strong className="num">{formatPayMoney(p.kopecks)}</strong><span className="sub">{p.period}, {METHOD_LABEL[p.method]}</span></span><span className="num sub">{fmtDate(p.date)}</span></li>
+                <li key={p.id} className="plist__row"><span><strong className="display"><Money text={formatPayMoney(p.kopecks)} /></strong><span className="sub">{p.period}, {METHOD_LABEL[p.method]}</span></span><span className="num sub">{fmtDate(p.date)}</span></li>
               ))}</ul>
-            ) : <p className="empty">Платежей пока нет</p>)}
+            ) : <Empty pic="wallet" title="Платежей пока нет" />)}
             {tab === 'history' && (history.length ? (
               <ul className="feed">{history.map((a) => (
                 <li key={a.id} className="feed__item"><span className="feed__icon"><Icon name="clock" size={16} /></span><span className="feed__text">{a.text}<span className="sub">{fmtDate(a.when.slice(0, 10))}, {a.when.slice(11)}, {a.source}</span></span></li>

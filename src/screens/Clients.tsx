@@ -1,17 +1,21 @@
 // «Клиенты»: поиск в любом падеже, фильтр по типу, таблица; нажатие на строку — карточка справа.
+// Пустое поле из таблицы остаётся пустым и называет причину («ключа нет», «КВЕД не указан»).
 import { useEffect, useMemo, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { kindLabel } from '../data/fake';
 import { useStore } from '../data/store';
 import type { ClientKind, DatedDeadline } from '../data/types';
-import { TODAY, daysBetween, daysLabel, fmtDate, plural, statusByDays } from '../lib/dates';
+import { TODAY, daysBetween, daysLabel, fmtDate, statusByDays } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 import { search } from '../lib/search';
+import { play } from '../lib/sound';
 import { Icon } from '../ui/Icon';
-import { Avatar, StatusPill, Tabs, reducedMotion } from '../ui/kit';
+import { Avatar, Money, Tabs, reducedMotion } from '../ui/kit';
+import { Empty } from '../ui/Empty';
 import { useUi } from '../app/ui-context';
 import { roAttrs } from '../ui/readonly';
+import { URGENCY_ICON } from './DeadlineTable';
 
 type KindFilter = 'all' | 'fop1' | 'fop2' | 'fop3' | 'other';
 
@@ -27,7 +31,7 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
 
   useGSAP(() => {
     if (reducedMotion()) return;
-    gsap.from('.reveal', { y: 14, opacity: 0, duration: 0.45, stagger: 0.05, ease: 'power3.out', clearProps: 'transform,opacity' });
+    gsap.from('.reveal', { y: 14, opacity: 0, duration: 0.5, stagger: 0.05, ease: 'power3.out', clearProps: 'transform,opacity' });
   }, { scope });
 
   // Ближайший срок каждого клиента — один проход по срокам, а не перебор на каждую строку.
@@ -42,33 +46,34 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
   }, [deadlines]);
 
   // Тип не указан (null) — в «Другие».
-  const byKind = (k: ClientKind | null) => kind === 'all' || k === kind || (kind === 'other' && !['fop1', 'fop2', 'fop3'].includes(k ?? ''));
+  const isOther = (k: ClientKind | null) => !['fop1', 'fop2', 'fop3'].includes(k ?? '');
+  const byKind = (k: ClientKind | null, f: KindFilter) => f === 'all' || k === f || (f === 'other' && isOther(k));
   const found = search(
-    store.clients.filter((c) => byKind(c.kind)).map((c) => ({ ...c, extra: [...c.kved.map((k) => k.code), c.phone] })),
+    store.clients.filter((c) => byKind(c.kind, kind)).map((c) => ({ ...c, extra: [...c.kved.map((k) => k.code), c.phone] })),
     q,
   );
-  const count = (f: KindFilter) => store.clients.filter((c) => f === 'all' || c.kind === f || (f === 'other' && !['fop1', 'fop2', 'fop3'].includes(c.kind ?? ''))).length;
+  const count = (f: KindFilter) => store.clients.filter((c) => byKind(c.kind, f)).length;
+  const total = store.clients.length;
 
   return (
     <div ref={scope} className="page">
       <header className="page__head reveal">
         <div>
-          <h1 className="page__title">Клиенты</h1>
-          <p className="page__sub">{store.clients.length} {plural(store.clients.length, 'клиент', 'клиента', 'клиентов')} в таблице</p>
+          <h1 className="page__title">Клиенты <em>{total} в таблице</em></h1>
         </div>
         <button type="button" className="btn btn--primary" onClick={ui.openAddClient} {...roAttrs('clients')}><Icon name="userPlus" />Добавить клиента</button>
       </header>
 
       <section className="panel reveal" aria-label="Список клиентов">
         <div className="toolbar">
-          <label className="search-input">
-            <Icon name="search" />
+          <label className="search-input search-input--lg">
+            <Icon name="search" size={22} />
             <span className="visually-hidden">Поиск клиента</span>
             <input ref={input} type="search" value={q} onChange={(e) => setQ(e.target.value)}
-              placeholder="Фамилия в любом падеже, КВЕД или телефон…" spellCheck={false} autoComplete="off" />
-            <kbd className="kbd">Ctrl K</kbd>
+              placeholder="Фамилия в любом падеже, КВЕД или телефон" spellCheck={false} autoComplete="off" />
+            {q ? <span className="search-input__count num" role="status">{found.length} из {total}</span> : <kbd className="kbd">/</kbd>}
           </label>
-          <Tabs label="Тип клиента" value={kind} onChange={setKind} items={[
+          <Tabs label="Тип клиента" value={kind} onChange={(k) => { setKind(k); play('tick'); }} items={[
             { id: 'all', label: 'Все', count: count('all') },
             { id: 'fop1', label: '1 гр.', count: count('fop1') },
             { id: 'fop2', label: '2 гр.', count: count('fop2') },
@@ -76,7 +81,6 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
             { id: 'other', label: 'ТОВ, общая и др.', count: count('other') },
           ]} />
         </div>
-        {q && <p className="found sub" role="status">Найдено {found.length} из {store.clients.length}</p>}
 
         <div className="ctable" role="table" aria-label="Клиенты">
           <div className="ctable__head" role="row">
@@ -86,13 +90,15 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
             <span role="columnheader">Ключ ЭЦП</span>
             <span role="columnheader">Ближайший срок</span>
           </div>
-          {found.map((c) => {
+          {found.map((c, i) => {
             const month = c.monthly.reduce((s, m) => s + (m.kopecks ?? 0), 0);
             const keyDays = c.keyUntil ? daysBetween(TODAY, c.keyUntil) : null;
+            const keySt = keyDays === null ? null : statusByDays(keyDays);
             const next = nextByClient.get(c.id);
             const nextDays = next ? daysBetween(TODAY, next.due) : null;
+            const nextSt = nextDays === null ? null : statusByDays(nextDays);
             return (
-              <div key={c.id} className="ctable__row" role="row">
+              <div key={c.id} className="ctable__row" role="row" style={{ '--i': i } as React.CSSProperties}>
                 <span role="cell" className="ctable__client">
                   <Avatar name={c.name} clientId={c.id} />
                   <span className="ctable__who">
@@ -100,25 +106,30 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
                     <button type="button" className="ctable__open" onClick={() => ui.openClient(c.id)}>
                       <strong data-client-name={c.id}>{c.name}</strong>
                     </button>
-                    <span className="sub">{kindLabel(c.kind)}{c.employer ? ', работодатель' : ''}</span>
+                    <span className="sub">{c.kind ? kindLabel(c.kind) : <span className="nil">тип не указан</span>}{c.employer ? ', работодатель' : ''}</span>
                   </span>
                 </span>
-                <span role="cell" className="num">{c.kved.map((k) => k.code).join(', ')}</span>
-                <span role="cell" className="ta-r num">{month ? formatMoney(month) : <span className="sub">по доходу</span>}</span>
-                <span role="cell">{keyDays === null ? <span className="sub">нет</span> : keyDays <= 30
-                  ? <StatusPill status={statusByDays(keyDays)}>{daysLabel(keyDays).replace('через ', '')}</StatusPill>
-                  : <span className="num">{fmtDate(c.keyUntil ?? '')}</span>}</span>
-                <span role="cell">{next && nextDays !== null
-                  ? <span className="ctable__next"><span className={`dot dot--${statusByDays(nextDays)}`} aria-hidden="true" /><span>{next.what}<span className="sub">{daysLabel(nextDays)}</span></span></span>
-                  : <span className="sub">—</span>}</span>
+                <span role="cell" className="ctable__kved num">{c.kved.length ? c.kved.map((k) => k.code).join(', ') : <span className="nil">не указан</span>}</span>
+                <span role="cell" className="ta-r ctable__sum">{month ? <Money text={formatMoney(month)} /> : <span className="sub">по доходу</span>}</span>
+                <span role="cell" className="ctable__key">
+                  {keyDays === null || !keySt
+                    ? <span className="ctable__state"><Icon name="inactive" size={18} className="urgency--grey" /><span className="nil">ключа нет</span></span>
+                    : <span className="ctable__state"><Icon name={URGENCY_ICON[keySt]} size={18} className={`urgency--${keySt}`} />
+                      <span className="ctable__state-text">{keyDays <= 30 ? <span className={`due--${keySt}`}>{daysLabel(keyDays).replace('через ', 'ещё ')}</span> : null}<span className="sub num">до {fmtDate(c.keyUntil ?? '')}</span></span></span>}
+                </span>
+                <span role="cell" className="ctable__next">
+                  {next && nextDays !== null && nextSt
+                    ? <span className="ctable__state"><Icon name={URGENCY_ICON[nextSt]} size={18} className={`urgency--${nextSt}`} />
+                      <span className="ctable__state-text"><span>{next.what}</span><span className={`sub due--${nextSt}`}>{daysLabel(nextDays)}</span></span></span>
+                    : <span className="sub">открытых сроков нет</span>}
+                </span>
               </div>
             );
           })}
           {found.length === 0 && (
-            <div className="empty">
-              <p>{q ? `Никого не нашли по «${q}».` : 'Клиентов этого типа пока нет.'}</p>
-              <button type="button" className="btn btn--secondary" onClick={ui.openAddClient}><Icon name="userPlus" />Добавить клиента</button>
-            </div>
+            <Empty pic="search" title={q ? `Никого не нашли по «${q}»` : 'Клиентов этого типа пока нет'} action={
+              <button type="button" className="btn btn--secondary" onClick={ui.openAddClient} {...roAttrs('clients')}><Icon name="userPlus" />Добавить клиента</button>
+            }>{q ? 'Проверьте букву или попробуйте часть фамилии — падеж и украинские буквы не важны.' : null}</Empty>
           )}
         </div>
       </section>

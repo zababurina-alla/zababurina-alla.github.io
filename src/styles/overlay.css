@@ -1,0 +1,496 @@
+/* То, что парит над страницей: окна, карточка клиента, уведомления, командная строка. Тень — --shadow-3. */
+
+/* ═════════ Окна ═════════ */
+.modal {
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+}
+
+/* Задний план размыт, затемнение проявляется (как в образце) */
+.modal::backdrop {
+  background: var(--scrim);
+  -webkit-backdrop-filter: blur(6px) saturate(1.1);
+  backdrop-filter: blur(6px) saturate(1.1);
+  animation: fade-in var(--dur-base) ease;
+}
+
+.modal.is-closing::backdrop {
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.modal__box {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--edge), 0 0 0 1px var(--line), var(--shadow-3);
+}
+
+.modal__head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-4) var(--space-3) var(--space-6);
+}
+
+.modal__grip {
+  display: none;
+}
+
+.modal__title {
+  font-family: var(--display);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.02em;
+}
+
+.modal__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-2) var(--space-6) var(--space-6);
+  overscroll-behavior: contain;
+}
+
+.modal__foot {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6) calc(var(--space-5) + env(safe-area-inset-bottom));
+  box-shadow: inset 0 1px 0 var(--line);
+}
+
+/* Окно по центру (ноутбук): вырастает из кнопки пружиной (точку роста ставит Modal.tsx), уходит быстро */
+.modal--dialog {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+}
+
+.modal--dialog:not([open]) {
+  display: none;
+}
+
+.modal--dialog .modal__box {
+  width: min(38rem, 100%);
+  max-height: min(54rem, calc(100dvh - 3rem));
+  border-radius: var(--radius-lg);
+  transition: transform var(--dur-pop) var(--spring-soft), opacity var(--dur-base) var(--ease-out);
+
+  @starting-style {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+.modal--dialog.is-closing .modal__box {
+  opacity: 0;
+  transform: scale(0.96);
+  transition-duration: 180ms;
+  transition-timing-function: var(--ease-out);
+}
+
+/* Телефон: окно становится шторкой снизу */
+@media (max-width: 699px) {
+  .modal--dialog {
+    place-items: end stretch;
+    padding: 0;
+  }
+
+  .modal--dialog .modal__box {
+    width: 100%;
+    max-height: 94dvh;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    transform-origin: 50% 100% !important;
+    transition: transform var(--dur-move) var(--ease-drawer);
+
+    @starting-style {
+      opacity: 1;
+      transform: translateY(100%);
+    }
+  }
+
+  .modal--dialog.is-closing .modal__box {
+    opacity: 1;
+    transform: translateY(100%);
+    transition-duration: 220ms;
+  }
+
+  .modal__grip {
+    display: block;
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 2.5rem;
+    height: 4px;
+    margin-left: -1.25rem;
+    border-radius: var(--radius-full);
+    background: var(--line-strong);
+  }
+
+  .modal__head {
+    padding: var(--space-5) var(--space-3) var(--space-3) var(--space-4);
+  }
+
+  .modal__body {
+    padding: var(--space-2) var(--space-4) var(--space-5);
+  }
+
+  .modal__foot {
+    padding: var(--space-3) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom));
+  }
+}
+
+/* Карточка клиента: лист справа (ноутбук) / во весь экран (телефон) */
+.modal--panel {
+  inset: 0 0 0 auto;
+  width: min(var(--panel-w), 100vw);
+  height: 100dvh;
+  padding: var(--space-3);
+}
+
+.modal--panel:not([open]) {
+  display: none;
+}
+
+.modal--panel .modal__box {
+  height: 100%;
+  border-radius: var(--radius-xl);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  transition: transform var(--dur-move) var(--ease-drawer);
+
+  @starting-style {
+    transform: translateX(105%);
+  }
+}
+
+.modal--panel.is-closing .modal__box {
+  transform: translateX(105%);
+  transition-duration: 220ms;
+}
+
+@media (max-width: 699px) {
+  .modal--panel {
+    padding: 0;
+  }
+
+  .modal--panel .modal__box {
+    border-radius: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal--panel .modal__box,
+  .modal--dialog .modal__box {
+    transition: opacity 160ms ease;
+
+    @starting-style {
+      opacity: 0;
+      transform: none;
+    }
+  }
+
+  .modal--panel.is-closing .modal__box,
+  .modal--dialog.is-closing .modal__box {
+    opacity: 0;
+    transform: none;
+  }
+}
+
+/* ═════════ Уведомления ═════════
+   Выезжают пружиной снизу, уходят быстро и без перелёта. Полоска внизу — сколько осталось («Отменить» — 10 с).
+   Стопка: новое — спереди, прежние — выше на 10 px и меньше на 5 %; наведение раскрывает стопку. */
+.toasts {
+  position: fixed;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: calc(4.25rem + var(--space-3) + env(safe-area-inset-bottom));
+  z-index: 60;
+  display: grid;
+  justify-items: center;
+  align-items: end;
+  pointer-events: none;
+}
+
+.toasts > .toast {
+  grid-area: 1 / 1;
+  z-index: calc(10 - var(--i));
+  transform: translateY(calc(var(--i) * -10px)) scale(calc(1 - var(--i) * 0.05));
+  transform-origin: 50% 0;
+  transition: transform var(--dur-pop) var(--spring-pop), opacity var(--dur-base) var(--ease-out);
+}
+
+.toasts:hover > .toast {
+  transform: translateY(calc(var(--i) * (-100% - 8px)));
+  transition: transform var(--dur-spring) var(--spring), opacity var(--dur-base) var(--ease-out);
+}
+
+@media (min-width: 1024px) {
+  .toasts {
+    left: auto;
+    right: var(--space-6);
+    bottom: var(--space-6);
+    justify-items: end;
+  }
+}
+
+.toast {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  width: min(32rem, 100%);
+  min-height: 3.75rem;
+  padding: var(--space-3) var(--space-2) var(--space-3) var(--space-4);
+  border-radius: var(--radius-l);
+  background: var(--toast);
+  color: var(--on-toast);
+  box-shadow: var(--shadow-3);
+  overflow: hidden;
+  pointer-events: auto;
+
+  @starting-style {
+    opacity: 0;
+    transform: translateY(18px) scale(0.94);
+  }
+}
+
+.toasts > .toast.is-leaving {
+  opacity: 0;
+  transform: translateY(calc(var(--i) * -10px + 10px)) scale(calc(1 - var(--i) * 0.05 - 0.02));
+  transition: opacity 160ms var(--ease-out), transform 200ms var(--ease-out);
+}
+
+.toast--error {
+  background: var(--st-red-bg);
+  color: var(--st-red-ink);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--st-red-ink) 25%, transparent), var(--shadow-3);
+}
+
+.toast__icon {
+  flex: none;
+  opacity: 0.9;
+}
+
+.toast--ok .toast__icon {
+  color: var(--toast-action);
+  animation: toast-icon var(--dur-pop) var(--spring-pop) 80ms both;
+}
+
+@keyframes toast-icon {
+  from { transform: scale(0.4) rotate(-30deg); opacity: 0; }
+}
+
+.toast__text {
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  line-height: 1.4;
+}
+
+.toast__action {
+  min-height: var(--tap);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--toast-action) 16%, transparent);
+  color: var(--toast-action);
+  font-weight: var(--weight-bold);
+  white-space: nowrap;
+  transition: background-color var(--dur-fast) ease, transform var(--dur-press) var(--ease-out);
+}
+
+.toast__action:active {
+  transform: scale(0.96);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .toast__action:hover {
+    background: color-mix(in srgb, var(--toast-action) 26%, transparent);
+  }
+}
+
+.toast--error .toast__action {
+  background: color-mix(in srgb, var(--st-red-ink) 12%, transparent);
+  color: var(--st-red-ink);
+}
+
+.toast__close {
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: inherit;
+  opacity: 0.7;
+}
+
+.toast__timer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--toast-action);
+  opacity: 0.7;
+  transform-origin: left;
+  animation: timer linear forwards;
+}
+
+@keyframes timer {
+  to { transform: scaleX(0); }
+}
+
+@media (max-width: 479px) {
+  .toast {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .toast__action {
+    grid-column: 2 / -1;
+    justify-self: start;
+    margin-left: calc(var(--space-2) * -1);
+  }
+
+  .toast__close {
+    grid-row: 1;
+    grid-column: 3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast,
+  .toasts > .toast {
+    transition: opacity 160ms ease;
+
+    @starting-style {
+      opacity: 0;
+      transform: none;
+    }
+  }
+
+  .toast--ok .toast__icon {
+    animation: none;
+  }
+}
+
+/* ═════════ Командная строка (Ctrl K) ═════════ */
+.palette {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 12vh var(--space-4) 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+}
+
+.palette:not([open]) {
+  display: none;
+}
+
+.palette[open] {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+}
+
+.palette::backdrop {
+  background: var(--scrim);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: fade-in var(--dur-base) ease;
+}
+
+.palette__box {
+  width: min(42rem, 100%);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--edge), 0 0 0 1px var(--line), var(--shadow-3);
+  overflow: hidden;
+  transition: transform var(--dur-pop) var(--spring-soft), opacity var(--dur-base) var(--ease-out);
+
+  @starting-style {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+}
+
+.palette__search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-5);
+  min-height: 4rem;
+  color: var(--ink-2);
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+
+.palette__search:focus-within {
+  box-shadow: inset 0 -2px 0 var(--focus);
+}
+
+.palette__search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--text-lg);
+}
+
+.palette__list {
+  margin: 0;
+  padding: var(--space-2);
+  max-height: min(28rem, 60vh);
+  overflow-y: auto;
+}
+
+.palette__group {
+  padding: var(--space-3) var(--space-3) var(--space-1);
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.palette__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 3rem;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.palette__item[aria-selected='true'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.palette__label {
+  flex: 1;
+  font-weight: var(--weight-medium);
+}
+
+.palette__empty {
+  padding: var(--space-4);
+}

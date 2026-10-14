@@ -1,8 +1,11 @@
 /*
-  Токены дизайна кабинета «Бухгалтерия». Направление — «финтех-премиум» (выбор Дмитрия 14.10.2026).
-  Единственное место, где задаются цвета, шрифт, размеры, отступы, радиусы, тени и движение.
-  Статусные пары — эталон таблиц «Мамы CRM» (docs/стиль-таблиц.md, п. 1 и п. 10), чтобы сайт и таблица говорили
-  одним языком. Отличия от таблицы помечены «≠ таблица» с причиной.
+  Токены дизайна кабинета «Бухгалтерия», v2 (15.10.2026) — по ощущению как «Сверка рейсов» (sverka-reysov.github.io):
+  бумага и лист, два мягких свечения, стекло, крупный заголовок с засечками, пружины. Персонажа нет.
+  Единственное место, где задаются цвета, шрифт, размеры, отступы, радиусы, тени и движение. Каталог деталей —
+  docs/дизайн/детали.md.
+  Цвет = смысл. Синий «море» — действие и фокус; пшеничный — второстепенный акцент (вопросы, подсказки).
+  Статусные пары — эталон таблиц «Мамы CRM» (docs/стиль-таблиц.md, п. 1 и п. 10) и словарь значков: сайт и таблица
+  говорят одним языком. Пороги дней — docs/словарь-значков.md, п. 1.
   Контраст каждой пары «текст → фон» проверяет `npm run contrast` (docs/контраст.md) и тест scripts/contrast.test.ts.
   Цвета — только в виде #RRGGBB: так их читает проверка контраста.
 */
@@ -42,29 +45,74 @@
     U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+/* Цифры крупных чисел (суммы, счётчики, заголовки) — Newsreader, только знаки чисел; буквы — системные с засечками.
+   Набор latin из @fontsource/newsreader 5.3.0 (копия из «Сверки рейсов»), SIL OFL 1.1 — assets/fonts/OFL-newsreader.txt. */
+@font-face {
+  font-family: 'Cab Num';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/fonts/newsreader-400.woff2') format('woff2');
+  unicode-range: U+0025, U+002B-002E, U+0030-0039, U+2212;
+}
+@font-face {
+  font-family: 'Cab Num';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../assets/fonts/newsreader-600.woff2') format('woff2');
+  unicode-range: U+0025, U+002B-002E, U+0030-0039, U+2212;
+}
+@font-face {
+  font-family: 'Cab Num';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/fonts/newsreader-400-italic.woff2') format('woff2');
+  unicode-range: U+0025, U+002B-002E, U+0030-0039, U+2212;
+}
+@font-face {
+  font-family: 'Cab Num';
+  font-style: italic;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../assets/fonts/newsreader-600-italic.woff2') format('woff2');
+  unicode-range: U+0025, U+002B-002E, U+0030-0039, U+2212;
+}
+
 /* ───────── Светлая тема (по умолчанию) ───────── */
 :root {
   color-scheme: light;
 
-  /* Поверхности */
-  --canvas: #F6F7F9;        /* фон страницы */
-  --surface: #FFFFFF;       /* панели, таблицы, окна */
-  --surface-sunk: #F9FAFB;  /* строка под курсором, шапка таблицы */
-  --line: #E6E8EC;          /* рамки панелей и разделители строк (декоративные) */
-  --field-border: #8A94A6;  /* рамка поля ввода: ≥ 3 : 1 к белому (WCAG 1.4.11) */
+  /* Материал: бумага (фон), лист (панели), шапка листа */
+  --canvas: #ECEEF1;        /* бумага — фон страницы */
+  --surface: #FFFFFF;       /* лист — панели, таблицы, окна */
+  --surface-sunk: #F3F5F8;  /* шапка таблицы, строка под курсором */
+  --line: #E3E7EC;          /* разделители строк, рамки листов (декоративные) */
+  --line-strong: #D2D8DF;   /* рамка кнопки, вкладок */
+  --field-border: #8A94A6;  /* рамка поля ввода: ≥ 3 : 1 к листу (WCAG 1.4.11) */
 
   /* Текст */
-  --ink: #0B1220;
-  --ink-2: #5B6474;
-  --positive: #15803D;      /* «+12 % к сентябрю» */
+  --ink: #0D1218;
+  --ink-2: #586272;
+  --positive: #0C7A4C;      /* «+12 % к сентябрю» */
 
-  /* Акцент — тёмно-синий, как у банковских кабинетов. Синий в таблице статусами не занят (п. 1). */
-  --accent: #172554;
+  /* Действие и фокус — синий «море» (в таблице статусами не занят) */
+  --accent: #1E64CF;
   --on-accent: #FFFFFF;
-  --accent-soft: #EEF0F6;
-  --focus: #2747C7;
+  --accent-soft: #E6EEFB;
+  --focus: #1E64CF;
 
-  /* Статусы — пары из таблицы (п. 1) */
+  /* Главная кнопка — «таблетка» цвета чернил, как в образце */
+  --btn: #0D1218;
+  --on-btn: #FFFFFF;
+
+  /* Пшеничный — второстепенный акцент: вопрос от Дмитрия, подсказки */
+  --wheat: #9A7432;         /* линии и значки (не текст) */
+  --wheat-ink: #7A5A22;     /* текст пшеничным */
+  --wheat-soft: #F5EFE2;
+
+  /* Статусы — пары из таблицы (п. 1), шкала дней — словарь значков, п. 1 */
   --st-red-bg: #FEE2E2;
   --st-red-ink: #991B1B;
   --st-orange-bg: #FFEDD5;
@@ -76,37 +124,47 @@
   --st-grey-bg: #F3F4F6;
   --st-grey-ink: #5B6472; /* ≠ таблица: было #6B7280 (4,39 : 1); координатор переносит #5B6472 в таблицу */
 
-  /* Точки статуса рядом с текстом (элемент интерфейса, ≥ 3 : 1) */
+  /* Значки и точки статуса рядом с текстом (элемент интерфейса, ≥ 3 : 1) */
   --dot-red: #DC2626;
   --dot-orange: #EA580C;
   --dot-yellow: #B45309;
   --dot-green: #16A34A;
 
   /* Уведомления — тёмная плашка в светлой теме, светлая в тёмной */
-  --toast: #0B1220;
+  --toast: #0D1218;
   --on-toast: #FFFFFF;
-  --toast-action: #A5B4FC;
+  --toast-action: #7CC4FF;
 
-  /* Тени: у панелей — едва заметная, у того, что парит (меню, окно), — глубже */
-  --shadow-sm: 0 1px 2px rgb(11 18 32 / 0.04);
-  --shadow-md: 0 1px 2px rgb(11 18 32 / 0.04), 0 6px 16px rgb(11 18 32 / 0.06);
-  --shadow-lg: 0 2px 6px rgb(11 18 32 / 0.06), 0 24px 48px -12px rgb(11 18 32 / 0.22);
-  --scrim: rgb(11 18 32 / 0.32);
+  /* Свечения за листами и стекло шапки */
+  --glow-a: rgb(30 100 207 / 0.1);
+  --glow-b: rgb(154 116 50 / 0.08);
+  --glass: rgb(255 255 255 / 0.72);
+  --edge: rgb(255 255 255 / 0);  /* блик по верхней кромке листа (виден в тёмной теме) */
+  --grain-opacity: 0.035;
 
-  /* Шрифт: один — Inter. Цифры в суммах и датах — табличные. */
+  /* Тени: лежит / поднят (наведение) / окно. Своих теней не заводить. */
+  --shadow-1: 0 1px 2px rgb(13 18 24 / 0.05), 0 14px 34px rgb(13 18 24 / 0.06);
+  --shadow-2: 0 2px 4px rgb(13 18 24 / 0.05), 0 20px 40px rgb(13 18 24 / 0.09);
+  --shadow-3: 0 4px 10px rgb(13 18 24 / 0.08), 0 40px 90px rgb(13 18 24 / 0.22);
+  --scrim: rgb(13 18 24 / 0.32);
+
+  /* Шрифты: текст — Inter; заголовки и крупные числа — с засечками, цифры Newsreader */
   --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --display: 'Cab Num', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
   --font-features: 'cv05' 1, 'cv08' 1; /* cv05 «l» с хвостиком, cv08 «1» с засечкой: l / I / 1 не путаются */
   --tracking-tight: -0.011em;
 
   /* Шкала размеров. Порог наш: основной текст ≥ 16 px (бриф, п. 5). */
+  --text-xs: 0.8125rem;  /* 13 px — только надзаголовок капителью (.eyebrow) */
   --text-sm: 0.9375rem;  /* 15 px — подписи, шапка таблицы, значки статуса */
   --text-md: 1.0625rem;  /* 17 px — основной текст */
   --text-lg: 1.25rem;    /* 20 px — заголовок панели */
-  --text-xl: 1.5rem;     /* 24 px — имя в карточке на телефоне */
-  --text-2xl: 1.875rem;  /* 30 px — заголовок экрана */
-  --text-3xl: 2.5rem;    /* 40 px — крупные суммы и показатели */
+  --text-xl: 1.625rem;   /* 26 px — имя в карточке */
+  --text-2xl: 2.25rem;   /* 36 px — заголовок экрана */
+  --text-3xl: 2.75rem;   /* 44 px — крупные суммы */
+  --text-hero: clamp(2.375rem, 2.2vw + 1.6rem, 3.75rem); /* 38–60 px — первый экран «Сегодня» */
   --leading-body: 1.5;
-  --leading-tight: 1.15;
+  --leading-tight: 1.12;
   --weight-regular: 400;
   --weight-medium: 500;
   --weight-semibold: 600;
@@ -125,44 +183,69 @@
   /* Размеры касания: ≥ 44 px (WCAG 2.5.5); поля ввода — 48 px */
   --tap: 2.75rem;
   --field-h: 3rem;
-  --rail-w: 16rem;
+  --rail-w: 17.5rem;
   --content-max: 84rem;
-  --panel-w: 40rem;       /* выезжающая карточка клиента */
+  --panel-w: 42rem;       /* выезжающая карточка клиента */
 
-  /* Радиусы — по иерархии */
-  --radius-sm: 6px;   /* значок, клавиша */
-  --radius-md: 10px;  /* кнопка, поле, вкладки */
-  --radius-lg: 16px;  /* панель, окно */
-  --radius-xl: 20px;  /* шторка на телефоне */
+  /* Радиусы — одна шкала (как в образце): 6 клавиша · 10 метка, маленькая кнопка · 12 кнопка, поле, вкладки ·
+     16 вложенный блок · 20 лист, окно · 24 первый экран */
+  --radius-sm: 6px;
+  --radius-s: 10px;
+  --radius-md: 12px;
+  --radius-l: 16px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
   --radius-full: 999px;
 
-  /* Движение — кривые из навыков animate / emil-design-eng */
-  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  /* Движение. Пружины linear() — в блоке ниже; без поддержки linear() — то же движение без перелёта. */
+  --ease-out: cubic-bezier(0.25, 1, 0.5, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --spring: var(--ease-out);
+  --spring-pop: var(--ease-out);
+  --spring-soft: var(--ease-out);
   --dur-press: 120ms;   /* нажатие */
-  --dur-fast: 160ms;    /* подсветка строки, смена экрана */
-  --dur-base: 220ms;    /* окно, уведомление, вкладка */
-  --dur-move: 300ms;    /* строка → карточка, выезд панели */
+  --dur-fast: 150ms;    /* подсветка строки */
+  --dur-base: 220ms;    /* окно, вкладка */
+  --dur-move: 400ms;    /* строка → карточка, выезд панели */
+  --dur-spring: 550ms;  /* пружина (успокаивается за 0,54 с) */
+  --dur-pop: 640ms;     /* пружина с перелётом */
   --dur-count: 700ms;   /* пересчёт чисел */
+  --stagger: 30ms;      /* шаг появления строк */
   --undo-window: 10s;   /* «Отменить» (бриф, п. 4) */
+}
+
+/* Пружины посчитаны из физики (масса 1), значения — из «Сверки рейсов»: --spring — жёсткость 300, затухание 24
+   (перелёт 5 %, 0,54 с); --spring-pop — 400 / 22 (перелёт 12 %, 0,64 с); --spring-soft — 170 / 20 (перелёт 2 %, 0,66 с). */
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    --spring: linear(0, 0.043, 0.147, 0.281, 0.424, 0.562, 0.686, 0.791, 0.875, 0.94, 0.986, 1.017, 1.036, 1.046, 1.048, 1.046, 1.041, 1.034, 1.027, 1.021, 1.015, 1.01, 1.006, 1.003, 1.001, 0.999, 0.998, 0.998, 0.998, 0.998, 1);
+    --spring-soft: linear(0, 0.036, 0.124, 0.238, 0.362, 0.484, 0.597, 0.696, 0.78, 0.848, 0.902, 0.944, 0.974, 0.995, 1.009, 1.017, 1.022, 1.023, 1.022, 1.02, 1.018, 1.015, 1.012, 1.009, 1.007, 1.005, 1.004, 1.002, 1.001, 1.001, 1);
+    --spring-pop: linear(0, 0.08, 0.259, 0.48, 0.694, 0.867, 0.997, 1.079, 1.117, 1.125, 1.111, 1.088, 1.06, 1.034, 1.013, 0.998, 0.989, 0.985, 0.985, 0.987, 0.99, 0.993, 0.996, 0.999, 1.001, 1.002, 1.002, 1.002, 1.002, 1.001, 1);
+  }
 }
 
 /* ───────── Тёмная тема: выбрана вручную ───────── */
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --canvas: #0B0D12;
-  --surface: #12151C;
-  --surface-sunk: #171B24;
-  --line: #222734;
+  --canvas: #07090C;
+  --surface: #0F1318;
+  --surface-sunk: #161C23;
+  --line: #1D242C;
+  --line-strong: #2A323C;
   --field-border: #5F6B80;
-  --ink: #ECEEF2;
-  --ink-2: #9AA3B2;
-  --positive: #4ADE80;
-  --accent: #E8ECF7;
-  --on-accent: #0B0D12;
-  --accent-soft: #1B2030;
-  --focus: #8EA2FF;
+  --ink: #ECEFF3;
+  --ink-2: #8B95A4;
+  --positive: #4BD39A;
+  --accent: #7CC4FF;
+  --on-accent: #07090C;
+  --accent-soft: #10223A;
+  --focus: #7CC4FF;
+  --btn: #ECEFF3;
+  --on-btn: #07090C;
+  --wheat: #E7D6AA;
+  --wheat-ink: #E7D6AA;
+  --wheat-soft: #221D12;
   --st-red-bg: #3A1517;
   --st-red-ink: #FFB4B4;
   --st-orange-bg: #3A2112;
@@ -177,12 +260,17 @@
   --dot-orange: #FB923C;
   --dot-yellow: #FBBF24;
   --dot-green: #4ADE80;
-  --toast: #ECEEF2;
-  --on-toast: #0B0D12;
-  --toast-action: #2747C7;
-  --shadow-sm: 0 0 0 1px rgb(255 255 255 / 0.02);
-  --shadow-md: 0 0 0 1px rgb(255 255 255 / 0.04), 0 8px 20px rgb(0 0 0 / 0.4);
-  --shadow-lg: 0 0 0 1px rgb(255 255 255 / 0.06), 0 24px 48px -12px rgb(0 0 0 / 0.6);
+  --toast: #ECEFF3;
+  --on-toast: #07090C;
+  --toast-action: #1E64CF;
+  --glow-a: rgb(124 196 255 / 0.14);
+  --glow-b: rgb(231 214 170 / 0.07);
+  --glass: rgb(15 19 25 / 0.62);
+  --edge: rgb(255 255 255 / 0.06);
+  --grain-opacity: 0.05;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.35), 0 14px 34px rgb(0 0 0 / 0.3);
+  --shadow-2: 0 2px 4px rgb(0 0 0 / 0.4), 0 24px 48px rgb(0 0 0 / 0.5);
+  --shadow-3: 0 4px 12px rgb(0 0 0 / 0.5), 0 48px 110px rgb(0 0 0 / 0.7);
   --scrim: rgb(0 0 0 / 0.55);
 }
 
@@ -190,18 +278,24 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
-    --canvas: #0B0D12;
-    --surface: #12151C;
-    --surface-sunk: #171B24;
-    --line: #222734;
+    --canvas: #07090C;
+    --surface: #0F1318;
+    --surface-sunk: #161C23;
+    --line: #1D242C;
+    --line-strong: #2A323C;
     --field-border: #5F6B80;
-    --ink: #ECEEF2;
-    --ink-2: #9AA3B2;
-    --positive: #4ADE80;
-    --accent: #E8ECF7;
-    --on-accent: #0B0D12;
-    --accent-soft: #1B2030;
-    --focus: #8EA2FF;
+    --ink: #ECEFF3;
+    --ink-2: #8B95A4;
+    --positive: #4BD39A;
+    --accent: #7CC4FF;
+    --on-accent: #07090C;
+    --accent-soft: #10223A;
+    --focus: #7CC4FF;
+    --btn: #ECEFF3;
+    --on-btn: #07090C;
+    --wheat: #E7D6AA;
+    --wheat-ink: #E7D6AA;
+    --wheat-soft: #221D12;
     --st-red-bg: #3A1517;
     --st-red-ink: #FFB4B4;
     --st-orange-bg: #3A2112;
@@ -216,12 +310,17 @@
     --dot-orange: #FB923C;
     --dot-yellow: #FBBF24;
     --dot-green: #4ADE80;
-    --toast: #ECEEF2;
-    --on-toast: #0B0D12;
-    --toast-action: #2747C7;
-    --shadow-sm: 0 0 0 1px rgb(255 255 255 / 0.02);
-    --shadow-md: 0 0 0 1px rgb(255 255 255 / 0.04), 0 8px 20px rgb(0 0 0 / 0.4);
-    --shadow-lg: 0 0 0 1px rgb(255 255 255 / 0.06), 0 24px 48px -12px rgb(0 0 0 / 0.6);
+    --toast: #ECEFF3;
+    --on-toast: #07090C;
+    --toast-action: #1E64CF;
+    --glow-a: rgb(124 196 255 / 0.14);
+    --glow-b: rgb(231 214 170 / 0.07);
+    --glass: rgb(15 19 25 / 0.62);
+    --edge: rgb(255 255 255 / 0.06);
+    --grain-opacity: 0.05;
+    --shadow-1: 0 1px 2px rgb(0 0 0 / 0.35), 0 14px 34px rgb(0 0 0 / 0.3);
+    --shadow-2: 0 2px 4px rgb(0 0 0 / 0.4), 0 24px 48px rgb(0 0 0 / 0.5);
+    --shadow-3: 0 4px 12px rgb(0 0 0 / 0.5), 0 48px 110px rgb(0 0 0 / 0.7);
     --scrim: rgb(0 0 0 / 0.55);
   }
 }
@@ -230,6 +329,9 @@
 @media (prefers-reduced-motion: reduce) {
   :root {
     --dur-move: 0ms;
+    --dur-spring: 0ms;
+    --dur-pop: 0ms;
     --dur-count: 0ms;
+    --stagger: 0ms;
   }
 }
