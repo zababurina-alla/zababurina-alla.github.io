@@ -1,7 +1,7 @@
 // Выдуманные данные прототипа. Ни один клиент не взят из таблицы; совпадения фамилий случайны.
 // Начисления посчитаны по ставкам 2026 из брифа (МЗП 8 647, ПМ 3 328, ЄСВ 22 % МЗП = 1 902,34) — только для вида;
 // на живых данных их считает сервер.
-import type { Activity, Client, Deadline, Payment, Task } from './types';
+import type { Activity, Client, Deadline, Payment, Question, Task } from './types';
 
 const ESV = { name: 'ЄСВ', kopecks: 190234, note: '22 % МЗП' };
 const EP1 = { name: 'ЄП', kopecks: 33280, note: '10 % ПМ' };
@@ -52,14 +52,14 @@ export const DEADLINES: Deadline[] = [
 ];
 
 export const PAYMENTS: Payment[] = [
-  { id: 'p1', clientId: 'c1', kopecks: 150000, period: 'Октябрь 2026', method: 'bank', date: '2026-10-14', source: 'бот' },
-  { id: 'p2', clientId: 'c2', kopecks: 420000, period: 'III квартал 2026', method: 'cash', date: '2026-10-13', source: 'сайт' },
-  { id: 'p3', clientId: 'c6', kopecks: 200000, period: 'Октябрь 2026', method: 'mono', date: '2026-10-12', source: 'таблица' },
-  { id: 'p4', clientId: 'c11', kopecks: 150000, period: 'Октябрь 2026', method: 'bank', date: '2026-10-09', source: 'сайт' },
-  { id: 'p5', clientId: 'c9', kopecks: 300000, period: 'Сентябрь 2026', method: 'bank', date: '2026-10-08', source: 'бот' },
-  { id: 'p6', clientId: 'c3', kopecks: 100000, period: 'Октябрь 2026', method: 'cash', date: '2026-10-05', source: 'сайт' },
-  { id: 'p7', clientId: 'c12', kopecks: 250000, period: 'III квартал 2026', method: 'mono', date: '2026-10-03', source: 'сайт' },
-  { id: 'p8', clientId: 'c10', kopecks: 500000, period: 'Октябрь 2026', method: 'bank', date: '2026-10-02', source: 'таблица' },
+  { id: 'p1', version: 1, clientId: 'c1', kopecks: 150000, period: 'Октябрь 2026', method: 'bank', date: '2026-10-14', source: 'бот' },
+  { id: 'p2', version: 1, clientId: 'c2', kopecks: 420000, period: 'III квартал 2026', method: 'cash', date: '2026-10-13', source: 'сайт' },
+  { id: 'p3', version: 1, clientId: 'c6', kopecks: 200000, period: 'Октябрь 2026', method: 'mono', date: '2026-10-12', source: 'таблица' },
+  { id: 'p4', version: 1, clientId: 'c11', kopecks: 150000, period: 'Октябрь 2026', method: 'bank', date: '2026-10-09', source: 'сайт' },
+  { id: 'p5', version: 1, clientId: 'c9', kopecks: 300000, period: 'Сентябрь 2026', method: 'bank', date: '2026-10-08', source: 'бот' },
+  { id: 'p6', version: 1, clientId: 'c3', kopecks: 100000, period: 'Октябрь 2026', method: 'cash', date: '2026-10-05', source: 'сайт' },
+  { id: 'p7', version: 1, clientId: 'c12', kopecks: 250000, period: 'III квартал 2026', method: 'mono', date: '2026-10-03', source: 'сайт' },
+  { id: 'p8', version: 1, clientId: 'c10', kopecks: 500000, period: 'Октябрь 2026', method: 'bank', date: '2026-10-02', source: 'таблица' },
 ];
 
 /** Поступления по дням октября, нарастающим итогом, тыс. ₴ — для графика. */
@@ -81,8 +81,9 @@ export const TASKS: Task[] = [
   { id: 't5', version: 1, clientId: null, text: 'Сверить выписку Приватбанка за неделю', due: null, priority: 'medium', done: false },
 ];
 
-export const QUESTIONS = [
-  { id: 'q1', from: 'Дмитрий', text: 'У Ясенко новый КВЕД 47.91 — добавить в карточку?', when: 'вчера, 21:40' },
+export const QUESTIONS: Question[] = [
+  { id: 'q1', version: 1, text: 'У Ясенко новый КВЕД 47.99 — добавить в карточку?', type: 'choice', options: ['Да', 'Нет', 'Уточню'],
+    clientId: 'c5', status: 'asked', askedAt: '2026-10-13T21:40', answer: null },
 ];
 
 export const KIND_LABEL: Record<Client['kind'], string> = {

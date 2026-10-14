@@ -1,6 +1,6 @@
 // Очередь записей «ещё не в таблице». Хранится в IndexedDB — переживает обрыв связи и перезагрузку страницы.
 // Отправляет строго по одной и по порядку (отмена не обгонит закрытие). Нет связи — ждёт и повторяет с паузой
-// 2 → 4 → 8 → … 30 с. Повтор безопасен: у каждой записи свой requestId, сервер не создаёт дубль.
+// 2 → 4 → 8 → … 30 с (ночное обслуживание — до retryAt от сервера). Повтор безопасен: у каждой записи свой requestId, сервер не создаёт дубль.
 // Счётчики ступеней (правило владельца, п. 2.8): введено → в очереди → отправлено → принято → применено → видно в таблице.
 import { RETRYABLE } from './api';
 import type { CabinetApi, WriteOp, WriteResult } from './api';
@@ -41,11 +41,14 @@ export interface Counters {
 }
 
 const BACKOFF_MS = [2000, 4000, 8000, 16000, 30000];
+const MAX_WAIT_MS = 10 * 60_000;
 
 export class Outbox {
   private items = new Map<string, OutboxItem>();
   private busy = false;
   private timer: ReturnType<typeof setTimeout> | null = null;
+  /** До этого момента не отправлять даже по «сейчас» (опрос, связь вернулась): сервер сам назвал retryAt. */
+  private holdUntil = 0;
   counters: Counters = { entered: 0, sent: 0, accepted: 0, rejected: 0, applied: 0, seenInTable: 0 };
 
   constructor(private api: CabinetApi, private storage: Storage, private emit: (e: OutboxEvent) => void) {}
@@ -96,7 +99,7 @@ export class Outbox {
 
   /** Отправить следующую запись. now=true — не ждать паузы (кнопка «Повторить», связь вернулась). */
   async kick(now = false): Promise<void> {
-    if (now && this.timer) { clearTimeout(this.timer); this.timer = null; }
+    if (now && this.timer && Date.now() >= this.holdUntil) { clearTimeout(this.timer); this.timer = null; }
     if (this.busy || this.timer) return;
     const next = this.list().find((i) => i.state === 'queued');
     if (!next) return;
@@ -129,7 +132,11 @@ export class Outbox {
       await this.storage.set(next.op.requestId, next);
       if (result.code === 'NETWORK') this.emit({ type: 'offline', item: next });
       this.emit({ type: 'changed' });
-      const pause = BACKOFF_MS[Math.min(next.attempts - 1, BACKOFF_MS.length - 1)] ?? 30000;
+      const backoff = BACKOFF_MS[Math.min(next.attempts - 1, BACKOFF_MS.length - 1)] ?? 30000;
+      // Ночное обслуживание: ждать retryAt от сервера. Не дольше 10 мин — на случай, если часы браузера и сервера разошлись.
+      const until = result.retryAt ? Date.parse(result.retryAt) - Date.now() : NaN;
+      const pause = Number.isFinite(until) ? Math.min(Math.max(until, backoff), MAX_WAIT_MS) : backoff;
+      this.holdUntil = Number.isFinite(until) ? Date.now() + pause : 0;
       this.timer = setTimeout(() => { this.timer = null; void this.kick(); }, pause);
       return;
     }

@@ -53,7 +53,7 @@ interface Store {
   /** hideAfterMs — убрать строку с экрана не сразу (успеть показать анимацию); в очередь запись встаёт сразу. */
   closeDeadline: (id: string, onSaved?: (next: Deadline | null, notifyAt: string | null) => void, hideAfterMs?: number) => CloseResult;
   reopenDeadline: (id: string) => void;
-  addPayment: (p: Omit<Payment, 'id' | 'source' | 'save'>, onSaved?: () => void) => string;
+  addPayment: (p: Omit<Payment, 'id' | 'version' | 'source' | 'save'>, onSaved?: () => void) => string;
   removePayment: (id: string) => void;
   addClient: (c: Omit<Client, 'id' | 'version'>, onSaved?: (created: Deadline[], client: Client) => void) => Client;
   /** baseVersion — версия, которую мама видела, когда начала править (бриф, п. 6: конфликт). */
@@ -98,7 +98,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [cursor, setCursor] = useState(0);
   const cursorRef = useRef(0);
   const mine = useRef(new Set<string>());
-  const callbacks = useRef(new Map<string, (changes: Change[], result: { notifyAt?: string }) => void>());
+  const paymentsRef = useRef<Payment[]>([]);
+  useEffect(() => { paymentsRef.current = payments; }, [payments]);
+  const callbacks = useRef(new Map<string, (changes: Change[], result: { notifyAt?: string | null }) => void>());
   const outboxRef = useRef<Outbox | null>(null);
   const handlerRef = useRef<(e: OutboxEvent) => void>(() => undefined);
 
@@ -120,7 +122,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       } else if (ch.entity === 'deadline') {
         const rec = ch.record as Deadline | undefined;
         if (ch.op === 'delete') {
-          // Ушёл в архив (через 3 дня после закрытия) — из открытых убрать; «Закрыто сегодня» не трогаем.
+          // Ушёл в архив (ночью, когда со срока прошло > 3 дней) — из открытых убрать; «Закрыто сегодня» не трогаем.
           setDeadlines((xs) => xs.filter((x) => x.id !== ch.id));
         } else if (rec?.status === 'done') {
           // Закрыт (с сайта, в таблице или ботом): из открытых — в «Закрыто сегодня».
@@ -207,6 +209,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           return final ? cs.filter((c) => c.requestId !== op.requestId) : cs.map((c) => (c.requestId === op.requestId ? { ...c, save: 'failed' } : c));
         });
       }
+      // Отмену платежа сервер не выполнил — платёж возвращается на экран таким, каким он стал в таблице.
+      if (op.kind === 'cancelPayment' && e.result.current && 'kopecks' in e.result.current) {
+        const cur = e.result.current;
+        setPayments((xs) => upsert(xs, cur));
+      }
       if (op.kind === 'addPayment') setPayments((xs) => xs.map((p) => (p.id === op.payment.id ? { ...p, save: 'failed' } : p)));
       if (final) void outboxRef.current?.discard(op.requestId);
       play('attention');
@@ -263,7 +270,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => { window.clearInterval(t); document.removeEventListener('visibilitychange', tick); window.removeEventListener('online', tick); };
   }, [syncNow]);
 
-  const send = useCallback((op: WriteOp, label: string, onApplied?: (changes: Change[], result: { notifyAt?: string }) => void, showAfterMs = 0) => {
+  const send = useCallback((op: WriteOp, label: string, onApplied?: (changes: Change[], result: { notifyAt?: string | null }) => void, showAfterMs = 0) => {
     mine.current.add(op.requestId);
     if (onApplied) callbacks.current.set(op.requestId, onApplied);
     // Запись — в очередь сразу; на экране — сразу или после короткой анимации (таймер, не кадры анимации:
@@ -303,16 +310,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     send({ kind: 'reopenDeadline', requestId: newRequestId(), id, undoOf: entry.requestId }, `Отменить закрытие «${entry.deadline.what}»`);
   }, [closed, send]);
 
-  const addPayment = useCallback((p: Omit<Payment, 'id' | 'source' | 'save'>, onSaved?: () => void) => {
+  const addPayment = useCallback((p: Omit<Payment, 'id' | 'version' | 'source' | 'save'>, onSaved?: () => void) => {
     const requestId = newRequestId();
     // id платежа создаёт браузер (= requestId): повтор из очереди не создаст второй платёж.
-    send({ kind: 'addPayment', requestId, payment: { ...p, id: requestId, source: 'сайт' } }, 'Платёж', () => onSaved?.());
+    send({ kind: 'addPayment', requestId, payment: { ...p, id: requestId, version: 0, source: 'сайт' } }, 'Платёж', () => onSaved?.());
     return requestId;
   }, [send]);
 
   const removePayment = useCallback((id: string) => {
     if (outboxRef.current?.has(id)) { void outboxRef.current.discard(id); setPayments((xs) => xs.filter((x) => x.id !== id)); return; }
-    send({ kind: 'cancelPayment', requestId: newRequestId(), id }, 'Отменить платёж');
+    const p = paymentsRef.current.find((x) => x.id === id);
+    if (!p) return;
+    send({ kind: 'cancelPayment', requestId: newRequestId(), id, baseVersion: p.version }, 'Отменить платёж');
   }, [send]);
 
   const addClient = useCallback((data: Omit<Client, 'id' | 'version'>, onSaved?: (created: Deadline[], client: Client) => void) => {

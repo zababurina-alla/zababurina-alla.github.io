@@ -49,6 +49,7 @@ export type PayMethod = 'bank' | 'cash' | 'mono' | 'diia' | 'transfer' | 'other'
 
 export interface Payment {
   id: string;
+  version: number;
   clientId: string;
   kopecks: number;
   period: string;
@@ -68,6 +69,20 @@ export interface Task {
   due: string | null; // ISO
   priority: Priority;
   done: boolean;
+}
+
+/** Вопрос маме (контракт v2.1, уточнение 6). Следующий вопрос сайт берёт из questions.list, а не ждёт Telegram. */
+export interface Question {
+  id: string;
+  version: number;
+  text: string;
+  type: 'choice' | 'text' | 'number';
+  /** Для choice — ответ только из этого списка. */
+  options: string[];
+  clientId: string | null;
+  status: 'waiting' | 'asked';
+  askedAt: string; // ISO date-time
+  answer: string | null;
 }
 
 export interface Activity {

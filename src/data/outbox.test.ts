@@ -13,7 +13,7 @@ function memStorage() {
   };
 }
 
-const op = (id: string): WriteOp => ({ kind: 'cancelPayment', requestId: id, id: `p-${id}` });
+const op = (id: string): WriteOp => ({ kind: 'cancelPayment', requestId: id, id: `p-${id}`, baseVersion: 1 });
 const ok: WriteResult = { ok: true, changes: [], cursor: 1 };
 
 function apiWith(write: (o: WriteOp) => Promise<WriteResult>): CabinetApi {
@@ -75,5 +75,30 @@ describe('очередь записей', () => {
     expect(store.m.get('b')?.state).toBe('failed');
     expect(store.m.has('c')).toBe(false);
     expect(ob.counters.rejected).toBe(2);
+  });
+});
+
+describe('ночное обслуживание', () => {
+  it('ждёт retryAt от сервера, а не короткую паузу', async () => {
+    vi.useFakeTimers();
+    const start = Date.now();
+    let calls = 0;
+    const store = memStorage();
+    const ob = new Outbox(apiWith(async () => {
+      calls++;
+      return calls === 1
+        ? { ok: false, code: 'MAINTENANCE', message: 'обслуживание', retryAt: new Date(start + 60_000).toISOString() }
+        : ok;
+    }), store, () => undefined);
+    await ob.enqueue(op('a'), 'A');
+    await vi.advanceTimersByTimeAsync(30_000);
+    void ob.kick(true); // опрос таблицы / связь вернулась — retryAt всё равно не обгоняем
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls).toBe(1);
+    expect(store.m.get('a')?.state).toBe('queued');
+    await vi.advanceTimersByTimeAsync(31_000);
+    expect(calls).toBe(2);
+    expect(store.m.size).toBe(0);
+    vi.useRealTimers();
   });
 });

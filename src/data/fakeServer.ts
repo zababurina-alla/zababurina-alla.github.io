@@ -94,7 +94,11 @@ class FakeServer implements CabinetApi {
   async write(op: WriteOp): Promise<WriteResult> {
     await wait(this.slow ? SLOW_MS : WRITE_MS[0] + Math.random() * (WRITE_MS[1] - WRITE_MS[0]));
     if (!this.online) return { ok: false, code: 'NETWORK', message: 'Нет связи с таблицей' };
-    if (this.maintenance) return { ok: false, code: 'MAINTENANCE', message: 'Ночное обслуживание таблицы — запись отправлю после 03:45' };
+    // Обслуживание — по флагу ночных задач, а не по часам (v2.1, уточнение 1); в прототипе retryAt через 20 с.
+    if (this.maintenance) {
+      return { ok: false, code: 'MAINTENANCE', message: 'Ночное обслуживание таблицы (обычно 03:00–04:30) — запись отправлю, когда закончится',
+        retryAt: new Date(Date.now() + 20_000).toISOString() };
+    }
     const repeat = this.done.get(op.requestId);
     if (repeat) return repeat;
     if (this.failNext) {
@@ -117,7 +121,7 @@ class FakeServer implements CabinetApi {
         if (d.periodEnd && TODAY <= d.periodEnd) {
           return { ok: false, code: 'PERIOD_OPEN', message: `Период ещё не закончился — закрыть можно с ${fmtDate(addDays(d.periodEnd, 1))}` };
         }
-        // Закрытие — upsert со статусом «done» (п. 20); строка остаётся до ухода в архив через 3 дня.
+        // Закрытие — upsert со статусом «done» (п. 20); в архив срок уходит ночью, когда со СРОКА прошло > 3 дней.
         const done: Deadline = { ...d, status: 'done', closedAt: TODAY, version: this.cursor + 1 };
         this.deadlines.set(d.id, done);
         const changes = [this.record('deadline', 'upsert', d.id, o, done)];
@@ -142,7 +146,7 @@ class FakeServer implements CabinetApi {
         return { ok: true, changes, cursor: this.cursor };
       }
       case 'addPayment': {
-        const p = { ...op.payment, source: 'сайт' as const };
+        const p = { ...op.payment, source: 'сайт' as const, version: this.cursor + 1 };
         delete p.save;
         this.payments.set(p.id, p);
         const name = this.clients.get(p.clientId)?.name ?? '';
@@ -150,7 +154,11 @@ class FakeServer implements CabinetApi {
         return { ok: true, changes, cursor: this.cursor };
       }
       case 'cancelPayment': {
-        if (!this.payments.delete(op.id)) return { ok: false, code: 'NOT_FOUND', message: 'Этого платежа уже нет' };
+        const cur = this.payments.get(op.id);
+        if (!cur) return { ok: false, code: 'NOT_FOUND', message: 'Этого платежа уже нет' };
+        // Строку уже поправили в таблице — отменять нельзя молча (как «↩️ Отменить» в боте; v2.1, уточнение 7).
+        if (cur.version !== op.baseVersion) return { ok: false, code: 'CONFLICT', message: 'Платёж изменили в таблице — отмена не выполнена', current: { ...cur } };
+        this.payments.delete(op.id);
         return { ok: true, changes: [this.record('payment', 'delete', op.id, o), this.act('Платёж отменён', o, 'сайт')], cursor: this.cursor };
       }
       case 'addClient': {
@@ -197,7 +205,7 @@ class FakeServer implements CabinetApi {
   // ── Правки «извне» для режима отладки: так выглядят изменения в таблице и через бота ──
   external(kind: 'payment' | 'key' | 'close' | 'phone'): string {
     if (kind === 'payment') {
-      const p: Payment = { id: `p-bot-${this.cursor + 1}`, clientId: 'c5', kopecks: 320000, period: 'III квартал 2026', method: 'bank', date: TODAY, source: 'бот' };
+      const p: Payment = { id: `p-bot-${this.cursor + 1}`, version: this.cursor + 1, clientId: 'c5', kopecks: 320000, period: 'III квартал 2026', method: 'bank', date: TODAY, source: 'бот' };
       this.payments.set(p.id, p);
       this.record('payment', 'upsert', p.id, 'таблица', p);
       this.act('Платёж 3 200,00 ₴ от Ясенко Миколы записан', 'таблица', 'бот');

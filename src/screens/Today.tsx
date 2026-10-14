@@ -176,7 +176,7 @@ export function Today() {
             {QUESTIONS.map((q) => (
               <div key={q.id} className="question">
                 <p>{q.text}</p>
-                <div className="question__foot"><span className="sub">{q.when}</span><span className="sub">Ответить — в боте; на сайте появится с живыми данными</span></div>
+                <div className="question__foot"><span className="sub">{fmtDayMonth(q.askedAt.slice(0, 10))}, {q.askedAt.slice(11, 16)}</span><span className="sub">Ответить — в боте; на сайте появится с живыми данными</span></div>
               </div>
             ))}
           </section>

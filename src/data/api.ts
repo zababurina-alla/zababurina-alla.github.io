@@ -30,7 +30,7 @@ export type WriteOp =
   | { kind: 'closeDeadline'; requestId: string; id: string; baseVersion: number }
   | { kind: 'reopenDeadline'; requestId: string; id: string; undoOf: string }
   | { kind: 'addPayment'; requestId: string; payment: Payment }
-  | { kind: 'cancelPayment'; requestId: string; id: string }
+  | { kind: 'cancelPayment'; requestId: string; id: string; baseVersion: number }
   | { kind: 'addClient'; requestId: string; client: Client }
   | { kind: 'updateClient'; requestId: string; id: string; baseVersion: number; patch: Partial<Pick<Client, 'phone' | 'keyIssuer' | 'keyUntil'>> }
   | { kind: 'createTask'; requestId: string; task: Task }
@@ -39,12 +39,17 @@ export type WriteOp =
 export type ErrorCode = 'NETWORK' | 'CONFLICT' | 'PERIOD_OPEN' | 'NOT_FOUND' | 'SERVER' | 'VALIDATION' | 'UNDO_TOO_LATE'
   | 'DUPLICATE' | 'BUSY' | 'MAINTENANCE' | 'QUOTA' | 'RATE_LIMIT' | 'AUTH_EXPIRED' | 'AUTH_REQUIRED' | 'FORBIDDEN';
 
-/** Коды, при которых сайт повторяет запись сам, с паузой (контракт v2, раздел 9). */
+/** Коды, при которых сайт повторяет запись из очереди сам, с паузой (контракт v2.1, раздел 9).
+ *  RATE_LIMIT у входа и показа пароля не повторяется — они не идут через очередь (уточнение 10). */
 export const RETRYABLE: ReadonlySet<ErrorCode> = new Set<ErrorCode>(['NETWORK', 'BUSY', 'MAINTENANCE', 'QUOTA', 'RATE_LIMIT', 'AUTH_EXPIRED']);
 
 export type WriteResult =
-  | { ok: true; changes: Change[]; cursor: number; /** закрытие срока: когда уйдут уведомления (через 2 мин) */ notifyAt?: string }
-  | { ok: false; code: ErrorCode; message: string; current?: Client | Deadline };
+  | { ok: true; changes: Change[]; cursor: number;
+      /** Закрытие срока: когда уйдут уведомления (через 2 мин); null — у клиента нет Telegram, уведомления не будет. */
+      notifyAt?: string | null }
+  | { ok: false; code: ErrorCode; message: string; current?: Client | Deadline | Payment;
+      /** MAINTENANCE: когда ночные задачи закончатся (флаг сервера, не часы) — раньше не повторять. */
+      retryAt?: string };
 
 export interface CabinetApi {
   snapshot(): Promise<Snapshot>;
