@@ -15,7 +15,8 @@ export interface Client {
   id: string;
   version: number;
   name: string;
-  kind: ClientKind;
+  /** null — тип в таблице не указан. */
+  kind: ClientKind | null;
   marks: ClientMark[];
   employer: boolean;
   kved: { code: string; title: string }[];
@@ -56,8 +57,19 @@ export interface Payment {
   method: PayMethod;
   date: string; // ISO
   source: 'сайт' | 'бот' | 'таблица';
+  /** Колонка F «📌 Статус»; пустой в таблице сервер отдаёт как expected. Нет поля — считаем полученным. */
+  status?: 'received' | 'expected' | 'notReceived' | 'returned';
   save?: SaveState;
 }
+
+/** Деньги пришли: в суммы месяца идут только такие платежи. */
+export function isReceived(p: Pick<Payment, 'status'>): boolean {
+  return p.status === undefined || p.status === 'received';
+}
+
+export const PAY_STATUS_LABEL: Record<NonNullable<Payment['status']>, string> = {
+  received: 'получено', expected: 'ожидается', notReceived: 'не получено', returned: 'возвращено',
+};
 
 export type Priority = 'critical' | 'high' | 'medium' | 'low';
 

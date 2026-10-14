@@ -34,7 +34,10 @@ function normClient(raw: unknown): Client {
 }
 
 function normRecord(entity: Entity, raw: unknown): NonNullable<Change['record']> {
-  return entity === 'client' ? normClient(raw) : raw as Deadline | Payment | Activity | Task | Question;
+  if (entity === 'client') return normClient(raw);
+  // Срок, чьего клиента нет в «Клиентах», сервер отдаёт с clientId: null.
+  if (entity === 'deadline') { const d = raw as Deadline & { clientId: string | null }; return { ...d, clientId: d.clientId ?? '' }; }
+  return raw as Deadline | Payment | Activity | Task | Question;
 }
 
 function toChange(c: ServerChange): Change | null {
@@ -66,7 +69,7 @@ export class LiveApi implements CabinetApi {
     const d = env.data;
     return {
       clients: d.clients.map(normClient),
-      deadlines: d.deadlines,
+      deadlines: d.deadlines.map((x) => normRecord('deadline', x) as Deadline),
       payments: d.payments,
       tasks: d.tasks,
       activity: d.activity,

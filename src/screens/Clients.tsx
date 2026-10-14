@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
-import { KIND_LABEL } from '../data/fake';
+import { kindLabel } from '../data/fake';
 import { useStore } from '../data/store';
 import type { ClientKind, Deadline } from '../data/types';
 import { TODAY, daysBetween, daysLabel, fmtDate, plural, statusByDays } from '../lib/dates';
@@ -41,12 +41,13 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
     return m;
   }, [deadlines]);
 
-  const byKind = (k: ClientKind) => kind === 'all' || k === kind || (kind === 'other' && !['fop1', 'fop2', 'fop3'].includes(k));
+  // Тип не указан (null) — в «Другие».
+  const byKind = (k: ClientKind | null) => kind === 'all' || k === kind || (kind === 'other' && !['fop1', 'fop2', 'fop3'].includes(k ?? ''));
   const found = search(
     store.clients.filter((c) => byKind(c.kind)).map((c) => ({ ...c, extra: [...c.kved.map((k) => k.code), c.phone] })),
     q,
   );
-  const count = (f: KindFilter) => store.clients.filter((c) => f === 'all' || c.kind === f || (f === 'other' && !['fop1', 'fop2', 'fop3'].includes(c.kind))).length;
+  const count = (f: KindFilter) => store.clients.filter((c) => f === 'all' || c.kind === f || (f === 'other' && !['fop1', 'fop2', 'fop3'].includes(c.kind ?? ''))).length;
 
   return (
     <div ref={scope} className="page">
@@ -99,7 +100,7 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
                     <button type="button" className="ctable__open" onClick={() => ui.openClient(c.id)}>
                       <strong data-client-name={c.id}>{c.name}</strong>
                     </button>
-                    <span className="sub">{KIND_LABEL[c.kind]}{c.employer ? ', работодатель' : ''}</span>
+                    <span className="sub">{kindLabel(c.kind)}{c.employer ? ', работодатель' : ''}</span>
                   </span>
                 </span>
                 <span role="cell" className="num">{c.kved.map((k) => k.code).join(', ')}</span>

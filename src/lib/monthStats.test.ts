@@ -22,6 +22,14 @@ describe('суммы за месяц', () => {
     expect(monthStats([{ kopecks: 100, date: '2027-01-02' }], '2027-01-05').growth).toBeNull();
   });
 
+  it('«ожидается», «не получено», «возвращено» в суммы не идут', () => {
+    const s = monthStats([
+      { kopecks: 100, date: '2026-10-02', status: 'received' }, { kopecks: 1000, date: '2026-10-03', status: 'expected' },
+      { kopecks: 10000, date: '2026-10-04', status: 'returned' }, { kopecks: 5, date: '2026-10-05' },
+    ], '2026-10-14');
+    expect([s.total, s.count]).toEqual([105, 2]);
+  });
+
   it('месяцы словами и число дней', () => {
     expect([monthName('2026-10', 'nom'), monthName('2026-10', 'prep'), monthName('2026-09', 'gen')]).toEqual(['Октябрь', 'октябре', 'сентября']);
     expect([prevMonthKey('2026-01'), daysInMonth('2026-02'), daysInMonth('2028-02'), daysInMonth('2026-10')]).toEqual(['2025-12', 28, 29, 31]);

@@ -51,6 +51,11 @@ describe('транспорт', () => {
     await expect(call({ url: URL_, action: 'x', fetchImpl: s.fetchImpl })).rejects.toMatchObject({ code: 'SERVER' });
   });
 
+  it('выключатель API: текст «ok» вместо JSON → DISABLED с понятным текстом', async () => {
+    const s = server('ok');
+    await expect(call({ url: URL_, action: 'sync.snapshot', fetchImpl: s.fetchImpl })).rejects.toMatchObject({ code: 'DISABLED', message: expect.stringContaining('выключена') });
+  });
+
   it('тайм-аут 30 с прерывает запрос → NETWORK', async () => {
     vi.useFakeTimers();
     const fetchImpl = ((_u: unknown, init?: RequestInit) => new Promise((_, rej) => {
@@ -151,6 +156,15 @@ describe('живой адаптер: чтение', () => {
     expect(s.sent.map((x) => x.payload)).toEqual([{ since: 10, limit: 500 }, { since: 12, limit: 500 }]);
     expect(r.cursor).toBe(13);
     expect(r.changes.map((c) => `${c.cursor}:${c.entity}:${c.op}`)).toEqual(['11:payment:upsert', '13:deadline:delete']);
+  });
+
+  it('снимок: срок без клиента (clientId: null) и клиент без типа (kind: null) не ломают разбор', async () => {
+    const s = server(ok({ clients: [{ id: 'C-1', version: 1, name: 'Без типа', kind: null, marks: [], employer: false, kved: [], phone: null, keyIssuer: null, keyUntil: null, monthly: [] }],
+      deadlines: [{ ...dl('D-1'), clientId: null }], payments: [], tasks: [], activity: [], cursor: 5 }));
+    const snap = await new LiveApi(URL_, auth(), s.fetchImpl).snapshot();
+    expect(snap.clients[0]).toMatchObject({ kind: null, phone: '' });
+    expect(snap.deadlines[0]?.clientId).toBe('');
+    expect(snap.questions).toEqual([]);
   });
 
   it('CURSOR_EXPIRED уходит наверх как ApiError', async () => {

@@ -13,7 +13,7 @@ export interface Envelope<T> {
 }
 
 export interface ServerError {
-  code: ErrorCode | 'AUTH_INVALID' | 'CURSOR_EXPIRED' | 'UNSUPPORTED_VERSION';
+  code: ErrorCode | 'AUTH_INVALID' | 'CURSOR_EXPIRED' | 'UNSUPPORTED_VERSION' | 'DISABLED';
   message: string;
   retryable?: boolean;
   field?: string | null;
@@ -68,9 +68,19 @@ export async function call<T>({ url, action, payload = {}, session, requestId, f
   } finally {
     clearTimeout(timer);
   }
+  let text: string;
+  try {
+    text = await res.text();
+  } catch {
+    throw new ApiError({ code: 'NETWORK', message: 'Нет связи с таблицей' });
+  }
+  // Выключатель API на сервере: вместо JSON — просто «ok».
+  if (text.trim().toLowerCase() === 'ok') {
+    throw new ApiError({ code: 'DISABLED', message: 'Связь сайта с таблицей сейчас выключена — работайте в таблице или через бота' });
+  }
   let json: unknown;
   try {
-    json = await res.json();
+    json = JSON.parse(text);
   } catch {
     // Не JSON: страница входа Google, ошибка развёртывания, обрыв посреди ответа.
     throw new ApiError({ code: 'SERVER', message: 'Таблица ответила непонятно — попробуйте ещё раз' });

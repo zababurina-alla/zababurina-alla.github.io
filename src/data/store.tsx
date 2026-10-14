@@ -155,8 +155,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           // Ушёл в архив (ночью, когда со срока прошло > 3 дней) — из открытых убрать; «Закрыто сегодня» не трогаем.
           setDeadlines((xs) => xs.filter((x) => x.id !== ch.id));
         } else if (rec?.status === 'done') {
-          // Закрыт (с сайта, в таблице или ботом): из открытых — в «Закрыто сегодня».
+          // Закрыт (с сайта, в таблице или ботом): из открытых — в «Закрыто сегодня». Срок, закрытый раньше
+          // (например, ушёл в архив — сервер шлёт его upsert'ом), в «Закрыто сегодня» не попадает.
           setDeadlines((xs) => xs.filter((x) => x.id !== ch.id));
+          if (!own && rec.closedAt !== TODAY) continue;
           setClosed((cs) => (cs.some((c) => c.deadline.id === ch.id)
             ? cs.map((c) => (c.deadline.id === ch.id ? { ...c, save: 'saved' } : c))
             : [{ deadline: rec, next: null, save: 'saved', requestId: own ? ch.origin : `${ch.origin}-${ch.cursor}`, by: own ? 'сайт' : 'бот' }, ...cs]));

@@ -2,7 +2,7 @@
 // Открывается мгновенно, без анимации: действие частое и с клавиатуры (правило навыка animate).
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../data/store';
-import { KIND_LABEL } from '../data/fake';
+import { kindLabel } from '../data/fake';
 import { fold, search } from '../lib/search';
 import { navigate } from '../router';
 import { toggleTheme } from '../lib/theme';
@@ -44,7 +44,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   ];
   const clients: Item[] = q
     ? search(store.clients.map((c) => ({ ...c, extra: [...c.kved.map((k) => k.code), c.phone] })), q).slice(0, 6)
-      .map((c) => ({ id: c.id, group: 'Клиенты', label: c.name, hint: KIND_LABEL[c.kind], icon: 'fop' as IconName, run: () => ui.openClient(c.id) }))
+      .map((c) => ({ id: c.id, group: 'Клиенты', label: c.name, hint: kindLabel(c.kind), icon: 'fop' as IconName, run: () => ui.openClient(c.id) }))
     : [];
   const items = [...clients, ...actions.filter((a) => !q || fold(a.label).includes(fold(q)))];
 

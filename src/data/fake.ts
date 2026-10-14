@@ -88,7 +88,12 @@ export const QUESTIONS: Question[] = [
     clientId: 'c5', status: 'asked', askedAt: '2026-10-13T21:40', answer: null },
 ];
 
-export const KIND_LABEL: Record<Client['kind'], string> = {
+/** Тип клиента словами; null — «тип не указан» (в таблице пусто). */
+export function kindLabel(kind: Client['kind']): string {
+  return kind ? KIND_LABEL[kind] : 'тип не указан';
+}
+
+export const KIND_LABEL: Record<NonNullable<Client['kind']>, string> = {
   fop1: 'ФОП, 1 группа', fop2: 'ФОП, 2 группа', fop3: 'ФОП, 3 группа', fopGeneral: 'ФОП, общая система',
   tov3: 'ТОВ, 3 группа', tovGeneral: 'ТОВ, общая система', person: 'Физическое лицо', nonresident: 'Нерезидент',
 };

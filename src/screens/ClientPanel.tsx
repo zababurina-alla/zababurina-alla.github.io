@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { canWrite } from '../config';
 import gsap from 'gsap';
-import { KIND_LABEL } from '../data/fake';
+import { kindLabel } from '../data/fake';
 import { useStore } from '../data/store';
 import { MARK_LABEL, METHOD_LABEL } from '../data/types';
 import { TODAY, daysBetween, daysLabel, fmtDate, statusByDays } from '../lib/dates';
@@ -131,7 +131,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
             <span className="vt-avatar"><Avatar name={c.name} size="lg" /></span>
             <div className="cp__who">
               <h2 id="cp-name" className="cp__name"><span className="vt-name">{c.name}</span></h2>
-              <p className="cp__kind"><span className="tag">{KIND_LABEL[c.kind]}</span>{c.employer && <span className="tag">работодатель</span>}{c.marks.map((m) => <span key={m} className="tag">{MARK_LABEL[m]}</span>)}</p>
+              <p className="cp__kind"><span className="tag">{kindLabel(c.kind)}</span>{c.employer && <span className="tag">работодатель</span>}{c.marks.map((m) => <span key={m} className="tag">{MARK_LABEL[m]}</span>)}</p>
             </div>
             <div className="cp__actions">
               <a className="btn btn--secondary btn--sm" href={`tel:${c.phone.replace(/\s/g, '')}`}><Icon name="phone" />Позвонить</a>
