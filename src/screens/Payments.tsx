@@ -44,7 +44,7 @@ export function Payments() {
           <p className="kpi__value kpi__value--xl"><RollingNumber value={total} format={(n) => formatMoney(n)} /></p>
           <p className="kpi__note">{october.length} {plural(october.length, 'платёж', 'платежа', 'платежей')}, в сентябре {formatMoney(SEPTEMBER_TOTAL * 100)}</p>
         </div>
-        <div className="bars" role="img" aria-label="Поступления по дням октября">
+        <div className="bars" role="img" aria-label={`Поступления по дням октября: всего ${formatMoney(total)}, самый большой день — ${formatMoney(maxDay)}`}>
           {Array.from({ length: 31 }, (_, i) => {
             const iso = `2026-10-${String(i + 1).padStart(2, '0')}`;
             const sum = (byDay.get(iso) ?? []).reduce((s, p) => s + p.kopecks, 0);

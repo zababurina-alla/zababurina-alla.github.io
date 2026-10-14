@@ -1,6 +1,7 @@
 // Уведомления: «Платёж записан в таблицу» + «Отменить» (10 с). Таймер стоит, пока курсор на уведомлении
 // или вкладка скрыта. Ошибка не исчезает сама.
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { ReactNode } from 'react';
 import { Icon } from './Icon';
 import type { IconName } from './Icon';
@@ -11,6 +12,8 @@ export interface ToastInput {
   action?: { label: string; run: () => void };
   /** мс; по умолчанию 5 с, с действием «Отменить» — 10 с (бриф, п. 4), ошибка — без таймера. */
   timeout?: number;
+  /** Одно и то же событие (например, отказ по одной записи) — одно уведомление, даже если о нём сообщили дважды. */
+  key?: string;
 }
 interface ToastItem extends ToastInput { id: number; leaving?: boolean }
 
@@ -39,7 +42,8 @@ function Toast({ t, index, onClose }: { t: ToastItem; index: number; onClose: (i
   return (
     <div className={`toast toast--${t.tone ?? 'ok'}${t.leaving ? ' is-leaving' : ''}`} role={t.tone === 'error' ? 'alert' : 'status'}
       style={{ '--i': index } as React.CSSProperties}
-      onPointerEnter={() => setPaused(true)} onPointerLeave={() => setPaused(document.hidden)}>
+      onPointerEnter={() => setPaused(true)} onPointerLeave={() => setPaused(document.hidden)}
+      onFocus={() => setPaused(true)} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setPaused(document.hidden); }}>
       <Icon name={ICON[t.tone ?? 'ok']} size={18} className="toast__icon" />
       <span className="toast__text">{t.text}</span>
       {t.action && (
@@ -51,6 +55,23 @@ function Toast({ t, index, onClose }: { t: ToastItem; index: number; onClose: (i
   );
 }
 
+/**
+ * Слой уведомлений. Пока открыто модальное окно (<dialog>), всё вне его браузер делает недоступным —
+ * даже то, что нарисовано поверх. Поэтому уведомления («Не сохранилось — Повторить») рисуются внутри
+ * верхнего открытого окна, а без окон — в конце страницы.
+ */
+function ToastLayer({ children }: { children: ReactNode }) {
+  const [host, setHost] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const pick = () => setHost([...document.querySelectorAll<HTMLDialogElement>('dialog[open]')].at(-1) ?? null);
+    pick();
+    const mo = new MutationObserver(pick);
+    mo.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['open'] });
+    return () => mo.disconnect();
+  }, []);
+  return createPortal(<div className="toasts" aria-live="polite">{children}</div>, host ?? document.body);
+}
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
   const close = useCallback((id: number) => {
@@ -58,14 +79,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     window.setTimeout(() => setItems((xs) => xs.filter((x) => x.id !== id)), 180);
   }, []);
   const push = useCallback((t: ToastInput) => {
-    setItems((xs) => [...xs.slice(-2), { ...t, id: Date.now() + Math.random() }]);
+    setItems((xs) => (t.key && xs.some((x) => x.key === t.key && !x.leaving) ? xs : [...xs.slice(-2), { ...t, id: Date.now() + Math.random() }]));
   }, []);
   return (
     <Ctx.Provider value={push}>
       {children}
-      <div className="toasts" aria-live="polite">
+      <ToastLayer>
         {items.map((t, i) => <Toast key={t.id} t={t} index={items.length - 1 - i} onClose={close} />)}
-      </div>
+      </ToastLayer>
     </Ctx.Provider>
   );
 }

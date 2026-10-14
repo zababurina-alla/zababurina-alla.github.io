@@ -47,6 +47,9 @@ const KINDS: { id: ClientKind; icon: IconName; hint: string }[] = [
   { id: 'tov', icon: 'building', hint: 'юридическое лицо' },
 ];
 
+// На телефоне не открываем клавиатуру сразу: она закрыла бы плитки и шаги.
+const finePointer = typeof window !== 'undefined' && window.matchMedia('(pointer: fine)').matches;
+
 export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const store = useStore();
   const toast = useToast();
@@ -92,8 +95,13 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
 
   function next() {
     setTried(true);
-    if (step === 1 && err1) { play('attention'); return; }
-    if (step === 2 && err2) { play('attention'); return; }
+    if (step === 1 && err1) {
+      play('attention');
+      if (!name.trim()) document.getElementById('ac-name')?.focus();
+      else document.querySelector<HTMLElement>('.tiles .tile')?.focus();
+      return;
+    }
+    if (step === 2 && err2) { play('attention'); document.getElementById('ac-kved')?.focus(); return; }
     setTried(false);
     if (step < 3) { setStep(step + 1); return; }
     const k = KVEDS.find(([code]) => code === kved);
@@ -142,7 +150,8 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
           <>
             <div className="field">
               <label className="field__label" htmlFor="ac-name">ФИО или название</label>
-              <input id="ac-name" className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Например, Коваленко Марія Іванівна" autoFocus />
+              <input id="ac-name" name="clientName" className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Например, Коваленко Марія Іванівна…"
+                autoComplete="off" spellCheck={false} autoFocus={finePointer} aria-invalid={Boolean(tried && !name.trim())} aria-describedby="ac-err1" />
             </div>
             <fieldset className="field">
               <legend className="field__label">Тип</legend>
@@ -155,7 +164,7 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
               </div>
             </fieldset>
             <label className="check"><input type="checkbox" checked={employer} onChange={(e) => setEmployer(e.target.checked)} />Есть работники (работодатель)</label>
-            {tried && err1 && <p className="field__error" role="alert">{err1}</p>}
+            {tried && err1 && <p id="ac-err1" className="field__error" role="alert">{err1}</p>}
           </>
         )}
         {step === 2 && (
@@ -164,11 +173,11 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
               <label className="field__label" htmlFor="ac-kved">КВЕД</label>
               <div className="combo">
                 <span className="combo__icon"><Icon name="search" /></span>
-                <input id="ac-kved" className="input input--icon" value={kq} onChange={(e) => setKq(e.target.value)} placeholder="Код или слово: «перукар», «інтернет»" autoFocus />
+                <input id="ac-kved" className="input input--icon" value={kq} onChange={(e) => setKq(e.target.value)} placeholder="Код или слово: «перукар», «інтернет»…" autoComplete="off" autoFocus={finePointer} />
               </div>
-              <ul className="kved-list" role="listbox" aria-label="КВЕД">
+              <ul className="kved-list" aria-label="КВЕД">
                 {kveds.map(([code, title]) => (
-                  <li key={code} role="option" aria-selected={kved === code}>
+                  <li key={code}>
                     <button type="button" className="kved-opt" aria-pressed={kved === code} onClick={() => setKved(code)}>
                       <span className="num kved__code">{code}</span><span>{title}</span>{kved === code && <Icon name="check" />}
                     </button>
@@ -194,14 +203,14 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
           <>
             <div className="field">
               <label className="field__label" htmlFor="ac-phone">Телефон</label>
-              <input id="ac-phone" className="input num" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+380 …" autoFocus />
+              <input id="ac-phone" name="clientPhone" type="tel" className="input num" inputMode="tel" autoComplete="off" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+380 …" autoFocus={finePointer} />
               <p className="field__hint">Можно оставить пустым и добавить потом.</p>
             </div>
             <div className="field">
               <span className="field__label">Банк</span>
-              <div className="seg" role="radiogroup" aria-label="Банк">
+              <div className="seg" role="group" aria-label="Банк">
                 {['ПриватБанк', 'Монобанк', 'Ощадбанк', 'другой'].map((b) => (
-                  <button key={b} type="button" role="radio" aria-checked={bank === b} className="seg__opt" onClick={() => setBank(b)}>{b}</button>
+                  <button key={b} type="button" aria-pressed={bank === b} className="seg__opt" onClick={() => setBank(b)}>{b}</button>
                 ))}
               </div>
             </div>

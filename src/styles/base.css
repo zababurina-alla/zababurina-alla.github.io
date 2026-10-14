@@ -10,6 +10,16 @@
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  /* Липкие панели телефона не закрывают элемент в фокусе */
+  scroll-padding: 3.5rem 0 calc(4rem + env(safe-area-inset-bottom));
+}
+
+/* Без задержки двойного касания и без серой вспышки при нажатии на телефоне */
+a,
+button,
+[role='option'] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {

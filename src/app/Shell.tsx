@@ -1,5 +1,6 @@
 // Оболочка: левое меню на ноутбуке; верхняя полоса, нижние вкладки и кнопка «+» на телефоне.
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { getTheme, subscribeTheme, toggleTheme } from '../lib/theme';
 import type { ReactNode } from 'react';
 import { useStore } from '../data/store';
 import { TODAY, daysBetween } from '../lib/dates';
@@ -22,14 +23,8 @@ const NAV: { id: RouteName; label: string; icon: IconName; group: 'work' | 'ref'
 const PHONE_NAV: RouteName[] = ['today', 'clients', 'deadlines', 'payments'];
 
 function useTheme(): [string, () => void] {
-  const [theme, setTheme] = useState(() => document.documentElement.dataset.theme ?? 'light');
-  const toggle = () => {
-    const next = theme === 'dark' ? 'light' : 'dark';
-    document.documentElement.dataset.theme = next;
-    try { window.localStorage.setItem('sverka.theme', next); } catch { /* не запомнится — не страшно */ }
-    setTheme(next);
-  };
-  return [theme, toggle];
+  const theme = useSyncExternalStore(subscribeTheme, getTheme);
+  return [theme, toggleTheme];
 }
 
 /** Звук: переключатель, громкость, «Проверить». Настройка — удобство этого браузера (localStorage). */
@@ -131,12 +126,13 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
     <a key={n.id} href={toHash({ name: n.id, params: [] })} className="nav__item" aria-current={route === n.id ? 'page' : undefined}>
       <Icon name={n.icon} />
       <span>{n.label}</span>
-      {n.id === 'deadlines' && overdue > 0 && <span className="nav__badge num" aria-label={`просрочено ${overdue}`}>{overdue}</span>}
+      {n.id === 'deadlines' && overdue > 0 && <span className="nav__badge num"><span aria-hidden="true">{overdue}</span><span className="visually-hidden">, просрочено: {overdue}</span></span>}
     </a>
   );
 
   return (
     <div className="shell">
+      <button type="button" className="skip" onClick={() => document.getElementById('main')?.focus()}>К содержимому</button>
       <aside className="rail" aria-label="Меню">
         <a href="#/today" className="brand" aria-label="Сверка — на главную">
           <span className="brand__mark" aria-hidden="true">С</span>
@@ -174,7 +170,7 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
         </div>
       </header>
 
-      <main className="main" id="main">
+      <main className="main" id="main" tabIndex={-1}>
         <div key={route} className="screen">{children}</div>
       </main>
 
@@ -186,7 +182,7 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
           if (!n) return null;
           return (
             <a key={id} href={toHash({ name: id, params: [] })} className="tabbar__item" aria-current={route === id ? 'page' : undefined}>
-              <span className="tabbar__icon"><Icon name={n.icon} />{id === 'deadlines' && overdue > 0 && <span className="tabbar__badge" aria-hidden="true" />}</span>
+              <span className="tabbar__icon"><Icon name={n.icon} />{id === 'deadlines' && overdue > 0 && <><span className="tabbar__badge" aria-hidden="true" /><span className="visually-hidden">, просрочено: {overdue}</span></>}</span>
               <span>{n.label}</span>
             </a>
           );

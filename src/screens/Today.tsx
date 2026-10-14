@@ -12,7 +12,7 @@ import { RollingNumber, StatusPill, Tabs, reducedMotion } from '../ui/kit';
 import { useUi } from '../app/ui-context';
 import { DeadlineTable } from './DeadlineTable';
 
-type Filter = 'all' | 'overdue' | 'week';
+type Filter = 'all' | 'overdue' | 'burning' | 'week';
 
 function AreaChart() {
   const ref = useRef<SVGSVGElement>(null);
@@ -44,13 +44,13 @@ function AreaChart() {
         {[25, 50, 75].map((y) => <line key={y} x1="0" x2="600" y1={y} y2={y} className="chart__grid" />)}
         <path className="chart__area" d={`${line} L${last[0]} 100 L0 100 Z`} />
         <path className="chart__line" d={line} />
-        <circle className="chart__dot chart__dot--live" cx={last[0]} cy={last[1]} r="4" />
+        <circle className="chart__dot" cx={last[0]} cy={last[1]} r="4" />
         {hp && <line className="chart__cursor" x1={hp[0]} x2={hp[0]} y1="0" y2="100" />}
       </svg>
       {hp && hover !== null && (
         <>
           <span className="chart__hdot" style={{ left: `${(hp[0] / 600) * 100}%`, top: `${hp[1]}%` }} aria-hidden="true" />
-          <span className="chart__tip" style={{ left: `${(hp[0] / 600) * 100}%` }} role="status">
+          <span className="chart__tip" style={{ left: `${(hp[0] / 600) * 100}%` }} aria-hidden="true">
             {hover + 1} октября<strong className="num">{formatMoney(Math.round((OCTOBER_CUMULATIVE[hover] ?? 0) * 100_000))}</strong>
           </span>
         </>
@@ -77,7 +77,7 @@ export function Today() {
   const received = store.payments.filter((p) => p.date.startsWith('2026-10')).reduce((s, p) => s + p.kopecks, 0);
   const growth = Math.round((received / 100 / SEPTEMBER_TOTAL - 1) * 100);
 
-  const list = (filter === 'overdue' ? overdue : filter === 'week' ? week : withDays.filter((x) => x.days <= 30))
+  const list = (filter === 'overdue' ? overdue : filter === 'burning' ? burning : filter === 'week' ? week : withDays.filter((x) => x.days <= 30))
     .sort((a, b) => a.days - b.days).map((x) => x.d);
 
   // Сцена открытия: блоки поднимаются по очереди (16 px, 40 мс между ними). Только при открытии экрана.
@@ -119,23 +119,23 @@ export function Today() {
         <div className="kpi kpi--wide" onPointerMove={spotlight}>
           <p className="kpi__label">К оплате клиентами до {fmtDate('2026-10-21').slice(0, 5)}</p>
           <p className="kpi__value"><RollingNumber value={dueWeekKop} format={(n) => formatMoney(n)} /></p>
-          <p className="kpi__note">Получено в октябре <RollingNumber value={received} format={(n) => formatMoney(n)} /> <span className="up"><Icon name="arrowUp" size={14} />{growth} % к сентябрю</span></p>
+          <p className="kpi__note">Получено в октябре <RollingNumber value={received} format={(n) => formatMoney(n)} /> <span className="up"><Icon name="arrowUp" size={14} />{growth}{' '}% к{' '}сентябрю</span></p>
           <AreaChart />
         </div>
         <button type="button" className="kpi kpi--btn" onPointerMove={spotlight} onClick={() => setFilter('overdue')}>
-          <p className="kpi__label">Просрочено</p>
-          <p className="kpi__value kpi__value--md"><RollingNumber value={overdue.length} /></p>
-          <p className="kpi__note"><span className="dot dot--red" aria-hidden="true" /><span>{plural(overdue.length, 'срок требует', 'срока требуют', 'сроков требуют')} внимания</span></p>
+          <span className="kpi__label">Просрочено</span>
+          <span className="kpi__value kpi__value--md"><RollingNumber value={overdue.length} /></span>
+          <span className="kpi__note"><span className="dot dot--red" aria-hidden="true" /><span>{plural(overdue.length, 'срок требует', 'срока требуют', 'сроков требуют')} внимания</span></span>
         </button>
-        <button type="button" className="kpi kpi--btn" onPointerMove={spotlight} onClick={() => setFilter('week')}>
-          <p className="kpi__label">Горит, до 3 дней</p>
-          <p className="kpi__value kpi__value--md"><RollingNumber value={burning.length} /></p>
-          <p className="kpi__note"><span className="dot dot--orange" aria-hidden="true" />до субботы</p>
+        <button type="button" className="kpi kpi--btn" onPointerMove={spotlight} onClick={() => setFilter('burning')}>
+          <span className="kpi__label">Горит, до 3 дней</span>
+          <span className="kpi__value kpi__value--md"><RollingNumber value={burning.length} /></span>
+          <span className="kpi__note"><span className="dot dot--orange" aria-hidden="true" />до субботы</span>
         </button>
         <a className="kpi kpi--btn" href="#/keys" onPointerMove={spotlight}>
-          <p className="kpi__label">Ключи ЭЦП, 14 дней</p>
-          <p className="kpi__value kpi__value--md"><RollingNumber value={keys.length} /></p>
-          <p className="kpi__note"><span className="dot dot--yellow" aria-hidden="true" />продлить заранее</p>
+          <span className="kpi__label">Ключи ЭЦП, 14 дней</span>
+          <span className="kpi__value kpi__value--md"><RollingNumber value={keys.length} /></span>
+          <span className="kpi__note"><span className="dot dot--yellow" aria-hidden="true" />продлить заранее</span>
         </a>
       </section>
 
@@ -146,6 +146,7 @@ export function Today() {
             <Tabs label="Какие сроки показать" value={filter} onChange={setFilter} items={[
               { id: 'all', label: 'Месяц', count: withDays.filter((x) => x.days <= 30).length },
               { id: 'overdue', label: 'Просрочено', count: overdue.length },
+              { id: 'burning', label: 'Горит', count: burning.length },
               { id: 'week', label: 'Неделя', count: week.length },
             ]} />
           </header>
@@ -176,7 +177,7 @@ export function Today() {
             {QUESTIONS.map((q) => (
               <div key={q.id} className="question">
                 <p>{q.text}</p>
-                <div className="question__foot"><span className="sub">{q.when}</span><button type="button" className="btn btn--secondary btn--sm">Ответить</button></div>
+                <div className="question__foot"><span className="sub">{q.when}</span><span className="sub">Ответить — в боте; на сайте появится с живыми данными</span></div>
               </div>
             ))}
           </section>

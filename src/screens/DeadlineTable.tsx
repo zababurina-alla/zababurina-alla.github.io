@@ -68,7 +68,7 @@ export function DeadlineTable({ items, showClient = true, empty = 'Сроков 
             <span role="cell" className="ta-r num dtable__sum c-sum">{d.kopecks ? formatMoney(d.kopecks) : <span className="sub">—</span>}</span>
             <span role="cell" className="c-status"><StatusPill status={st} /></span>
             <span role="cell" className="ta-r c-act">
-              <button type="button" className="check-btn" disabled={closing !== null}
+              <button type="button" className="check-btn" aria-disabled={closing !== null}
                 aria-label={`Сдано и оплачено: ${d.what}, ${c?.name ?? ''}`} title="Сдано и оплачено" onClick={() => close(d.id)}>
                 <Icon name="check" />
               </button>

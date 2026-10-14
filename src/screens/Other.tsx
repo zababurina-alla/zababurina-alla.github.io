@@ -69,7 +69,7 @@ export function Reference() {
       <section className="panel" aria-labelledby="kv-title">
         <header className="panel__head"><h2 id="kv-title" className="panel__title">КВЕД и ставка ЄП</h2></header>
         <div className="toolbar"><label className="search-input"><Icon name="search" /><span className="visually-hidden">Поиск КВЕД</span>
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Код или слово" /></label></div>
+          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Код или слово…" autoComplete="off" spellCheck={false} /></label></div>
         <ul className="kved kved--table">{kv.map(([code, title, rate]) => <li key={code}><span className="num kved__code">{code}</span><span>{title}</span><span className="sub">{rate}</span></li>)}</ul>
         <p className="sub panel__note">Ставки по рішенню Миколаївської міськради придут из таблицы через API — здесь примеры.</p>
       </section>
@@ -134,7 +134,7 @@ export function Tasks() {
                 const saving = store.pending.some((p) => (p.op.kind === 'createTask' && p.op.task.id === t.id) || (p.op.kind === 'completeTask' && p.op.id === t.id));
                 return (
                   <li key={t.id} className={`tasks__row${t.done ? ' is-done' : ''}${store.fresh.includes(t.id) ? ' is-fresh' : ''}`}>
-                    <button type="button" className="tasks__check" aria-pressed={t.done} aria-label={t.done ? `Вернуть в работу: ${t.text}` : `Отметить сделанной: ${t.text}`}
+                    <button type="button" className="tasks__check" aria-pressed={t.done} aria-label={`Сделано: ${t.text}`}
                       onClick={() => store.toggleTask(t.id, !t.done)}><Icon name="check" size={16} /></button>
                     <span className="tasks__text">
                       {t.priority !== 'medium' && !t.done && <Icon name={PRIORITY_ICON[t.priority]} size={16} className={`prio prio--${t.priority}`} label={PRIORITY_LABEL[t.priority]} />}

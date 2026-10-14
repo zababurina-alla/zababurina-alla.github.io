@@ -17,9 +17,9 @@ const METHODS = ['на счёт', 'наличными', 'на карту'];
 
 function Segmented({ options, value, onChange, label }: { options: string[]; value: string; onChange: (v: string) => void; label: string }) {
   return (
-    <div className="seg" role="radiogroup" aria-label={label}>
+    <div className="seg" role="group" aria-label={label}>
       {options.map((o) => (
-        <button key={o} type="button" role="radio" aria-checked={value === o} className="seg__opt" onClick={() => onChange(o)}>{o}</button>
+        <button key={o} type="button" aria-pressed={value === o} className="seg__opt" onClick={() => onChange(o)}>{o}</button>
       ))}
     </div>
   );
@@ -40,6 +40,8 @@ export function PaymentDialog({ open, clientId, onClose }: { open: boolean; clie
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const amountRef = useRef<HTMLInputElement>(null);
   const clientRef = useRef<HTMLInputElement>(null);
+  const dateRef = useRef<HTMLInputElement>(null);
+  const otherRef = useRef<HTMLButtonElement>(null);
 
   // Открыли окно — свежая форма; клиент подставлен, если окно открыто из карточки.
   const [lastOpen, setLastOpen] = useState(false);
@@ -83,6 +85,10 @@ export function PaymentDialog({ open, clientId, onClose }: { open: boolean; clie
     setTouched({ client: true, amount: true, date: true });
     if (errors.client || errors.amount || errors.date || !client || !money.ok || !dateIso) {
       play('attention');
+      // Фокус — к первому полю с ошибкой: на телефоне оно может быть за краем шторки.
+      if (errors.client) (clientRef.current ?? otherRef.current)?.focus();
+      else if (errors.amount) amountRef.current?.focus();
+      else dateRef.current?.focus();
       return;
     }
     const short = client.name.split(' ').slice(0, 2).join(' ');
@@ -103,7 +109,7 @@ export function PaymentDialog({ open, clientId, onClose }: { open: boolean; clie
   return (
     <Modal open={open} onClose={onClose} title="Записать платёж" footer={
       <>
-        <button type="button" className="btn btn--secondary" onClick={() => { void draft.clear(); onClose(); }}>Отмена</button>
+        <button type="button" className="btn btn--secondary" onClick={onClose}>Закрыть</button>
         <button type="submit" form={`${ids}-form`} className="btn btn--primary btn--grow">Записать платёж</button>
       </>
     }>
@@ -120,14 +126,14 @@ export function PaymentDialog({ open, clientId, onClose }: { open: boolean; clie
             <div className="picked">
               <Avatar name={client.name} size="sm" />
               <span className="picked__name">{client.name}</span>
-              <button type="button" className="link" onClick={() => { setWho(null); setTimeout(() => clientRef.current?.focus(), 0); }}>Другой</button>
+              <button ref={otherRef} type="button" className="link" onClick={() => { setWho(null); setTimeout(() => clientRef.current?.focus(), 0); }}>Другой</button>
             </div>
           ) : (
             <div className="combo">
               <span className="combo__icon"><Icon name="search" /></span>
               <input id={`${ids}-client`} ref={clientRef} className="input input--icon" value={q} autoComplete="off"
                 role="combobox" aria-expanded="true" aria-controls={`${ids}-list`} aria-activedescendant={`${ids}-opt-${active}`}
-                placeholder="Начните фамилию — в любом падеже"
+                placeholder="Начните фамилию — в любом падеже…"
                 onChange={(e) => { setQ(e.target.value); setActive(0); }}
                 onBlur={() => setTouched((t) => ({ ...t, client: true }))}
                 onKeyDown={(e) => {
@@ -154,14 +160,14 @@ export function PaymentDialog({ open, clientId, onClose }: { open: boolean; clie
           <label className="field__label" htmlFor={`${ids}-amount`}>Сумма</label>
           <div className="money">
             <input id={`${ids}-amount`} ref={amountRef} className="input input--money num" inputMode="decimal" value={amount}
-              placeholder="0,00" autoComplete="off" aria-invalid={Boolean(touched.amount && errors.amount)}
+              placeholder="0,00" autoComplete="off" aria-invalid={Boolean(touched.amount && errors.amount)} aria-describedby={`${ids}-amount-msg`}
               onChange={(e) => setAmount(e.target.value)}
               onBlur={() => { setTouched((t) => ({ ...t, amount: true })); if (money.ok) setAmount(formatMoney(money.kopecks, false)); }} />
             <span className="money__sign" aria-hidden="true">₴</span>
           </div>
           {touched.amount && errors.amount
-            ? <p className="field__error" role="alert">{errors.amount}</p>
-            : <p className="field__hint">{money.ok ? <>Будет записано: <strong className="num">{formatMoney(money.kopecks)}</strong></> : 'Можно писать 1234.5 или 1 234,50 — покажем одинаково'}</p>}
+            ? <p id={`${ids}-amount-msg`} className="field__error" role="alert">{errors.amount}</p>
+            : <p id={`${ids}-amount-msg`} className="field__hint">{money.ok ? <>Будет записано: <strong className="num">{formatMoney(money.kopecks)}</strong></> : 'Можно писать 1234.5 или 1 234,50 — покажем одинаково'}</p>}
           {lastPay && <p className="field__hint">Прошлый платёж: {formatMoney(lastPay.kopecks)} за {lastPay.period.toLowerCase()}</p>}
         </div>
 
@@ -178,8 +184,8 @@ export function PaymentDialog({ open, clientId, onClose }: { open: boolean; clie
         <div className="field">
           <label className="field__label" htmlFor={`${ids}-date`}>Дата оплаты</label>
           <div className="date-row">
-            <input id={`${ids}-date`} className="input input--date num" value={date} inputMode="numeric"
-              aria-invalid={Boolean(touched.date && errors.date)}
+            <input id={`${ids}-date`} ref={dateRef} className="input input--date num" value={date} autoComplete="off"
+              aria-invalid={Boolean(touched.date && errors.date)} aria-describedby={`${ids}-date-msg`}
               onChange={(e) => setDate(e.target.value)}
               onBlur={() => { setTouched((t) => ({ ...t, date: true })); if (dateIso) setDate(fmtDate(dateIso)); }} />
             <div className="chips">
@@ -188,7 +194,7 @@ export function PaymentDialog({ open, clientId, onClose }: { open: boolean; clie
               ))}
             </div>
           </div>
-          {touched.date && errors.date && <p className="field__error" role="alert">{errors.date}</p>}
+          {touched.date && errors.date && <p id={`${ids}-date-msg`} className="field__error" role="alert">{errors.date}</p>}
         </div>
       </form>
     </Modal>

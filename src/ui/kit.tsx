@@ -104,7 +104,7 @@ export function SaveBadge({ state, offline = false, onRetry }: { state: SaveStat
   );
 }
 
-/** Вкладки: индикатор переезжает под выбранную (transform, 220 мс). */
+/** Переключатель (фильтр, раздел карточки): индикатор переезжает под выбранный пункт (transform, 220 мс). */
 export function Tabs<T extends string>({ items, value, onChange, label }: {
   items: { id: T; label: string; count?: number }[]; value: T; onChange: (v: T) => void; label: string;
 }) {
@@ -117,10 +117,10 @@ export function Tabs<T extends string>({ items, value, onChange, label }: {
     ind.current.style.width = `${btn.offsetWidth}px`;
   }, [value, items]);
   return (
-    <div ref={wrap} className="tabs" role="tablist" aria-label={label}>
+    <div ref={wrap} className="tabs" role="group" aria-label={label}>
       <span ref={ind} className="tabs__ind" aria-hidden="true" />
       {items.map((it) => (
-        <button key={it.id} type="button" role="tab" data-tab={it.id} aria-selected={it.id === value}
+        <button key={it.id} type="button" data-tab={it.id} aria-pressed={it.id === value}
           className="tabs__tab" onClick={() => onChange(it.id)}>
           {it.label}{it.count !== undefined && <span className="tabs__count num">{it.count}</span>}
         </button>

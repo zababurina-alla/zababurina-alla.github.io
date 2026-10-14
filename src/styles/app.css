@@ -573,7 +573,7 @@ body {
   transition: color var(--dur-fast) ease;
 }
 
-.tabs__tab[aria-selected='true'] {
+.tabs__tab[aria-pressed='true'] {
   color: var(--ink);
   font-weight: var(--weight-semibold);
 }
@@ -1172,6 +1172,7 @@ body {
 }
 
 .ctable__row {
+  position: relative;
   width: 100%;
   min-height: 4.25rem;
   padding-top: var(--space-2);
@@ -2010,7 +2011,7 @@ body {
   transform: scale(0.97);
 }
 
-.seg__opt[aria-checked='true'],
+.seg__opt[aria-pressed='true'],
 .chip[aria-pressed='true'] {
   background: var(--accent);
   box-shadow: inset 0 0 0 1px var(--accent);
@@ -3438,4 +3439,94 @@ body {
   width: 100%;
   accent-color: var(--accent);
   min-height: var(--tap);
+}
+
+/* ═════════ Поправки по проверке правил интерфейса (14.10.2026) ═════════ */
+/* Строка клиента: настоящая кнопка с именем, её зона растянута на всю строку */
+.ctable__open {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+
+.ctable__open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.ctable__open:focus-visible {
+  outline: none;
+}
+
+.ctable__open:focus-visible::after {
+  outline: 3px solid var(--focus);
+  outline-offset: -3px;
+  border-radius: 4px;
+}
+
+/* Кнопка «Сдано» во время закрытия: остаётся в порядке Tab, но не нажимается повторно */
+.check-btn[aria-disabled='true'] {
+  cursor: default;
+}
+
+/* «К содержимому» — видна только при переходе Tab */
+.skip {
+  position: fixed;
+  top: var(--space-3);
+  left: var(--space-3);
+  z-index: 80;
+  min-height: var(--tap);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: var(--weight-semibold);
+  transform: translateY(-200%);
+}
+
+.skip:focus-visible {
+  transform: none;
+}
+
+.main:focus {
+  outline: none;
+}
+
+/* Ссылки-кнопки и мелкие кнопки — зона нажатия не меньше 44 px */
+.link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 0 var(--space-1);
+}
+
+.toast__close {
+  width: var(--tap);
+  height: var(--tap);
+}
+
+.tasks__check {
+  position: relative;
+}
+
+.tasks__check::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+
+.tabs__tab {
+  min-height: 2.5rem;
+}
+
+.tabbar__item {
+  font-size: var(--text-sm);
+}
+
+.palette__search:focus-within {
+  box-shadow: inset 0 -2px 0 var(--focus);
 }

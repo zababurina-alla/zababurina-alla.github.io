@@ -30,7 +30,7 @@ export function FailureWatcher() {
       if (it.state !== 'failed' || shown.current.has(it.op.requestId)) continue;
       shown.current.add(it.op.requestId);
       const rid = it.op.requestId;
-      toast({ text: `Не сохранилось: ${it.label}. ${it.error ?? ''}`, tone: 'error', action: { label: 'Повторить', run: () => { shown.current.delete(rid); retry(rid); } } });
+      toast({ key: `fail-${rid}`, text: `Не сохранилось: ${it.label}. ${it.error ?? ''}`, tone: 'error', action: { label: 'Повторить', run: () => { shown.current.delete(rid); retry(rid); } } });
     }
   }, [pending, retry, toast]);
   return null;
@@ -41,7 +41,7 @@ export function ConflictDialog() {
   const { conflict, client, resolveConflict } = useStore();
   const c = conflict ? client(conflict.clientId) : undefined;
   return (
-    <Modal open={Boolean(conflict)} onClose={() => resolveConflict('theirs')} title="Запись изменилась в таблице" footer={
+    <Modal open={Boolean(conflict)} onClose={() => undefined} title="Запись изменилась в таблице" footer={
       <>
         <button type="button" className="btn btn--secondary" onClick={() => resolveConflict('theirs')}>Взять из таблицы</button>
         <button type="button" className="btn btn--primary btn--grow" onClick={() => resolveConflict('mine')}>Оставить моё</button>
@@ -54,7 +54,7 @@ export function ConflictDialog() {
             <div className="conflict__cell"><dt>В таблице сейчас</dt><dd className="num">{conflict.theirs}</dd></div>
             <div className="conflict__cell conflict__cell--mine"><dt>Вы ввели</dt><dd className="num">{conflict.mine}</dd></div>
           </dl>
-          <p className="sub">Ваш вариант сохранён и никуда не делся, пока вы не выберете.</p>
+          <p className="sub">Ваш вариант сохранён и никуда не денется, пока вы не выберете одну из кнопок ниже.</p>
         </div>
       )}
     </Modal>

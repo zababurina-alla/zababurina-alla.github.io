@@ -18,7 +18,7 @@ const PASSWORD_SHOW_MS = 30_000;
 
 function PasswordReveal() {
   const [stage, setStage] = useState<'hidden' | 'confirm' | 'shown'>('hidden');
-  const [left, setLeft] = useState(0);
+  const [left, setLeft] = useState(30);
   useEffect(() => {
     if (stage !== 'shown') return;
     const started = Date.now();

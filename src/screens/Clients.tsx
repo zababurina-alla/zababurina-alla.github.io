@@ -1,10 +1,10 @@
 // «Клиенты»: поиск в любом падеже, фильтр по типу, таблица; нажатие на строку — карточка справа.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { KIND_LABEL } from '../data/fake';
 import { useStore } from '../data/store';
-import type { ClientKind } from '../data/types';
+import type { ClientKind, Deadline } from '../data/types';
 import { TODAY, daysBetween, daysLabel, fmtDate, plural, statusByDays } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 import { search } from '../lib/search';
@@ -29,6 +29,17 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
     gsap.from('.reveal', { y: 14, opacity: 0, duration: 0.45, stagger: 0.05, ease: 'power3.out', clearProps: 'transform,opacity' });
   }, { scope });
 
+  // Ближайший срок каждого клиента — один проход по срокам, а не перебор на каждую строку.
+  const deadlines = store.deadlines;
+  const nextByClient = useMemo(() => {
+    const m = new Map<string, Deadline>();
+    for (const d of deadlines) {
+      const cur = m.get(d.clientId);
+      if (!cur || d.due < cur.due) m.set(d.clientId, d);
+    }
+    return m;
+  }, [deadlines]);
+
   const byKind = (k: ClientKind) => kind === 'all' || k === kind || (kind === 'other' && (k === 'general' || k === 'tov'));
   const found = search(
     store.clients.filter((c) => byKind(c.kind)).map((c) => ({ ...c, extra: [...c.kved.map((k) => k.code), c.phone] })),
@@ -52,7 +63,7 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
             <Icon name="search" />
             <span className="visually-hidden">Поиск клиента</span>
             <input ref={input} type="search" value={q} onChange={(e) => setQ(e.target.value)}
-              placeholder="Фамилия в любом падеже, КВЕД или телефон" autoComplete="off" />
+              placeholder="Фамилия в любом падеже, КВЕД или телефон…" spellCheck={false} autoComplete="off" />
             <kbd className="kbd">Ctrl K</kbd>
           </label>
           <Tabs label="Тип клиента" value={kind} onChange={setKind} items={[
@@ -76,13 +87,19 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
           {found.map((c) => {
             const month = c.monthly.reduce((s, m) => s + m.kopecks, 0);
             const keyDays = c.keyUntil ? daysBetween(TODAY, c.keyUntil) : null;
-            const next = store.deadlines.filter((d) => d.clientId === c.id).sort((a, b) => a.due.localeCompare(b.due))[0];
+            const next = nextByClient.get(c.id);
             const nextDays = next ? daysBetween(TODAY, next.due) : null;
             return (
-              <button key={c.id} type="button" className="ctable__row" role="row" onClick={() => ui.openClient(c.id)}>
+              <div key={c.id} className="ctable__row" role="row">
                 <span role="cell" className="ctable__client">
                   <Avatar name={c.name} clientId={c.id} />
-                  <span className="ctable__who"><strong data-client-name={c.id}>{c.name}</strong><span className="sub">{KIND_LABEL[c.kind]}{c.employer ? ', работодатель' : ''}</span></span>
+                  <span className="ctable__who">
+                    {/* Вся строка нажимается через растянутую зону этой кнопки (::after) — для диктора это одна кнопка с именем */}
+                    <button type="button" className="ctable__open" onClick={() => ui.openClient(c.id)}>
+                      <strong data-client-name={c.id}>{c.name}</strong>
+                    </button>
+                    <span className="sub">{KIND_LABEL[c.kind]}{c.employer ? ', работодатель' : ''}</span>
+                  </span>
                 </span>
                 <span role="cell" className="num">{c.kved.map((k) => k.code).join(', ')}</span>
                 <span role="cell" className="ta-r num">{month ? formatMoney(month) : <span className="sub">по доходу</span>}</span>
@@ -92,12 +109,12 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
                 <span role="cell">{next && nextDays !== null
                   ? <span className="ctable__next"><span className={`dot dot--${statusByDays(nextDays)}`} aria-hidden="true" /><span>{next.what}<span className="sub">{daysLabel(nextDays)}</span></span></span>
                   : <span className="sub">—</span>}</span>
-              </button>
+              </div>
             );
           })}
           {found.length === 0 && (
             <div className="empty">
-              <p>Никого не нашли по «{q}».</p>
+              <p>{q ? `Никого не нашли по «${q}».` : 'Клиентов этого типа пока нет.'}</p>
               <button type="button" className="btn btn--secondary" onClick={ui.openAddClient}><Icon name="userPlus" />Добавить клиента</button>
             </div>
           )}

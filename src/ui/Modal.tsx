@@ -1,6 +1,6 @@
 // Окно на основе <dialog>: фокус остаётся внутри, Esc закрывает, фон недоступен — это даёт сам браузер.
 // Вид: «dialog» — по центру (ноутбук) / шторка снизу (телефон); «panel» — выезжает справа (карточка клиента).
-import { useLayoutEffect, useRef } from 'react';
+import { useId, useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { Icon } from './Icon';
 
@@ -16,6 +16,7 @@ export function Modal({ open, onClose, title, kind = 'dialog', children, footer,
   labelledBy?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   // Синхронно (layout effect): окно должно открыться в том же кадре, что снимает плавный переход.
   useLayoutEffect(() => {
     const d = ref.current;
@@ -30,14 +31,14 @@ export function Modal({ open, onClose, title, kind = 'dialog', children, footer,
     }
   }, [open]);
   return (
-    <dialog ref={ref} className={`modal modal--${kind}`} aria-labelledby={labelledBy ?? (title ? 'modal-title' : undefined)}
+    <dialog ref={ref} className={`modal modal--${kind}`} aria-labelledby={labelledBy ?? (title ? titleId : undefined)}
       onCancel={(e) => { e.preventDefault(); onClose(); }}
       onClick={(e) => { if (e.target === ref.current) onClose(); }}>
       <div className="modal__box">
         {title && (
           <header className="modal__head">
             <span className="modal__grip" aria-hidden="true" />
-            <h2 id="modal-title" className="modal__title">{title}</h2>
+            <h2 id={titleId} className="modal__title">{title}</h2>
             <button type="button" className="icon-btn" aria-label="Закрыть" onClick={onClose}><Icon name="close" /></button>
           </header>
         )}

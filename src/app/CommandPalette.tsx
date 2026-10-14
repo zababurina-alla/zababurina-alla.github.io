@@ -5,16 +5,11 @@ import { useStore } from '../data/store';
 import { KIND_LABEL } from '../data/fake';
 import { fold, search } from '../lib/search';
 import { navigate } from '../router';
+import { toggleTheme } from '../lib/theme';
 import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
 import { useUi } from './ui-context';
 
-function toggleTheme(): void {
-  const root = document.documentElement;
-  const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
-  root.dataset.theme = next;
-  try { window.localStorage.setItem('sverka.theme', next); } catch { /* не запомнится */ }
-}
 
 interface Item { id: string; group: string; label: string; hint?: string; icon: IconName; run: () => void }
 
@@ -60,7 +55,6 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     window.setTimeout(it.run, 0);
   }
 
-  let lastGroup = '';
   return (
     <dialog ref={ref} className="palette" aria-label="Командная строка"
       onCancel={(e) => { e.preventDefault(); onClose(); }}
@@ -70,7 +64,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           <Icon name="search" />
           <span className="visually-hidden">Что найти</span>
           <input ref={input} value={q} placeholder="Клиент, раздел или действие…" autoComplete="off"
-            role="combobox" aria-expanded="true" aria-controls="palette-list" aria-activedescendant={`pal-${active}`}
+            role="combobox" aria-expanded={items.length > 0} aria-controls="palette-list" aria-activedescendant={items[active] ? `pal-${active}` : undefined}
             onChange={(e) => { setQ(e.target.value); setActive(0); }}
             onKeyDown={(e) => {
               if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => Math.min(a + 1, items.length - 1)); }
@@ -79,24 +73,22 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
             }} />
           <kbd className="kbd">Esc</kbd>
         </label>
-        <ul id="palette-list" className="palette__list" role="listbox" aria-label="Результаты">
-          {items.map((it, i) => {
-            const head = it.group !== lastGroup ? it.group : null;
-            lastGroup = it.group;
-            return (
-              <li key={it.id} role="presentation">
-                {head && <p className="palette__group">{head}</p>}
-                <div id={`pal-${i}`} role="option" aria-selected={i === active} className="palette__item"
+        <div id="palette-list" className="palette__list" role="listbox" aria-label="Результаты">
+          {[...new Set(items.map((it) => it.group))].map((g) => (
+            <div key={g} role="group" aria-labelledby={`palg-${g}`}>
+              <p id={`palg-${g}`} className="palette__group" role="presentation">{g}</p>
+              {items.map((it, i) => it.group === g && (
+                <div key={it.id} id={`pal-${i}`} role="option" aria-selected={i === active} className="palette__item"
                   onMouseMove={() => setActive(i)} onClick={() => run(it)}>
                   <Icon name={it.icon} />
                   <span className="palette__label">{it.label}</span>
                   {it.hint && <span className="sub">{it.hint}</span>}
                 </div>
-              </li>
-            );
-          })}
-          {items.length === 0 && <li className="palette__empty sub">Ничего не нашли по «{q}»</li>}
-        </ul>
+              ))}
+            </div>
+          ))}
+          {items.length === 0 && <p className="palette__empty sub">Ничего не нашли по «{q}»</p>}
+        </div>
       </div>
     </dialog>
   );

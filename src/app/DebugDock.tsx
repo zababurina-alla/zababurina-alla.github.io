@@ -41,7 +41,7 @@ export function DebugDock() {
           onClick={() => toast({ text: store.external(a.kind), tone: 'info' })}>{a.label}</button>
       ))}
       <p className="debug__h">Сеть и сервер</p>
-      <button type="button" className="btn btn--secondary btn--sm" aria-pressed={!net}
+      <button type="button" className="btn btn--secondary btn--sm"
         onClick={() => { store.setOnline(!net); setNet(!net); }}>
         <Icon name={net ? 'offline' : 'saved'} size={16} />{net ? 'Оборвать связь' : 'Вернуть связь'}
       </button>

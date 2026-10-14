@@ -22,9 +22,9 @@ export function IconGallery() {
           <h1 className="page__title">Значки «Сверки»</h1>
           <p className="page__sub">{entries.length} значков, {cats.length} категорий. Свои, сетка 24, линия 1,75. Тема — переключателем в меню.</p>
         </div>
-        <div className="seg" role="radiogroup" aria-label="Вид">
-          <button type="button" role="radio" aria-checked={view === 'line'} className="seg__opt" onClick={() => setView('line')}>Линия</button>
-          <button type="button" role="radio" aria-checked={view === 'tile'} className="seg__opt" onClick={() => setView('tile')}>Плитка</button>
+        <div className="seg" role="group" aria-label="Вид">
+          <button type="button" aria-pressed={view === 'line'} className="seg__opt" onClick={() => setView('line')}>Линия</button>
+          <button type="button" aria-pressed={view === 'tile'} className="seg__opt" onClick={() => setView('tile')}>Плитка</button>
         </div>
       </header>
       {cats.map((cat) => (
