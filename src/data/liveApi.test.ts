@@ -1,0 +1,157 @@
+import { describe, expect, it, vi } from 'vitest';
+import { LiveApi } from './liveApi';
+import type { SessionProvider } from './liveApi';
+import { ApiError, call } from './transport';
+import type { Deadline, Payment } from './types';
+
+const URL_ = 'https://script.google.com/macros/s/TEST/exec';
+
+interface Sent { action: string; session?: string; requestId?: string; payload: Record<string, unknown>; v: number }
+
+/** Подставной сервер: отвечает по очереди заготовками и запоминает, что ему прислали. */
+function server(...replies: unknown[]) {
+  const sent: Sent[] = [];
+  const inits: RequestInit[] = [];
+  const fetchImpl = vi.fn(async (_url: unknown, init?: RequestInit) => {
+    inits.push(init ?? {});
+    sent.push(JSON.parse(String(init?.body)) as Sent);
+    const r = replies.shift();
+    if (r instanceof Error) throw r;
+    return new Response(typeof r === 'string' ? r : JSON.stringify(r), { status: 200 });
+  }) as unknown as typeof fetch;
+  return { sent, inits, fetchImpl };
+}
+
+function auth(session = 'S1'): SessionProvider & { refreshed: number } {
+  const a = { cur: session, refreshed: 0, session: () => a.cur, refresh: async () => { a.refreshed++; a.cur = 'S2'; return a.cur; } };
+  return a;
+}
+
+const ok = (data: unknown, cursor = 10) => ({ ok: true, data, cursor, serverTime: '2026-10-14T10:00:00+03:00' });
+const fail = (code: string, message = 'нет', extra: Record<string, unknown> = {}, current: unknown = null) =>
+  ({ ok: false, error: { code, message, retryable: false, field: null, ...extra }, current });
+
+const dl = (id: string, status: Deadline['status'] = 'new'): Deadline => ({
+  id, version: 3, clientId: 'C-1', what: 'ЄП за III квартал', periodicity: 'quarter', due: '2026-10-20', periodEnd: '2026-09-30', status, closedAt: null,
+});
+
+describe('транспорт', () => {
+  it('POST text/plain без своих заголовков, тело по контракту', async () => {
+    const s = server(ok({}));
+    await call({ url: URL_, action: 'auth.me', session: 'S1', fetchImpl: s.fetchImpl });
+    expect(s.inits[0]?.method).toBe('POST');
+    expect(s.inits[0]?.headers).toEqual({ 'Content-Type': 'text/plain;charset=utf-8' });
+    expect(s.inits[0]?.credentials).toBe('omit');
+    expect(s.sent[0]).toEqual({ v: 1, action: 'auth.me', payload: {}, session: 'S1' });
+  });
+
+  it('обрыв связи → NETWORK, не-JSON → SERVER', async () => {
+    const s = server(new TypeError('Failed to fetch'), '<html>Sign in</html>');
+    await expect(call({ url: URL_, action: 'x', fetchImpl: s.fetchImpl })).rejects.toMatchObject({ code: 'NETWORK' });
+    await expect(call({ url: URL_, action: 'x', fetchImpl: s.fetchImpl })).rejects.toMatchObject({ code: 'SERVER' });
+  });
+
+  it('тайм-аут 30 с прерывает запрос → NETWORK', async () => {
+    vi.useFakeTimers();
+    const fetchImpl = ((_u: unknown, init?: RequestInit) => new Promise((_, rej) => {
+      init?.signal?.addEventListener('abort', () => rej(new DOMException('aborted', 'AbortError')));
+    })) as unknown as typeof fetch;
+    const p = call({ url: URL_, action: 'x', fetchImpl });
+    const check = expect(p).rejects.toMatchObject({ code: 'NETWORK' });
+    await vi.advanceTimersByTimeAsync(30_000);
+    await check;
+    vi.useRealTimers();
+  });
+});
+
+describe('живой адаптер: записи', () => {
+  it('закрытие срока: requestId, baseVersion, closed + next, notifyAt', async () => {
+    const s = server(ok({ closed: dl('D-1', 'done'), next: dl('D-2'), notifyAt: null }, 77));
+    const api = new LiveApi(URL_, auth(), s.fetchImpl);
+    const r = await api.write({ kind: 'closeDeadline', requestId: 'R1', id: 'D-1', baseVersion: 3 });
+    expect(s.sent[0]).toMatchObject({ action: 'deadlines.close', requestId: 'R1', session: 'S1', payload: { id: 'D-1', baseVersion: 3 } });
+    expect(r).toMatchObject({ ok: true, cursor: 77, notifyAt: null });
+    if (!r.ok) return;
+    expect(r.changes.map((c) => [c.entity, c.op, c.id, c.origin])).toEqual([['deadline', 'upsert', 'D-1', 'R1'], ['deadline', 'upsert', 'D-2', 'R1']]);
+  });
+
+  it('платёж уходит только с полями контракта (без save, source, version)', async () => {
+    const p: Payment = { id: 'R2', version: 0, clientId: 'C-1', kopecks: 150000, period: 'Октябрь 2026', method: 'mono', date: '2026-10-14', source: 'сайт', save: 'saving' };
+    const s = server(ok({ payment: { ...p, version: 12, save: undefined } }));
+    await new LiveApi(URL_, auth(), s.fetchImpl).write({ kind: 'addPayment', requestId: 'R2', payment: p });
+    expect(s.sent[0]?.payload).toEqual({ payment: { id: 'R2', clientId: 'C-1', kopecks: 150000, period: 'Октябрь 2026', method: 'mono', date: '2026-10-14' } });
+  });
+
+  it('отмена платежа → delete; конфликт возвращает current', async () => {
+    const cur: Payment = { id: 'P-5', version: 9, clientId: 'C-1', kopecks: 100, period: 'x', method: 'bank', date: '2026-10-14', source: 'сайт' };
+    const s = server(ok({ cancelled: 'P-5' }), fail('CONFLICT', 'Платёж изменили в таблице', {}, cur));
+    const api = new LiveApi(URL_, auth(), s.fetchImpl);
+    const a = await api.write({ kind: 'cancelPayment', requestId: 'R3', id: 'P-5', baseVersion: 8 });
+    expect(a.ok && a.changes[0]).toMatchObject({ entity: 'payment', op: 'delete', id: 'P-5' });
+    const b = await api.write({ kind: 'cancelPayment', requestId: 'R4', id: 'P-5', baseVersion: 8 });
+    expect(b).toEqual({ ok: false, code: 'CONFLICT', message: 'Платёж изменили в таблице', current: cur });
+  });
+
+  it('новый клиент: пустое → null на сервер, null → строка на сайт, сроки от шаблона', async () => {
+    const s = server(ok({ client: { id: 'C-117', version: 5, name: 'Тест', kind: 'fop2', marks: [], employer: false, kved: [], phone: null, keyIssuer: null, keyUntil: null, monthly: [] }, createdDeadlines: [dl('D-9')] }));
+    const r = await new LiveApi(URL_, auth(), s.fetchImpl).write({ kind: 'addClient', requestId: 'R5', client: {
+      id: 'tmp-1', version: 0, name: 'Тест', kind: 'fop2', marks: [], employer: false, kved: [], phone: '', keyIssuer: '', keyUntil: null, monthly: [],
+    } });
+    expect(s.sent[0]?.payload).toMatchObject({ client: { phone: null, keyIssuer: null } });
+    expect(s.sent[0]?.payload.client).not.toHaveProperty('id');
+    expect(r.ok && r.changes.map((c) => c.id)).toEqual(['C-117', 'D-9']);
+    expect(r.ok && r.changes[0]?.record).toMatchObject({ phone: '', keyIssuer: '' });
+  });
+
+  it('задача уходит с типом', async () => {
+    const s = server(ok({ task: { id: 'R6', version: 1, clientId: null, text: 'Позвонить', due: null, type: 'call', priority: 'medium', done: false } }));
+    await new LiveApi(URL_, auth(), s.fetchImpl).write({ kind: 'createTask', requestId: 'R6', task: { id: 'R6', version: 1, clientId: null, text: 'Позвонить', due: null, type: 'call', priority: 'medium', done: false } });
+    expect(s.sent[0]?.payload).toEqual({ task: { id: 'R6', clientId: null, text: 'Позвонить', due: null, type: 'call', priority: 'medium' } });
+  });
+
+  it('ночное обслуживание: код и retryAt доходят до очереди', async () => {
+    const s = server(fail('MAINTENANCE', 'Ночное обслуживание', { retryable: true, retryAt: '2026-10-15T04:30:00+03:00' }));
+    const r = await new LiveApi(URL_, auth(), s.fetchImpl).write({ kind: 'completeTask', requestId: 'R7', id: 'T-1', done: true });
+    expect(r).toEqual({ ok: false, code: 'MAINTENANCE', message: 'Ночное обслуживание', retryAt: '2026-10-15T04:30:00+03:00' });
+  });
+
+  it('незнакомый код сервера → SERVER (кнопка «Повторить»)', async () => {
+    const s = server(fail('UNSUPPORTED_VERSION', 'Обновите страницу'));
+    const r = await new LiveApi(URL_, auth(), s.fetchImpl).write({ kind: 'completeTask', requestId: 'R8', id: 'T-1', done: true });
+    expect(r).toMatchObject({ ok: false, code: 'SERVER' });
+  });
+
+  it('сеанс истёк → тихий вход и повтор тем же requestId', async () => {
+    const s = server(fail('AUTH_EXPIRED', 'истёк'), ok({ task: { id: 'T-1', version: 2 } }));
+    const a = auth();
+    const r = await new LiveApi(URL_, a, s.fetchImpl).write({ kind: 'completeTask', requestId: 'R9', id: 'T-1', done: true });
+    expect(r.ok).toBe(true);
+    expect(a.refreshed).toBe(1);
+    expect(s.sent.map((x) => [x.session, x.requestId])).toEqual([['S1', 'R9'], ['S2', 'R9']]);
+  });
+});
+
+describe('живой адаптер: чтение', () => {
+  it('изменения страницами до hasMore=false; вопросы пока пропускаем', async () => {
+    const s = server(
+      ok({ changes: [{ rev: 11, entity: 'payment', op: 'upsert', id: 'P-1', origin: 'таблица', record: { id: 'P-1' } }, { rev: 12, entity: 'question', op: 'upsert', id: 'Q-1', origin: 'таблица', record: {} }], cursor: 12, hasMore: true }),
+      ok({ changes: [{ rev: 13, entity: 'deadline', op: 'delete', id: 'D-1', origin: 'таблица' }], cursor: 13, hasMore: false }),
+    );
+    const r = await new LiveApi(URL_, auth(), s.fetchImpl).changesSince(10);
+    expect(s.sent.map((x) => x.payload)).toEqual([{ since: 10, limit: 500 }, { since: 12, limit: 500 }]);
+    expect(r.cursor).toBe(13);
+    expect(r.changes.map((c) => `${c.cursor}:${c.entity}:${c.op}`)).toEqual(['11:payment:upsert', '13:deadline:delete']);
+  });
+
+  it('CURSOR_EXPIRED уходит наверх как ApiError', async () => {
+    const s = server(fail('CURSOR_EXPIRED', 'старый курсор'));
+    await expect(new LiveApi(URL_, auth(), s.fetchImpl).changesSince(1)).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it('пароль: отдельный запрос с confirm, без requestId', async () => {
+    const s = server(ok({ login: 'l', password: 'p', ttlSeconds: 30 }));
+    const r = await new LiveApi(URL_, auth(), s.fetchImpl).revealPassword('C-1');
+    expect(s.sent[0]).toEqual({ v: 1, action: 'clients.revealPassword', payload: { id: 'C-1', confirm: true }, session: 'S1' });
+    expect(r.ttlSeconds).toBe(30);
+  });
+});

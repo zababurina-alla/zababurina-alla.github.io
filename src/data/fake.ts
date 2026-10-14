@@ -74,11 +74,11 @@ export const ACTIVITY: Activity[] = [
 ];
 
 export const TASKS: Task[] = [
-  { id: 't1', version: 1, clientId: 'c1', text: 'Позвонить — продлить ключ ЭЦП', due: '2026-10-15', priority: 'high', done: false },
-  { id: 't2', version: 1, clientId: 'c10', text: 'Запросить первичку за сентябрь', due: '2026-10-16', priority: 'medium', done: false },
-  { id: 't3', version: 1, clientId: 'c5', text: 'Проверить новый КВЕД 47.91', due: '2026-10-17', priority: 'low', done: false },
-  { id: 't4', version: 1, clientId: 'c6', text: 'Напомнить об оплате ЄП за сентябрь', due: '2026-10-14', priority: 'critical', done: false },
-  { id: 't5', version: 1, clientId: null, text: 'Сверить выписку Приватбанка за неделю', due: null, priority: 'medium', done: false },
+  { id: 't1', version: 1, clientId: 'c1', text: 'Позвонить — продлить ключ ЭЦП', due: '2026-10-15', priority: 'high', type: 'key', done: false },
+  { id: 't2', version: 1, clientId: 'c10', text: 'Запросить первичку за сентябрь', due: '2026-10-16', priority: 'medium', type: 'docs', done: false },
+  { id: 't3', version: 1, clientId: 'c5', text: 'Проверить новый КВЕД 47.91', due: '2026-10-17', priority: 'low', type: 'docs', done: false },
+  { id: 't4', version: 1, clientId: 'c6', text: 'Напомнить об оплате ЄП за сентябрь', due: '2026-10-14', priority: 'critical', type: 'taxes', done: false },
+  { id: 't5', version: 1, clientId: null, text: 'Сверить выписку Приватбанка за неделю', due: null, priority: 'medium', type: 'docs', done: false },
 ];
 
 export const QUESTIONS: Question[] = [

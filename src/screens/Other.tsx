@@ -100,7 +100,7 @@ export function Tasks() {
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!parsed?.text) return;
-    store.addTask({ text: parsed.text, clientId: parsed.clientId, due: parsed.due, priority: parsed.priority });
+    store.addTask({ text: parsed.text, clientId: parsed.clientId, due: parsed.due, priority: parsed.priority, type: parsed.type });
     setLine('');
   }
 

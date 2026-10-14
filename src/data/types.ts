@@ -61,12 +61,16 @@ export interface Payment {
 
 export type Priority = 'critical' | 'high' | 'medium' | 'low';
 
+/** Тип задачи — список «⚙️ Справочники» F5:F11 + call (контракт, раздел 7, п. 26). */
+export type TaskType = 'report' | 'taxes' | 'salary' | 'key' | 'diia' | 'consult' | 'docs' | 'call';
+
 export interface Task {
   id: string;
   version: number;
   clientId: string | null;
   text: string;
   due: string | null; // ISO
+  type: TaskType;
   priority: Priority;
   done: boolean;
 }
