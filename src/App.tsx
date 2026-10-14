@@ -13,6 +13,7 @@ import { Payments } from './screens/Payments';
 import { PaymentDialog } from './screens/PaymentDialog';
 import { AddClientDialog } from './screens/AddClientDialog';
 import { Keys, More, Reference, Tasks } from './screens/Other';
+import { IconGallery } from './screens/IconGallery';
 
 function Screens() {
   const route = useRoute();
@@ -37,6 +38,7 @@ function Screens() {
         {route.name === 'keys' && <Keys />}
         {route.name === 'reference' && <Reference />}
         {route.name === 'more' && <More />}
+        {route.name === 'icons' && <IconGallery />}
       </Shell>
       <ClientPanel id={clientId} onClose={() => setClientId(null)} />
       <PaymentDialog open={payFor.open} clientId={payFor.clientId} onClose={() => setPayFor((p) => ({ ...p, open: false }))} />
