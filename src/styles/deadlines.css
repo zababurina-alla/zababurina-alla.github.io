@@ -709,3 +709,23 @@
 .dactions .btn:disabled {
   opacity: 0.45;
 }
+
+/* «Закрыть N» (п. 5) — временно, оформление за отделом дизайна */
+.dsel-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+
+.dsel-bar__grow {
+  flex: 1;
+}
+
+.dsel {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}

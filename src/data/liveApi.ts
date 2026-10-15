@@ -151,6 +151,34 @@ export class LiveApi implements CabinetApi {
           if (env.data.next) changes.push(up('deadline', env.data.next, env.cursor));
           return { ok: true, changes, cursor: env.cursor, notifyAt: env.data.notifyAt };
         }
+        case 'closeDeadlines': {
+          // Ответ { results[], closed, failed }: по каждому сроку — закрыт (closed + next) или отказ с кодом.
+          // Форма строки results — допущение (как у deadlines.close + { id, ok, code, message, current }).
+          const env = await this.rpc<{ results?: unknown[] }>('deadlines.closeMany', { items: op.items }, o);
+          const changes: Change[] = [];
+          const failed: NonNullable<Extract<WriteResult, { ok: true }>['failed']> = [];
+          const seen = new Set<string>();
+          for (const raw of env.data.results ?? []) {
+            const r = (raw ?? {}) as { id?: unknown; ok?: unknown; closed?: Deadline | null; next?: Deadline | null; code?: unknown; message?: unknown;
+              error?: { code?: unknown; message?: unknown }; current?: unknown };
+            const id = typeof r.id === 'string' ? r.id : r.closed?.id ?? '';
+            if (!id) continue;
+            seen.add(id);
+            const code = String(r.error?.code ?? r.code ?? '');
+            if (r.ok === false || code) {
+              const c = SITE_CODES.has(code) ? code as ErrorCode : 'SERVER';
+              const item: (typeof failed)[number] = { id, code: c, message: String(r.error?.message ?? r.message ?? 'Не закрылся') };
+              if (r.current && typeof r.current === 'object' && 'periodicity' in r.current) item.current = normRecord('deadline', r.current) as Deadline;
+              failed.push(item);
+              continue;
+            }
+            if (r.closed) changes.push(up('deadline', r.closed, env.cursor));
+            if (r.next) changes.push(up('deadline', r.next, env.cursor));
+          }
+          // Срок, о котором сервер ничего не сказал, не считаем закрытым.
+          for (const it of op.items) if (!seen.has(it.id)) failed.push({ id: it.id, code: 'SERVER', message: 'Таблица не ответила по этому сроку' });
+          return { ok: true, changes, cursor: env.cursor, failed };
+        }
         case 'reopenDeadline': {
           const env = await this.rpc<{ reopened: Deadline }>('deadlines.reopen', { id: op.id, undoOf: op.undoOf }, o);
           return { ok: true, changes: [up('deadline', env.data.reopened, env.cursor)], cursor: env.cursor };

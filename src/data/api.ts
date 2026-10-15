@@ -32,6 +32,8 @@ export interface Change {
 /** Запись с сайта. requestId создаёт браузер: повтор из очереди с тем же requestId не создаёт дубль. */
 export type WriteOp =
   | { kind: 'closeDeadline'; requestId: string; id: string; baseVersion: number }
+  /** deadlines.closeMany: 1…20 сроков одним запросом; отказ по одному — в failed, остальные закрываются. */
+  | { kind: 'closeDeadlines'; requestId: string; items: { id: string; baseVersion: number }[] }
   | { kind: 'reopenDeadline'; requestId: string; id: string; undoOf: string }
   | { kind: 'addPayment'; requestId: string; payment: Payment }
   | { kind: 'cancelPayment'; requestId: string; id: string; baseVersion: number }
@@ -55,7 +57,9 @@ export const RETRYABLE: ReadonlySet<ErrorCode> = new Set<ErrorCode>(['NETWORK', 
 export type WriteResult =
   | { ok: true; changes: Change[]; cursor: number;
       /** Закрытие срока: когда уйдут уведомления (через 2 мин); null — у клиента нет Telegram, уведомления не будет. */
-      notifyAt?: string | null }
+      notifyAt?: string | null;
+      /** closeMany: сроки, которые не закрылись (PERIOD_OPEN / CONFLICT / NOT_FOUND), — остальные закрыты. */
+      failed?: { id: string; code: ErrorCode; message: string; current?: Deadline }[] }
   | { ok: false; code: ErrorCode; message: string; current?: Client | Deadline | Payment | Question | InboxItem;
       /** MAINTENANCE: когда ночные задачи закончатся (флаг сервера, не часы) — раньше не повторять. */
       retryAt?: string };

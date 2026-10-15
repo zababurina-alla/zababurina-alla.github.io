@@ -16,10 +16,10 @@ import { readSnap, saveSnap } from './snapCache';
 import { Outbox } from './outbox';
 import type { Counters, OutboxEvent, OutboxItem } from './outbox';
 import { newRequestId } from './api';
-import type { Change, DeadlinePatch, Snapshot, WriteOp } from './api';
+import type { Change, DeadlinePatch, Snapshot, WriteOp, WriteResult } from './api';
 import type { Activity, Client, DatedDeadline, Deadline, InboxItem, Payment, Question, SaveState, Task } from './types';
 import { isDated } from './types';
-import { TODAY, addDays, fmtDate } from '../lib/dates';
+import { TODAY, addDays, fmtDate, plural } from '../lib/dates';
 import { play } from '../lib/sound';
 
 // Опрос изменений из таблицы: бриф — раз в 30–60 с. Квоты Apps Script дневного лимита на запросы не задают
@@ -41,7 +41,10 @@ export interface Conflict {
   theirs: string;
 }
 
-export interface ClosedEntry { deadline: Deadline; next: Deadline | null; save: SaveState; requestId: string; by: 'сайт' | 'бот' }
+/** batch — закрыт пакетом (closeMany): requestId общий у всех сроков пакета. */
+export interface ClosedEntry { deadline: Deadline; next: Deadline | null; save: SaveState; requestId: string; by: 'сайт' | 'бот'; batch?: boolean }
+/** Что сервер сказал о записи, кроме изменений: когда уйдут уведомления, что из пакета не закрылось. */
+type Applied = Pick<Extract<WriteResult, { ok: true }>, 'notifyAt' | 'failed'>;
 
 interface Store {
   loaded: boolean;
@@ -72,6 +75,8 @@ interface Store {
   client: (id: string) => Client | undefined;
   /** hideAfterMs — убрать строку с экрана не сразу (успеть показать анимацию); в очередь запись встаёт сразу. */
   closeDeadline: (id: string, onSaved?: (next: Deadline | null, notifyAt: string | null) => void, hideAfterMs?: number) => CloseResult;
+  /** Закрыть несколько сроков (deadlines.closeMany по 20). skipped — у кого период не закончился (не отправлены). */
+  closeDeadlines: (ids: string[], onDone?: (closed: number, failed: { what: string; message: string }[]) => void) => { sent: number; skipped: { id: string; what: string; message: string }[] };
   reopenDeadline: (id: string) => void;
   addPayment: (p: Omit<Payment, 'id' | 'version' | 'source' | 'save'>, onSaved?: () => void) => string;
   removePayment: (id: string) => void;
@@ -114,7 +119,7 @@ interface Store {
 const Ctx = createContext<Store | null>(null);
 
 const AREA_OF: Record<WriteOp['kind'], WriteArea> = {
-  closeDeadline: 'deadlines', reopenDeadline: 'deadlines', addPayment: 'payments', cancelPayment: 'payments',
+  closeDeadline: 'deadlines', closeDeadlines: 'deadlines', reopenDeadline: 'deadlines', addPayment: 'payments', cancelPayment: 'payments',
   updateDeadline: 'deadlines', addClient: 'clients', updateClient: 'clients', createTask: 'tasks', completeTask: 'tasks', answerQuestion: 'questions', decideInbox: 'inbox',
 };
 
@@ -168,7 +173,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const mine = useRef(new Set<string>());
   const paymentsRef = useRef<Payment[]>([]);
   useEffect(() => { paymentsRef.current = payments; }, [payments]);
-  const callbacks = useRef(new Map<string, (changes: Change[], result: { notifyAt?: string | null }) => void>());
+  const callbacks = useRef(new Map<string, (changes: Change[], result: Applied) => void>());
   const outboxRef = useRef<Outbox | null>(null);
   const syncSoon = useRef<number | null>(null);
   const syncRef = useRef<() => Promise<void>>(async () => undefined);
@@ -239,7 +244,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   /** Показать запись сразу — с пометкой, что она ещё не в таблице. */
   const applyOptimistic = useCallback((op: WriteOp) => {
-    if (op.kind === 'closeDeadline') {
+    if (op.kind === 'closeDeadlines') {
+      const ids = new Set(op.items.map((it) => it.id));
+      setDeadlines((xs) => {
+        const picked = xs.filter((x) => ids.has(x.id));
+        setClosed((cs) => [...picked.map((d) => ({ deadline: d, next: null, save: 'saving' as const, requestId: op.requestId, by: 'сайт' as const, batch: true })),
+          ...cs.filter((c) => !(c.requestId === op.requestId && ids.has(c.deadline.id)))]);
+        return xs.filter((x) => !ids.has(x.id));
+      });
+    } else if (op.kind === 'closeDeadline') {
       setDeadlines((xs) => {
         const d = xs.find((x) => x.id === op.id);
         if (d) setClosed((cs) => [{ deadline: d, next: null, save: 'saving', requestId: op.requestId, by: 'сайт' }, ...cs.filter((c) => c.requestId !== op.requestId)]);
@@ -301,6 +314,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // Отказ: показать честно. SERVER — запись остаётся «не сохранилось — повторить»;
       // PERIOD_OPEN / NOT_FOUND — повтор не поможет: экран возвращается к правде таблицы.
       const final = e.result.code !== 'SERVER';
+      if (op.kind === 'closeDeadlines' && final) {
+        // Пакет целиком не принят (VALIDATION, BUSY, MAINTENANCE) — все сроки возвращаются в список.
+        setClosed((cs) => {
+          for (const c of cs) if (c.requestId === op.requestId) putOpen(c.deadline);
+          return cs.filter((c) => c.requestId !== op.requestId);
+        });
+      }
       if (op.kind === 'closeDeadline') {
         setClosed((cs) => {
           const entry = cs.find((c) => c.requestId === op.requestId);
@@ -424,7 +444,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => { window.clearInterval(t); document.removeEventListener('visibilitychange', tick); window.removeEventListener('online', tick); };
   }, [syncNow]);
 
-  const send = useCallback((op: WriteOp, label: string, onApplied?: (changes: Change[], result: { notifyAt?: string | null }) => void, showAfterMs = 0) => {
+  const send = useCallback((op: WriteOp, label: string, onApplied?: (changes: Change[], result: Applied) => void, showAfterMs = 0) => {
     // Раздел ещё только для просмотра (config.json → writes): в таблицу не пишем, говорим, где сделать.
     const area = AREA_OF[op.kind];
     if (!canWrite(area)) {
@@ -460,6 +480,35 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   }, [deadlines, send, markFresh]);
 
+  /** Закрыть несколько сроков (п. 5): по 20 в пакете (deadlines.closeMany). Период не закончился — не отправляем,
+   *  возвращаем причину. Итог по каждому пакету — в onDone: сколько закрыто и что не закрылось. */
+  const closeDeadlines = useCallback((ids: string[], onDone?: (closed: number, failed: { what: string; message: string }[]) => void) => {
+    const picked = deadlines.filter((d) => ids.includes(d.id));
+    const skipped = picked.filter((d) => d.periodEnd && TODAY <= d.periodEnd)
+      .map((d) => ({ id: d.id, what: d.what, message: `период ещё не закончился — с ${fmtDate(addDays(d.periodEnd ?? TODAY, 1))}` }));
+    const ok = picked.filter((d) => !skipped.some((s) => s.id === d.id));
+    for (let i = 0; i < ok.length; i += 20) {
+      const part = ok.slice(i, i + 20);
+      const requestId = newRequestId();
+      send({ kind: 'closeDeadlines', requestId, items: part.map((d) => ({ id: d.id, baseVersion: d.version })) },
+        `Закрыть ${part.length} ${plural(part.length, 'срок', 'срока', 'сроков')}`, (changes, result) => {
+          const done = changes.filter((c) => c.entity === 'deadline' && c.op === 'upsert' && (c.record as Deadline).status === 'done').map((c) => c.record as Deadline);
+          const nexts = changes.filter((c) => c.entity === 'deadline' && c.op === 'upsert' && (c.record as Deadline).status !== 'done').map((c) => c.record as Deadline);
+          const failed = result.failed ?? [];
+          setClosed((cs) => cs.flatMap((c) => {
+            if (c.requestId !== requestId) return [c];
+            const f = failed.find((x) => x.id === c.deadline.id);
+            if (f) { putOpen(f.current && isDated(f.current) ? f.current : c.deadline); return []; }
+            const next = nexts.find((n) => n.clientId === c.deadline.clientId && n.what === c.deadline.what) ?? null;
+            return [{ ...c, save: 'saved' as const, next }];
+          }));
+          if (nexts.length) markFresh(nexts.map((n) => n.id));
+          onDone?.(done.length, failed.map((f) => ({ what: part.find((d) => d.id === f.id)?.what ?? f.id, message: f.message })));
+        });
+    }
+    return { sent: ok.length, skipped };
+  }, [deadlines, send, markFresh, putOpen]);
+
   const reopenDeadline = useCallback((id: string) => {
     const entry = closed.find((c) => c.deadline.id === id);
     if (!entry) return;
@@ -467,7 +516,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setDeadlines((xs) => xs.filter((x) => x.id !== entry.next?.id));
     putOpen(entry.deadline);
     // Отмена — тоже запись в таблицу; если закрытие ещё в очереди — просто убираем его оттуда.
-    if (outboxRef.current?.has(entry.requestId)) { void outboxRef.current.discard(entry.requestId); return; }
+    // Из пакета так нельзя (уйдут и остальные): отмена встаёт в очередь следом за пакетом.
+    if (!entry.batch && outboxRef.current?.has(entry.requestId)) { void outboxRef.current.discard(entry.requestId); return; }
     send({ kind: 'reopenDeadline', requestId: newRequestId(), id, undoOf: entry.requestId }, `Отменить закрытие «${entry.deadline.what}»`);
   }, [closed, send, putOpen]);
 
@@ -605,10 +655,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<Store>(() => ({
     loaded, online, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance,
   }), [loaded, online, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

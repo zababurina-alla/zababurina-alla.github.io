@@ -19,6 +19,7 @@ import { TableText } from '../ui/TableText';
 import { OBLIGATION_ICON } from '../ui/obligationIcon';
 import { obligationKind } from '../lib/obligation';
 import { useCloseDeadline } from './useClose';
+import { useSelection } from './selection';
 
 gsap.registerPlugin(Flip);
 
@@ -44,6 +45,7 @@ export function DeadlineTable({ items, showClient = true, empty = 'Сроков 
   const store = useStore();
   const ui = useUi();
   const { close, closing, warn } = useCloseDeadline();
+  const sel = useSelection();
   const scope = useRef<HTMLDivElement>(null);
   useFlipRows(scope, items.map((d) => d.id).join(','));
   if (items.length === 0) return <p className="empty">{empty}</p>;
@@ -64,10 +66,15 @@ export function DeadlineTable({ items, showClient = true, empty = 'Сроков 
           <div key={d.id} data-row data-id={d.id} data-flip-id={d.id} role="row" style={{ '--i': i } as React.CSSProperties}
             className={`dtable__row dtable__row--${st}${store.fresh.includes(d.id) ? ' is-fresh' : ''}`}>
             <span role="cell" className="c-act">
+              {sel.on ? (
+                <input type="checkbox" className="dsel" checked={sel.picked.has(d.id)} onChange={() => sel.toggle(d.id)}
+                  aria-label={`Выбрать: ${d.what}, ${name}`} />
+              ) : (
               <button type="button" className="check-btn" aria-disabled={closing !== null}
                 aria-label={`Сдано и оплачено: ${d.what}, ${name}`} title="Сдано и оплачено" onClick={() => { dismissHint('today.tick'); close(d.id); }}>
                 <span className="check-btn__ring" aria-hidden="true"><Icon name="check" size={16} /></span>
               </button>
+              )}
             </span>
             {showClient && (
               <span role="cell" className="dtable__client c-client">

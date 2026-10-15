@@ -139,8 +139,20 @@ class FakeServer implements CabinetApi {
         const notifyAt = new Date(Date.now() + 120_000).toISOString();
         return { ok: true, changes, cursor: this.cursor, notifyAt };
       }
+      case 'closeDeadlines': {
+        // Как deadlines.closeMany: каждый срок — как отдельное закрытие; отказ по одному не мешает остальным.
+        const changes: Change[] = [];
+        const failed: NonNullable<Extract<WriteResult, { ok: true }>['failed']> = [];
+        for (const it of op.items) {
+          const r = this.apply({ kind: 'closeDeadline', requestId: `${o}#${it.id}`, id: it.id, baseVersion: it.baseVersion });
+          if (r.ok) changes.push(...r.changes);
+          else failed.push({ id: it.id, code: r.code, message: r.message, ...(r.current && 'periodicity' in r.current ? { current: r.current } : {}) });
+        }
+        return { ok: true, changes, cursor: this.cursor, failed };
+      }
       case 'reopenDeadline': {
-        const was = this.closedBy.get(op.undoOf);
+        // Отмена одного из пакета: undoOf — requestId пакета, срок — по id.
+        const was = this.closedBy.get(op.undoOf) ?? this.closedBy.get(`${op.undoOf}#${op.id}`);
         if (!was) return { ok: false, code: 'NOT_FOUND', message: 'Нечего отменять' };
         const changes: Change[] = [];
         if (was.next) { this.deadlines.delete(was.next.id); changes.push(this.record('deadline', 'delete', was.next.id, o)); }
