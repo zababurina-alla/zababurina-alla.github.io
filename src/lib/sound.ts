@@ -5,8 +5,10 @@
 // 1) Звук — только в ответ на действие человека: нажатие или клавиша не дальше 5 с назад. Пришло из таблицы или от бота
 //    само по себе, без действия мамы, — тишина (подсветка строки говорит сама).
 // 2) Режимы: «вкл» / «ночью тихо» (22:00–7:00 молчит) / «выкл». По умолчанию — «ночью тихо».
+// 3) Исключение (владелец, 16.10): новое сообщение клиента — playAmbient('message'): без недавнего нажатия, но только
+//    если звук уже разблокирован действием мамы в этой вкладке и режим сейчас слышен. Иначе — тишина, браузер не ругается.
 
-export type SoundName = 'saved' | 'closed' | 'attention' | 'incoming' | 'tick';
+export type SoundName = 'saved' | 'closed' | 'attention' | 'incoming' | 'tick' | 'message';
 export type SoundMode = 'on' | 'night' | 'off';
 
 const KEY_MODE = 'sverka.sound.mode';
@@ -85,34 +87,52 @@ export function play(name: SoundName, force = false): void {
   if (force && soundSettings.mode === 'off') return;
   try {
     ctx ??= new AudioContext();
-    const ac = ctx;
-    if (ac.state === 'suspended') void ac.resume();
-    const out = ac.createGain();
-    out.gain.value = soundSettings.volume * 0.35;
-    out.connect(ac.destination);
-    const t = ac.currentTime + 0.01;
-    switch (name) {
-      case 'saved': // две мягкие ноты вверх (ми → ля), 160 мс — «записано»
-        tone(ac, out, 659.25, t, 0.12);
-        tone(ac, out, 880, t + 0.07, 0.16, 'sine', 0.8);
-        break;
-      case 'closed': // «закрыто»: мягкий низ + две светлые ноты вверх (соль → си → ми), 260 мс — как поставить галочку
-        tone(ac, out, 196, t, 0.18, 'triangle', 0.7);
-        tone(ac, out, 987.77, t + 0.03, 0.14, 'sine', 0.45);
-        tone(ac, out, 1318.5, t + 0.1, 0.2, 'sine', 0.35);
-        break;
-      case 'attention': // одна низкая нота с лёгким спадом, без тревоги, 220 мс
-        tone(ac, out, 440, t, 0.22, 'sine', 0.8);
-        tone(ac, out, 392, t + 0.09, 0.2, 'sine', 0.5);
-        break;
-      case 'incoming': // едва слышный тик, 40 мс
-        tone(ac, out, 1760, t, 0.04, 'sine', 0.25);
-        break;
-      case 'tick': // щелчок выбора, 30 мс
-        tone(ac, out, 2093, t, 0.03, 'sine', 0.18);
-        break;
-    }
+    voice(ctx, name);
   } catch {
     /* звук — украшение; без него всё работает */
+  }
+}
+
+/** Звук события без нажатия (новое сообщение клиента): только в уже разблокированном звуке и в слышимом режиме. */
+export function playAmbient(name: SoundName): void {
+  if (!soundSettings.on || !ctx || ctx.state !== 'running') return;
+  try {
+    voice(ctx, name);
+  } catch {
+    /* без звука всё работает */
+  }
+}
+
+function voice(ac: AudioContext, name: SoundName): void {
+  if (ac.state === 'suspended') void ac.resume();
+  const out = ac.createGain();
+  out.gain.value = soundSettings.volume * 0.35;
+  out.connect(ac.destination);
+  const t = ac.currentTime + 0.01;
+  switch (name) {
+    case 'saved': // две мягкие ноты вверх (ми → ля), 160 мс — «записано»
+      tone(ac, out, 659.25, t, 0.12);
+      tone(ac, out, 880, t + 0.07, 0.16, 'sine', 0.8);
+      break;
+    case 'closed': // «закрыто»: мягкий низ + две светлые ноты вверх (соль → си → ми), 260 мс — как поставить галочку
+      tone(ac, out, 196, t, 0.18, 'triangle', 0.7);
+      tone(ac, out, 987.77, t + 0.03, 0.14, 'sine', 0.45);
+      tone(ac, out, 1318.5, t + 0.1, 0.2, 'sine', 0.35);
+      break;
+    case 'attention': // одна низкая нота с лёгким спадом, без тревоги, 220 мс
+      tone(ac, out, 440, t, 0.22, 'sine', 0.8);
+      tone(ac, out, 392, t + 0.09, 0.2, 'sine', 0.5);
+      break;
+    case 'incoming': // едва слышный тик, 40 мс
+      tone(ac, out, 1760, t, 0.04, 'sine', 0.25);
+      break;
+    case 'tick': // щелчок выбора, 30 мс
+      tone(ac, out, 2093, t, 0.03, 'sine', 0.18);
+      break;
+    case 'message': // новое сообщение: «капля» — мягкий низ и две светлые ноты (до → фа), 260 мс, тише «записано»
+      tone(ac, out, 523.25, t, 0.18, 'triangle', 0.22);
+      tone(ac, out, 1046.5, t, 0.1, 'sine', 0.5);
+      tone(ac, out, 1396.9, t + 0.075, 0.2, 'sine', 0.4);
+      break;
   }
 }

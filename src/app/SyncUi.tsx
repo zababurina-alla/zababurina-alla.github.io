@@ -5,6 +5,8 @@ import { AREA_LABEL, readOnlyAreas, visibleAreas } from '../config';
 import { Icon } from '../ui/Icon';
 import { Modal } from '../ui/Modal';
 import { useToast } from '../ui/toast';
+import { playAmbient } from '../lib/sound';
+import { chatKey } from '../screens/Inbox';
 
 /** Полоса сверху, пока нет связи: сколько записей ждут — и что ничего не потеряется. */
 export function OfflineBanner() {
@@ -24,18 +26,28 @@ export function OfflineBanner() {
 
 /** Отказ сервера — уведомление с «Повторить» (один раз на запись); окончательный отказ — объяснение без повтора. */
 export function FailureWatcher() {
-  const { pending, retry, notices, dismissNotice } = useStore();
+  const { pending, retry, notices, dismissNotice, inbox } = useStore();
   const toast = useToast();
   const shown = useRef(new Set<string>());
   useEffect(() => {
     for (const n of notices) {
+      // Новое сообщение клиента — как в Telegram: аватар, имя, время, отрывок; нажатие — сразу в этот чат; тихий звук.
+      const msg = n.id.startsWith('in-') ? inbox.find((i) => i.id === n.id.slice(3)) : undefined;
+      if (msg) {
+        const open = `#/inbox/${encodeURIComponent(chatKey(msg))}`;
+        toast({ key: n.key ?? `notice-${n.id}`, text: msg.snippet, tone: 'info', timeout: 12_000, from: { name: msg.clientName, at: msg.at },
+          action: { label: 'Открыть', run: () => { location.hash = open; } } });
+        playAmbient('message');
+        dismissNotice(n.id);
+        continue;
+      }
       // Отказ записи — ошибка, висит до закрытия; «пока в таблице» — подсказка на 7 с, одна на раздел (п. 7).
       const go = n.href;
       toast(n.info ? { key: n.key ?? `notice-${n.id}`, text: n.text, tone: 'info', timeout: go ? 12_000 : 7000, ...(go ? { action: { label: 'Открыть', run: () => { location.hash = go; } } } : {}) }
         : { key: `notice-${n.id}`, text: n.text, tone: 'error' });
       dismissNotice(n.id);
     }
-  }, [notices, dismissNotice, toast]);
+  }, [notices, dismissNotice, toast, inbox]);
   useEffect(() => {
     for (const it of pending) {
       if (it.state !== 'failed' || shown.current.has(it.op.requestId)) continue;

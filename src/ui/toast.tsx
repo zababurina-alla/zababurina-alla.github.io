@@ -1,10 +1,11 @@
 // Уведомления: «Платёж записан в таблицу» + «Отменить» (10 с). Таймер стоит, пока курсор на уведомлении
-// или вкладка скрыта. Ошибка не исчезает сама.
+// или вкладка скрыта. Ошибка не исчезает сама. Смахнуть в сторону — закрыть (как в Telegram).
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ReactNode } from 'react';
 import { Icon } from './Icon';
 import type { IconName } from './Icon';
+import { Avatar } from './kit';
 
 export interface ToastInput {
   text: string;
@@ -14,6 +15,8 @@ export interface ToastInput {
   timeout?: number;
   /** Одно и то же событие (например, отказ по одной записи) — одно уведомление, даже если о нём сообщили дважды. */
   key?: string;
+  /** Сообщение клиента — как в Telegram: аватар, имя и время над текстом; нажатие на уведомление — действие (открыть). */
+  from?: { name: string; at: string };
 }
 interface ToastItem extends ToastInput { id: number; leaving?: boolean }
 
@@ -39,13 +42,43 @@ function Toast({ t, index, onClose }: { t: ToastItem; index: number; onClose: (i
     document.addEventListener('visibilitychange', vis);
     return () => document.removeEventListener('visibilitychange', vis);
   }, []);
+  // Смахнуть: ведём пальцем/мышью по уведомлению — оно едет следом; дальше 80 px — закрыто, ближе — пружиной назад.
+  const drag = useRef<{ x: number; id: number } | null>(null);
+  const [dx, setDx] = useState(0);
+  const swipe = {
+    onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => {
+      if ((e.target as Element).closest('button')) return;
+      drag.current = { x: e.clientX, id: e.pointerId };
+    },
+    onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => {
+      const d = drag.current;
+      if (!d || d.id !== e.pointerId) return;
+      const moved = e.clientX - d.x;
+      if (Math.abs(moved) > 6 && !e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.setPointerCapture(e.pointerId);
+      setDx(moved);
+    },
+    onPointerUp: (e: React.PointerEvent<HTMLDivElement>) => {
+      const d = drag.current;
+      drag.current = null;
+      if (!d) return;
+      const moved = e.clientX - d.x;
+      if (Math.abs(moved) > 80) { onClose(t.id); return; }
+      setDx(0);
+      // Без движения — это нажатие: у сообщения клиента нажатие на уведомление открывает диалог.
+      if (Math.abs(moved) < 6 && t.from && t.action) { t.action.run(); onClose(t.id); }
+    },
+    onPointerCancel: () => { drag.current = null; setDx(0); },
+  };
   return (
-    <div className={`toast toast--${t.tone ?? 'ok'}${t.leaving ? ' is-leaving' : ''}`} role={t.tone === 'error' ? 'alert' : 'status'}
-      style={{ '--i': index } as React.CSSProperties}
+    <div className={`toast toast--${t.tone ?? 'ok'}${t.from ? ' toast--message' : ''}${t.leaving ? ' is-leaving' : ''}${dx ? ' is-dragging' : ''}`} role={t.tone === 'error' ? 'alert' : 'status'}
+      style={{ '--i': index, '--dx': `${dx}px`, '--drag-o': String(Math.max(0.2, 1 - Math.abs(dx) / 220)) } as React.CSSProperties}
       onPointerEnter={() => setPaused(true)} onPointerLeave={() => setPaused(document.hidden)}
-      onFocus={() => setPaused(true)} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setPaused(document.hidden); }}>
-      <Icon name={ICON[t.tone ?? 'ok']} size={18} className="toast__icon" />
-      <span className="toast__text">{t.text}</span>
+      onFocus={() => setPaused(true)} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setPaused(document.hidden); }}
+      {...swipe}>
+      {t.from ? <Avatar name={t.from.name} /> : <Icon name={ICON[t.tone ?? 'ok']} size={18} className="toast__icon" />}
+      {t.from
+        ? <span className="toast__text"><span className="toast__from"><strong>{t.from.name}</strong><time className="num" dateTime={t.from.at}>{t.from.at.slice(11, 16)}</time></span><span className="toast__msg">{t.text}</span></span>
+        : <span className="toast__text">{t.text}</span>}
       {t.action && (
         <button type="button" className="toast__action" onClick={() => { t.action?.run(); onClose(t.id); }}>{t.action.label}</button>
       )}
