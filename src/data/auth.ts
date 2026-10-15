@@ -3,6 +3,7 @@
 // при следующем открытии тихий вход. ID-токен никуда не сохраняется.
 // Справка GIS: https://developers.google.com/identity/gsi/web/reference/js-reference
 import { ApiError, call } from './transport';
+import { clearSnap } from './snapCache';
 
 export interface User { email: string; name: string; role: 'mama' | 'owner' }
 /** signingIn — Google ответил, таблица проверяет вход (3+ с): экран входа пишет «Входим…» (п. 41). */
@@ -203,6 +204,7 @@ export class Auth {
 
   private signOutLocal(error: string | null) {
     this.stored = null;
+    clearSnap(); // данные клиентов этой вкладки — вместе с сеансом
     try { sessionStorage.removeItem(KEY); } catch { /* нечего чистить */ }
     this.set({ status: 'signedOut', user: null, error });
   }
