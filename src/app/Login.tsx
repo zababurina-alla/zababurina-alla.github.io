@@ -10,11 +10,14 @@ export function Login() {
     if (!el || !auth) return;
     const a = auth;
     void a.mountButton(el);
-    // Одноразовый код входа живёт на сервере 5 мин: обновляем, пока экран открыт и когда мама вернулась во вкладку.
-    const tick = () => { if (!document.hidden) a.keepFresh(); };
+    // Одноразовый код входа живёт на сервере 10 мин: обновляем, пока экран виден и вход не идёт. Щелчок по кнопке
+    // Google (iframe) уводит фокус со страницы — это начало входа: до ответа Google кнопку не трогаем.
+    const tick = () => { if (!document.hidden && document.hasFocus()) a.keepFresh(); };
+    const onBlur = () => { if (document.activeElement instanceof HTMLIFrameElement && el.contains(document.activeElement)) a.markAttempt(); };
     const t = window.setInterval(tick, 30_000);
     document.addEventListener('visibilitychange', tick);
-    return () => { window.clearInterval(t); document.removeEventListener('visibilitychange', tick); a.unmountButton(el); };
+    window.addEventListener('blur', onBlur);
+    return () => { window.clearInterval(t); document.removeEventListener('visibilitychange', tick); window.removeEventListener('blur', onBlur); a.unmountButton(el); };
   }, []);
   return (
     <main className="login">

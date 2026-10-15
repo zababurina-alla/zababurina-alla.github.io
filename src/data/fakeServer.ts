@@ -258,7 +258,7 @@ class FakeServer implements CabinetApi {
   async listPayments(month: string): Promise<{ payments: Payment[]; totalKopecks: number }> {
     await wait(READ_MS);
     if (!this.online) throw new Error('NETWORK');
-    const payments = [...this.payments.values()].filter((p) => p.date.startsWith(month)).map((p) => ({ ...p }));
+    const payments = [...this.payments.values()].filter((p) => p.date?.startsWith(month)).map((p) => ({ ...p }));
     const totalKopecks = payments.filter((p) => !p.status || p.status === 'received').reduce((s, p) => s + (p.kopecks ?? 0), 0);
     return { payments, totalKopecks };
   }

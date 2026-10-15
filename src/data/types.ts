@@ -65,7 +65,8 @@ export interface Payment {
   kopecks: number | null;
   period: string;
   method: PayMethod;
-  date: string; // ISO
+  /** ISO; null — дата в таблице пустая: платёж в группе «Без даты — проверьте в таблице», в суммы не идёт. */
+  date: string | null;
   source: 'сайт' | 'бот' | 'таблица';
   /** Колонка F «📌 Статус»; пустой в таблице сервер отдаёт как expected. Нет поля — считаем полученным. */
   status?: 'received' | 'expected' | 'notReceived' | 'returned';

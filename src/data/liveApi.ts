@@ -30,13 +30,33 @@ const MAX_PAGES = 20;
 // Сервер отдаёт пустое как null (контракт, раздел 2); экраны сайта ждут строку.
 function normClient(raw: unknown): Client {
   const c = raw as Client & { phone: string | null; keyIssuer: string | null };
-  return { ...c, phone: c.phone ?? '', keyIssuer: c.keyIssuer ?? '', marks: c.marks ?? [], kved: c.kved ?? [], monthly: c.monthly ?? [] };
+  return { ...c, name: c.name ?? '', phone: c.phone ?? '', keyIssuer: c.keyIssuer ?? '', marks: c.marks ?? [], kved: c.kved ?? [], monthly: c.monthly ?? [] };
+}
+
+const METHODS: ReadonlySet<string> = new Set(['bank', 'cash', 'mono', 'diia', 'transfer', 'other']);
+
+// Платёж с пустыми клетками листа: дата '' → null (группа «Без даты»), сумма не число → null, способ не из списка → «другое».
+export function normPayment(raw: unknown): Payment {
+  const p = raw as Payment & { date: unknown; kopecks: unknown; period: unknown; method: unknown; clientId: unknown };
+  return {
+    ...p,
+    clientId: typeof p.clientId === 'string' ? p.clientId : '',
+    date: typeof p.date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(p.date) ? p.date.slice(0, 10) : null,
+    kopecks: typeof p.kopecks === 'number' && Number.isFinite(p.kopecks) ? p.kopecks : null,
+    period: typeof p.period === 'string' ? p.period : '',
+    method: typeof p.method === 'string' && METHODS.has(p.method) ? p.method as Payment['method'] : 'other',
+  };
 }
 
 function normRecord(entity: Entity, raw: unknown): NonNullable<Change['record']> {
   if (entity === 'client') return normClient(raw);
+  if (entity === 'payment') return normPayment(raw);
   // Срок, чьего клиента нет в «Клиентах», сервер отдаёт с clientId: null.
   if (entity === 'deadline') { const d = raw as Deadline & { clientId: string | null }; return { ...d, clientId: d.clientId ?? '' }; }
+  // Строки, которые экраны режут и сравнивают (when.slice, at.localeCompare): пустая клетка → '' вместо null.
+  if (entity === 'activity') { const a = raw as Activity; return { ...a, when: a.when ?? '', text: a.text ?? '' }; }
+  if (entity === 'task') { const t = raw as Task; return { ...t, text: t.text ?? '' }; }
+  if (entity === 'inbox') { const i = raw as InboxItem; return { ...i, at: i.at ?? '', snippet: i.snippet ?? '', clientName: i.clientName ?? '' }; }
   return raw as Deadline | Payment | Activity | Task | Question | InboxItem;
 }
 
@@ -70,11 +90,11 @@ export class LiveApi implements CabinetApi {
     return {
       clients: d.clients.map(normClient),
       deadlines: d.deadlines.map((x) => normRecord('deadline', x) as Deadline),
-      payments: d.payments,
-      tasks: d.tasks,
-      activity: d.activity,
+      payments: d.payments.map(normPayment),
+      tasks: d.tasks.map((x) => normRecord('task', x) as Task),
+      activity: d.activity.map((x) => normRecord('activity', x) as Activity),
       questions: d.questions ?? [],
-      inbox: d.inbox ?? [],
+      inbox: (d.inbox ?? []).map((x) => normRecord('inbox', x) as InboxItem),
       cursor: d.cursor ?? env.cursor,
     };
   }
@@ -178,8 +198,8 @@ export class LiveApi implements CabinetApi {
   }
 
   async listPayments(month: string): Promise<{ payments: Payment[]; totalKopecks: number }> {
-    const env = await this.rpc<{ payments: Payment[]; totalKopecks: number }>('payments.list', { month });
-    return env.data;
+    const env = await this.rpc<{ payments: unknown[]; totalKopecks: number }>('payments.list', { month });
+    return { payments: (env.data.payments ?? []).map(normPayment), totalKopecks: env.data.totalKopecks };
   }
 
   async listQuestions(): Promise<Question[]> {

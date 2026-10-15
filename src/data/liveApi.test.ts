@@ -226,4 +226,13 @@ describe('живой адаптер: чтение', () => {
     expect(s.sent[0]).toEqual({ v: 1, action: 'clients.revealPassword', payload: { id: 'C-1', confirm: true }, session: 'S1' });
     expect(r.ttlSeconds).toBe(30);
   });
+
+  it('платёж с пустыми клетками: дата и сумма → null, способ → «другое» (снимок, изменения, payments.list)', async () => {
+    const raw = { id: 'P-1', version: 1, clientId: null, kopecks: '', period: null, method: '', date: '', source: 'таблица' };
+    const s = server(ok({ clients: [], deadlines: [], payments: [raw], tasks: [], activity: [], cursor: 1 }), ok({ payments: [raw], totalKopecks: 0 }));
+    const api = new LiveApi(URL_, auth(), s.fetchImpl);
+    const want = { date: null, kopecks: null, method: 'other', period: '', clientId: '' };
+    expect((await api.snapshot()).payments[0]).toMatchObject(want);
+    expect((await api.listPayments('2026-10')).payments[0]).toMatchObject(want);
+  });
 });

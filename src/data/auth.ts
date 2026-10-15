@@ -19,8 +19,10 @@ interface Gis {
 const KEY = 'buh.session';
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
 const SILENT_MS = 15_000;
-/** nonce на сервере живёт 5 мин: экран входа берёт новый каждые 4 мин и при возврате во вкладку. */
-const REARM_MS = 4 * 60_000;
+/** nonce на сервере живёт 10 мин (v5.63): экран входа берёт новый через 8 мин — только если вход сейчас не идёт. */
+const REARM_MS = 8 * 60_000;
+/** После нажатия кнопки Google (окно выбора аккаунта открыто) код не трогаем столько, сколько длится выбор. */
+const ATTEMPT_MS = 3 * 60_000;
 
 function gis(): Gis | undefined {
   return (window as unknown as { google?: { accounts?: { id?: Gis } } }).google?.accounts?.id;
@@ -53,7 +55,7 @@ function readStored(): Stored | null {
 
 /** Понятный маме текст по коду отказа входа. */
 function loginMessage(e: unknown): string {
-  if (!(e instanceof ApiError)) return 'Не получилось войти — попробуйте ещё раз';
+  if (!(e instanceof ApiError)) return 'Нажмите кнопку «Войти через Google» ещё раз';
   if (e.code === 'FORBIDDEN') return 'У этого аккаунта Google нет доступа к кабинету. Войдите тем аккаунтом, который дал Дмитрий.';
   if (e.code === 'RATE_LIMIT') return 'Слишком много попыток входа — попробуйте через час';
   if (e.code === 'NETWORK') return 'Нет связи — проверьте интернет и попробуйте ещё раз';
@@ -81,6 +83,19 @@ export class Auth {
   private usedNonces = new Set<string>();
   private buttonEl: HTMLElement | null = null;
   private arming: Promise<void> | null = null;
+  /** Когда мама нажала кнопку Google: пока идёт выбор аккаунта, GIS не переинициализируем — новый initialize
+   *  отменяет открытый запрос FedCM (AbortError, 15.10.2026). 0 — вход сейчас не идёт. */
+  private attemptAt = 0;
+
+  /** Вход идёт: нажата кнопка (окно Google открыто) и ответа ещё нет. */
+  signingIn(now = Date.now()): boolean {
+    return this.attemptAt > 0 && now - this.attemptAt < ATTEMPT_MS;
+  }
+
+  /** Нажатие кнопки Google. Кнопка — iframe Google, её щелчок виден странице как уход фокуса со страницы (blur). */
+  markAttempt(): void {
+    if (this.buttonEl) { this.attemptAt = Date.now(); if (this.state.error) this.set({ ...this.state, error: null }); }
+  }
 
   /** Новый nonce и настройка GIS под него: initialize помнит только последний вызов, поэтому — перед каждой попыткой. */
   private async arm(): Promise<Gis> {
@@ -102,6 +117,7 @@ export class Auth {
           return;
         }
         this.usedNonces.add(nonce);
+        this.attemptAt = 0;
         void this.finish(r.credential ?? '', nonce);
       },
     });
@@ -109,7 +125,8 @@ export class Auth {
     return g;
   }
 
-  /** Свежий код входа и кнопка заново (если экран входа на месте). Параллельные вызовы сливаются в один. */
+  /** Свежий код входа и кнопка заново (если экран входа на месте). Параллельные вызовы сливаются в один.
+   *  prompt — только для тихого входа; на экране входа один запрос — кнопка (два запроса FedCM гасят друг друга). */
   private rearm(prompt = false): Promise<void> {
     this.arming ??= (async () => {
       try {
@@ -138,6 +155,8 @@ export class Auth {
       this.set({ status: 'signedIn', user: env.data.user, error: null });
       waiting?.resolve(env.data.session);
     } catch (e) {
+      // Код отказа — в консоль (без токена и почты): по нему видно, что именно не прошло.
+      console.warn('Вход: отказ', e instanceof ApiError ? e.code : e instanceof Error ? e.name : 'unknown');
       this.signOutLocal(loginMessage(e));
       waiting?.reject(e);
       // Код потрачен (или устарел) — сразу новый, чтобы следующее нажатие прошло.
@@ -150,7 +169,7 @@ export class Auth {
   mountButton(el: HTMLElement): Promise<void> {
     if (this.buttonEl === el && (this.arming || Date.now() - this.armedAt < REARM_MS)) return this.arming ?? Promise.resolve();
     this.buttonEl = el;
-    return this.rearm(true);
+    return this.rearm();
   }
 
   /** Экран входа ушёл — кнопку больше не перерисовываем. */
@@ -158,9 +177,9 @@ export class Auth {
     if (this.buttonEl === el) this.buttonEl = null;
   }
 
-  /** Пока виден экран входа: код старше 4 мин — взять новый (сервер держит его 5 мин). */
+  /** Пока виден экран входа и вход не идёт: код старше 8 мин — взять новый (сервер держит его 10 мин). */
   keepFresh(): void {
-    if (this.buttonEl && !this.arming && Date.now() - this.armedAt >= REARM_MS) void this.rearm();
+    if (this.buttonEl && !this.arming && !this.signingIn() && Date.now() - this.armedAt >= REARM_MS) void this.rearm();
   }
 
   /** Тихий вход, когда сеанс истёк посреди работы. Не вышло за 15 с — экран входа. */
