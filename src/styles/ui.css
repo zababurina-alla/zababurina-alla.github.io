@@ -737,3 +737,17 @@ p.empty {
     bottom: auto;
   }
 }
+
+/* Опасное действие при подтверждении («Да, закрыть 12»): второе нажатие — красная таблетка */
+.btn--danger {
+  border-color: transparent;
+  border-radius: var(--radius-full);
+  background: var(--st-red-ink);
+  color: var(--st-red-bg);
+  box-shadow: var(--shadow-1);
+  animation: warn-in var(--dur-pop) var(--spring-pop);
+}
+
+.btn--danger.btn--sm {
+  padding: 0 var(--space-4);
+}

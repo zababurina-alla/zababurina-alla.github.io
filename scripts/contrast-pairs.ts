@@ -15,6 +15,7 @@ export const PAIRS: Pair[] = [
   { fg: 'on-accent', bg: 'accent', where: 'текст на главной кнопке', kind: 'text' },
   { fg: 'accent', bg: 'accent-soft', where: 'пункт меню, инициалы клиента', kind: 'text' },
   { fg: 'on-btn', bg: 'btn', where: 'текст на главной кнопке-«таблетке»', kind: 'text' },
+  { fg: 'st-red-bg', bg: 'st-red-ink', where: 'кнопка «Да, закрыть N» (btn--danger)', kind: 'text' },
   { fg: 'wheat-ink', bg: 'wheat-soft', where: 'вопрос от Дмитрия, подсказка', kind: 'text' },
   { fg: 'wheat-ink', bg: 'surface', where: 'надзаголовок вопроса в панели', kind: 'text' },
   { fg: 'st-red-ink', bg: 'canvas', where: '«2 срока просрочены» в заголовке на фоне', kind: 'text' },

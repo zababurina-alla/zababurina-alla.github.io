@@ -260,13 +260,18 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                 <li key={p.id} className="plist__row"><span><strong className="display"><Money text={formatPayMoney(p.kopecks)} /></strong><span className="sub">{p.period}, {METHOD_LABEL[p.method]}</span></span><span className="num sub">{p.date ? fmtDate(p.date) : <span className="nil">без даты</span>}</span></li>
               ))}</ul>
             ) : <Empty pic="wallet" title="Платежей пока нет" />)}
-            {tab === 'history' && !cardNow && <p className="sub" role="status">Загружаем историю из таблицы…</p>}
-            {tab === 'history' && cardNow?.error && <p className="sub" role="alert">История не загрузилась: {cardNow.error}</p>}
+            {tab === 'history' && !cardNow && (
+              <div className="cp__loading" role="status" aria-label="Загружаем историю из таблицы">
+                <p className="sk-note"><Icon name="saving" />Загружаем историю из таблицы…</p>
+                {[0, 1, 2].map((i) => <div key={i} className="sk-row"><span className="sk sk--avatar" /><span className="sk sk--line" style={{ width: `${45 + i * 12}%` }} /></div>)}
+              </div>
+            )}
+            {tab === 'history' && cardNow?.error && <p className="offline" role="alert"><Icon name="warning" /><span>История не загрузилась: {cardNow.error}</span></p>}
             {tab === 'history' && cardNow?.history && (history.length ? (
               <ul className="feed">{history.map((a) => (
                 <li key={a.id} className="feed__item"><span className="feed__icon"><Icon name="clock" size={16} /></span><span className="feed__text"><TableText text={a.text} /><span className="sub">{fmtDate(a.when.slice(0, 10))}, {a.when.slice(11)}, {a.source}</span></span></li>
               ))}</ul>
-            ) : <p className="empty">Изменений пока не было. Журнал по клиентам ведётся с 15.10.2026 — правки с сайта, через бота и в таблице появятся здесь.</p>)}
+            ) : <Empty pic="tasks" title="Изменений пока не было">Журнал по клиентам ведётся с 15.10.2026 — правки с сайта, через бота и в таблице появятся здесь.</Empty>)}
           </div>
         </div>
       )}
