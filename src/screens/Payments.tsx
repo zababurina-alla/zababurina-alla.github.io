@@ -19,6 +19,7 @@ import { Empty } from '../ui/Empty';
 import { shortName } from '../ui/names';
 import { useUi } from '../app/ui-context';
 import { roAttrs } from '../ui/readonly';
+import { canWrite } from '../config';
 
 const SOURCE: Record<string, { icon: IconName; text: string }> = {
   'сайт': { icon: 'globe', text: 'с сайта' }, 'бот': { icon: 'bot', text: 'через бота' }, 'таблица': { icon: 'sheet', text: 'в таблице' },
@@ -48,6 +49,8 @@ export function Payments() {
   const current = monthKey(TODAY);
   const [month, setMonth] = useState(current);
   // Месяцы старше снимка: догружены ('ok'), не загрузились ('error'); нет записи — ещё не пришли.
+  // Отменить платёж можно не только в уведомлении (10 с): ошибочный платёж — из строки, вторым нажатием (payments.cancel).
+  const [cancelId, setCancelId] = useState<string | null>(null);
   const [months, setMonths] = useState<Record<string, 'ok' | 'error'>>({});
   const inflight = useRef(new Set<string>());
   const { loadPaymentsMonth } = store;
@@ -174,6 +177,11 @@ export function Payments() {
         {p.kopecks === null
           ? <span className="paylist__sum paylist__sum--none nil">сумма не указана</span>
           : <span className="paylist__sum display"><Money text={formatPayMoney(p.kopecks)} /></span>}
+        {canWrite('payments') && !p.save && (
+          <button type="button" className={`link paylist__cancel${cancelId === p.id ? ' is-sure' : ''}`}
+            onClick={() => { if (cancelId === p.id) { store.removePayment(p.id); setCancelId(null); } else setCancelId(p.id); }}>
+            {cancelId === p.id ? 'Да, отменить' : 'Отменить'}</button>
+        )}
       </li>
     );
   }
