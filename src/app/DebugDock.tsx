@@ -17,6 +17,7 @@ const EXTERNAL: { kind: ExternalKind; label: string }[] = [
   { kind: 'key', label: 'В таблице продлили ключ' },
   { kind: 'close', label: 'Бот закрыл срок' },
   { kind: 'phone', label: 'В таблице сменили телефон' },
+  { kind: 'inbox', label: 'Клиент написал в Telegram' },
 ];
 
 export function DebugDock() {

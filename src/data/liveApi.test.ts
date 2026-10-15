@@ -169,6 +169,23 @@ describe('живой адаптер: новые действия (очередь
   });
 });
 
+describe('живой адаптер: «Входящие»', () => {
+  it('inbox.decide: сумма передаётся, в ответе — сообщение и созданный платёж', async () => {
+    const it0 = { id: 'IN-1', at: '2026-10-15T09:00', clientId: 'C-1', clientName: 'Тест', type: 'payment', snippet: '1200', amount: 120000, status: 'accepted' };
+    const pay = { id: 'R30', version: 5, clientId: 'C-1', kopecks: 125000, period: 'x', method: 'bank', date: '2026-10-15', source: 'сайт' };
+    const s = server(ok({ inbox: it0, payment: pay, task: null }, 40));
+    const r = await new LiveApi(URL_, auth(), s.fetchImpl).write({ kind: 'decideInbox', requestId: 'R30', id: 'IN-1', action: 'accept', amount: 125000 });
+    expect(s.sent[0]).toMatchObject({ action: 'inbox.decide', requestId: 'R30', payload: { id: 'IN-1', action: 'accept', amount: 125000 } });
+    expect(r.ok && r.changes.map((c) => `${c.entity}:${c.id}`)).toEqual(['inbox:IN-1', 'payment:R30']);
+  });
+
+  it('без суммы поле amount не отправляется', async () => {
+    const s = server(ok({ inbox: { id: 'IN-2', status: 'rejected' } }));
+    await new LiveApi(URL_, auth(), s.fetchImpl).write({ kind: 'decideInbox', requestId: 'R31', id: 'IN-2', action: 'reject' });
+    expect(s.sent[0]?.payload).toEqual({ id: 'IN-2', action: 'reject' });
+  });
+});
+
 describe('живой адаптер: чтение', () => {
   it('изменения страницами до hasMore=false; незнакомую сущность пропускаем', async () => {
     const s = server(

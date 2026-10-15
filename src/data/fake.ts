@@ -1,7 +1,7 @@
 // Выдуманные данные прототипа. Ни один клиент не взят из таблицы; совпадения фамилий случайны.
 // Начисления посчитаны по ставкам 2026 из брифа (МЗП 8 647, ПМ 3 328, ЄСВ 22 % МЗП = 1 902,34) — только для вида;
 // на живых данных их считает сервер.
-import type { Activity, Client, Deadline, Payment, Question, Task } from './types';
+import type { Activity, Client, Deadline, InboxItem, Payment, Question, Task } from './types';
 
 const ESV = { name: 'ЄСВ', kopecks: 190234, note: '22 % МЗП' };
 const EP1 = { name: 'ЄП', kopecks: 33280, note: '10 % ПМ' };
@@ -81,6 +81,17 @@ export const TASKS: Task[] = [
   { id: 't3', version: 1, clientId: 'c5', text: 'Проверить новый КВЕД 47.91', due: '2026-10-17', priority: 'low', type: 'docs', done: false },
   { id: 't4', version: 1, clientId: 'c6', text: 'Напомнить об оплате ЄП за сентябрь', due: '2026-10-14', priority: 'critical', type: 'taxes', done: false },
   { id: 't5', version: 1, clientId: null, text: 'Сверить выписку Приватбанка за неделю', due: null, priority: 'medium', type: 'docs', done: false },
+];
+
+export const INBOX: InboxItem[] = [
+  { id: 'in1', at: '2026-10-14T08:52', clientId: 'c3', clientName: 'Калиновська Ірина', type: 'payment',
+    snippet: 'Добрий день! Оплатила ЄП за жовтень, 1 200 грн, квитанцію надішлю', amount: 120000, status: 'new' },
+  { id: 'in2', at: '2026-10-14T08:30', clientId: 'c12', clientName: 'Мирошниченко Ольга', type: 'document',
+    snippet: 'Надсилаю виписку з банку за вересень', amount: null, status: 'new' },
+  { id: 'in3', at: '2026-10-13T19:05', clientId: 'c5', clientName: 'Ясенко Микола', type: 'question',
+    snippet: 'Чи треба мені подавати щось через новий КВЕД?', amount: null, status: 'new' },
+  { id: 'in4', at: '2026-10-13T12:10', clientId: null, clientName: 'Невідомий номер +380…', type: 'who',
+    snippet: 'Добрий день, мені порадили вас як бухгалтера', amount: null, status: 'new' },
 ];
 
 export const QUESTIONS: Question[] = [

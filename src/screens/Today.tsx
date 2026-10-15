@@ -1,6 +1,7 @@
 // «Сегодня»: за 10 секунд понять день. Сверху — одна фраза о дне из чисел и четыре плашки срочности (они же фильтр),
 // ниже — что сдать по дням; сбоку — вопрос от Дмитрия, ключи ЭЦП, деньги месяца, что изменилось.
 import { useRef, useState, useEffect } from 'react';
+import { InboxCard } from './Inbox';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { useStore } from '../data/store';
@@ -15,7 +16,7 @@ import { shortName } from '../ui/names';
 import { play } from '../lib/sound';
 import { useUi } from '../app/ui-context';
 import { useToast } from '../ui/toast';
-import { canWrite } from '../config';
+import { canWrite, hasFeature } from '../config';
 import type { Question } from '../data/types';
 import { URGENCY_ICON } from './DeadlineTable';
 import { TableText } from '../ui/TableText';
@@ -214,6 +215,13 @@ export function Today() {
         </section>
 
         <div className="today-side">
+          {hasFeature('inbox') && store.inbox.some((i) => i.status === 'new') && (
+            <section className="panel reveal" aria-labelledby="t-inbox">
+              <header className="panel__head"><h2 id="t-inbox" className="panel__title">Новые от клиентов</h2><a className="link" href="#/inbox">Все входящие</a></header>
+              <ul className="inbox">{store.inbox.filter((i) => i.status === 'new').sort((a, b) => b.at.localeCompare(a.at)).slice(0, 3)
+                .map((it) => <InboxCard key={it.id} it={it} compact />)}</ul>
+            </section>
+          )}
           {store.questions.length > 0 && (
             <section className="panel panel--wheat reveal" aria-labelledby="t-q">
               <header className="panel__head">

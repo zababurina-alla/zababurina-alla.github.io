@@ -1,7 +1,7 @@
 // Видимая часть связи с таблицей: полоса «нет связи», окно конфликта версий, уведомления об отказах.
 import { useEffect, useRef } from 'react';
 import { useStore } from '../data/store';
-import { AREA_LABEL, readOnlyAreas } from '../config';
+import { AREA_LABEL, readOnlyAreas, visibleAreas } from '../config';
 import { Icon } from '../ui/Icon';
 import { Modal } from '../ui/Modal';
 import { useToast } from '../ui/toast';
@@ -73,7 +73,7 @@ export function ConflictDialog() {
 export function ReadOnlyBanner() {
   const areas = readOnlyAreas();
   if (!areas.length) return null;
-  const all = areas.length === 5;
+  const all = areas.length === visibleAreas().length;
   return (
     <div className="offline offline--info" role="status">
       <Icon name="sheet" />

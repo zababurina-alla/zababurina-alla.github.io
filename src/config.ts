@@ -4,14 +4,17 @@
 // Пустой адрес — сайт на выдуманном сервере (src/data/fakeServer.ts).
 
 /** Разделы, запись в которых можно включать по одному (сервер готовит их по очереди). */
-export type WriteArea = 'payments' | 'tasks' | 'questions' | 'deadlines' | 'clients';
-export const WRITE_AREAS: readonly WriteArea[] = ['payments', 'tasks', 'questions', 'deadlines', 'clients'];
+export type WriteArea = 'payments' | 'tasks' | 'questions' | 'deadlines' | 'clients' | 'inbox';
+export const WRITE_AREAS: readonly WriteArea[] = ['payments', 'tasks', 'questions', 'deadlines', 'clients', 'inbox'];
+
+/** Возможности, которые включаются, когда их готов отдавать сервер. На выдуманных данных — все. */
+export type Feature = 'inbox';
 
 /** OAuth client ID проекта Google Cloud «zababurina-alla» (…apps.googleusercontent.com). */
 export const GOOGLE_CLIENT_ID = '1078049272948-bnvonl9qah7npdq63gktbio1rm2lbgvb.apps.googleusercontent.com';
 
-interface Runtime { apiUrl: string; writes: WriteArea[] }
-let runtime: Runtime = { apiUrl: '', writes: [...WRITE_AREAS] };
+interface Runtime { apiUrl: string; writes: WriteArea[]; features: Feature[] }
+let runtime: Runtime = { apiUrl: '', writes: [...WRITE_AREAS], features: [] };
 
 const isArea = (x: unknown): x is WriteArea => typeof x === 'string' && (WRITE_AREAS as readonly string[]).includes(x);
 
@@ -25,10 +28,11 @@ export async function loadRuntimeConfig(fetchImpl: typeof fetch = fetch): Promis
     const local = r?.ok && (r.headers.get('content-type') ?? '').includes('json');
     if (!local) r = await fetchImpl('./config.json', { cache: 'no-store' });
     if (!r || !r.ok) return;
-    const j = await r.json() as { apiUrl?: unknown; writes?: unknown };
+    const j = await r.json() as { apiUrl?: unknown; writes?: unknown; features?: unknown };
     runtime = {
       apiUrl: typeof j.apiUrl === 'string' ? j.apiUrl.trim() : '',
       writes: Array.isArray(j.writes) ? j.writes.filter(isArea) : [...WRITE_AREAS],
+      features: Array.isArray(j.features) ? j.features.filter((f): f is Feature => f === 'inbox') : [],
     };
   } catch {
     // нет связи или файл битый — остаёмся на выдуманных данных
@@ -55,11 +59,21 @@ export function canWrite(area: WriteArea): boolean {
   return !isLive() || runtime.writes.includes(area);
 }
 
+/** Возможность включена: на выдуманных данных — всегда, на живых — если есть в config.json → features. */
+export function hasFeature(f: Feature): boolean {
+  return !isLive() || runtime.features.includes(f);
+}
+
+/** Разделы, которые сейчас есть на сайте: «Входящие» — только когда включены флагом. */
+export function visibleAreas(): WriteArea[] {
+  return WRITE_AREAS.filter((a) => a !== 'inbox' || hasFeature('inbox'));
+}
+
 /** Разделы, где на живых данных пока только просмотр. */
 export function readOnlyAreas(): WriteArea[] {
-  return isLive() ? WRITE_AREAS.filter((a) => !runtime.writes.includes(a)) : [];
+  return isLive() ? visibleAreas().filter((a) => !runtime.writes.includes(a)) : [];
 }
 
 export const AREA_LABEL: Record<WriteArea, string> = {
-  payments: 'платежи', tasks: 'задачи', questions: 'ответы на вопросы', deadlines: 'сроки', clients: 'клиенты',
+  payments: 'платежи', tasks: 'задачи', questions: 'ответы на вопросы', deadlines: 'сроки', clients: 'клиенты', inbox: 'входящие',
 };

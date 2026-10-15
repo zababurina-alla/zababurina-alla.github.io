@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { canWrite, isLive, loadRuntimeConfig, readOnlyAreas } from './config';
+import { canWrite, hasFeature, isLive, loadRuntimeConfig, readOnlyAreas } from './config';
 
 const fetchJson = (body: unknown, ok = true) => vi.fn(async () => new Response(typeof body === 'string' ? body : JSON.stringify(body), { status: ok ? 200 : 404 })) as unknown as typeof fetch;
 
@@ -25,6 +25,15 @@ describe('config.json', () => {
     expect(readOnlyAreas()).toHaveLength(5);
     await loadRuntimeConfig(fetchJson({ apiUrl: 'https://x/exec' }));
     expect(readOnlyAreas()).toEqual([]);
+  });
+
+  it('«Входящие» за флагом: на живых — только с features: ["inbox"], на выдуманных — всегда', async () => {
+    await loadRuntimeConfig(fetchJson({ apiUrl: 'https://x/exec', writes: [] }));
+    expect(hasFeature('inbox')).toBe(false);
+    await loadRuntimeConfig(fetchJson({ apiUrl: 'https://x/exec', features: ['inbox', 'лишнее'] }));
+    expect(hasFeature('inbox')).toBe(true);
+    await loadRuntimeConfig(fetchJson({ apiUrl: '' }));
+    expect(hasFeature('inbox')).toBe(true);
   });
 
   it('битый файл — остаёмся на выдуманных данных', async () => {

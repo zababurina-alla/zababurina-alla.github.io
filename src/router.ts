@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react';
 import { flushSync } from 'react-dom';
 
 // Маршруты через «#/…»: GitHub Pages отдаёт один index.html, и обновление страницы не даёт 404.
-export const ROUTES = ['today', 'clients', 'deadlines', 'payments', 'tasks', 'keys', 'reference', 'more', 'icons'] as const;
+export const ROUTES = ['today', 'inbox', 'clients', 'deadlines', 'payments', 'tasks', 'keys', 'reference', 'more', 'icons'] as const;
 export type RouteName = (typeof ROUTES)[number];
 
 export interface Route {

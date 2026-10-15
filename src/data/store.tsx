@@ -16,7 +16,7 @@ import { Outbox } from './outbox';
 import type { Counters, OutboxEvent, OutboxItem } from './outbox';
 import { newRequestId } from './api';
 import type { Change, DeadlinePatch, Snapshot, WriteOp } from './api';
-import type { Activity, Client, DatedDeadline, Deadline, Payment, Question, SaveState, Task } from './types';
+import type { Activity, Client, DatedDeadline, Deadline, InboxItem, Payment, Question, SaveState, Task } from './types';
 import { isDated } from './types';
 import { TODAY, addDays, fmtDate } from '../lib/dates';
 import { play } from '../lib/sound';
@@ -27,7 +27,7 @@ const POLL_MS = 30_000;
 const FRESH_MS = 2600;
 
 export type CloseResult = { ok: true } | { ok: false; reason: string };
-export type ExternalKind = 'payment' | 'key' | 'close' | 'phone';
+export type ExternalKind = 'payment' | 'key' | 'close' | 'phone' | 'inbox';
 
 /** Окончательный отказ таблицы (повтор не поможет): маме — что случилось, её словами. */
 export interface Notice { id: string; text: string }
@@ -53,6 +53,8 @@ interface Store {
   activity: Activity[];
   tasks: Task[];
   questions: Question[];
+  /** «Входящие» — сообщения клиентов из Telegram, превращённые в предложения. */
+  inbox: InboxItem[];
   notices: Notice[];
   /** Таблица не отдала данные при открытии (живой режим): текст для мамы; null — всё в порядке. */
   loadError: string | null;
@@ -83,6 +85,8 @@ interface Store {
   loadPaymentsMonth: (month: string) => Promise<number>;
   /** Открытые вопросы заново (questions.list) — без перезагрузки снимка. */
   refreshQuestions: () => Promise<void>;
+  /** Решение по сообщению из «Входящих» (inbox.decide). amount — копейки, если мама поправила сумму. */
+  decideInbox: (id: string, action: 'accept' | 'task' | 'reject', amount?: number) => void;
   /** Ответ на вопрос маме (questions.answer). */
   answerQuestion: (id: string, text: string, onSaved?: () => void) => void;
   dismissNotice: (id: string) => void;
@@ -105,7 +109,7 @@ const Ctx = createContext<Store | null>(null);
 
 const AREA_OF: Record<WriteOp['kind'], WriteArea> = {
   closeDeadline: 'deadlines', reopenDeadline: 'deadlines', addPayment: 'payments', cancelPayment: 'payments',
-  updateDeadline: 'deadlines', addClient: 'clients', updateClient: 'clients', createTask: 'tasks', completeTask: 'tasks', answerQuestion: 'questions',
+  updateDeadline: 'deadlines', addClient: 'clients', updateClient: 'clients', createTask: 'tasks', completeTask: 'tasks', answerQuestion: 'questions', decideInbox: 'inbox',
 };
 
 function upsert<T extends { id: string }>(xs: T[], rec: T): T[] {
@@ -135,6 +139,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [activity, setActivity] = useState<Activity[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [inbox, setInbox] = useState<InboxItem[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -206,6 +211,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       } else if (ch.entity === 'task') {
         if (ch.op === 'delete') setTasks((xs) => xs.filter((x) => x.id !== ch.id));
         else setTasks((xs) => upsert(xs, ch.record as Task));
+      } else if (ch.entity === 'inbox') {
+        // Решено здесь или в Telegram — приходит upsert со статусом; удалено — delete.
+        if (ch.op === 'delete') setInbox((xs) => xs.filter((x) => x.id !== ch.id));
+        else setInbox((xs) => upsert(xs, ch.record as InboxItem));
       } else if (ch.entity === 'question') {
         // На сайте — только открытые: отвеченный (здесь или в Telegram) уходит из списка.
         const rec = ch.record as Question | undefined;
@@ -244,6 +253,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setTasks((xs) => upsert(xs, op.task));
     } else if (op.kind === 'completeTask') {
       setTasks((xs) => xs.map((t) => (t.id === op.id ? { ...t, done: op.done } : t)));
+    } else if (op.kind === 'decideInbox') {
+      const status = op.action === 'accept' ? 'accepted' : op.action === 'task' ? 'task' : 'rejected';
+      setInbox((xs) => xs.map((x) => (x.id === op.id ? { ...x, status } : x)));
     } else if (op.kind === 'answerQuestion') {
       setQuestions((xs) => {
         const q = xs.find((x) => x.id === op.id);
@@ -288,6 +300,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           return final ? cs.filter((c) => c.requestId !== op.requestId) : cs.map((c) => (c.requestId === op.requestId ? { ...c, save: 'failed' } : c));
         });
       }
+      // Решение по сообщению не приняли — сообщение возвращается таким, какое оно на сервере (или снова «новое»).
+      if (op.kind === 'decideInbox' && final) {
+        const cur = e.result.current && 'snippet' in e.result.current ? e.result.current : null;
+        setInbox((xs) => xs.map((x) => (x.id === op.id ? (cur ?? { ...x, status: 'new' }) : x)));
+      }
       // Правку срока таблица не приняла — срок возвращается таким, какой он в таблице.
       if (op.kind === 'updateDeadline' && e.result.current && 'periodicity' in e.result.current) putOpen(e.result.current);
       // Отмену платежа сервер не выполнил — платёж возвращается на экран таким, каким он стал в таблице.
@@ -314,7 +331,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   // Загрузка: снимок таблицы, затем очередь, оставшаяся с прошлого раза (показываем её поверх снимка).
   const applySnapshot = useCallback((snap: Snapshot) => {
-    setClients(snap.clients); setPayments(snap.payments); setActivity(snap.activity); setTasks(snap.tasks); setQuestions(snap.questions);
+    setClients(snap.clients); setPayments(snap.payments); setActivity(snap.activity); setTasks(snap.tasks); setQuestions(snap.questions); setInbox(snap.inbox);
     const open = snap.deadlines.filter((d) => d.status !== 'done');
     setDeadlines(open.filter(isDated));
     setUndated(open.filter((d) => !isDated(d)));
@@ -545,6 +562,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     try { setQuestions(await api.listQuestions()); } catch { /* вопросы останутся из снимка */ }
   }, []);
 
+  const decideInbox = useCallback((id: string, action: 'accept' | 'task' | 'reject', amount?: number) => {
+    const it = inbox.find((x) => x.id === id);
+    const label = action === 'accept' ? `Принять: ${it?.clientName ?? 'сообщение'}` : action === 'task' ? `Задача из сообщения: ${it?.clientName ?? ''}` : `Отклонить: ${it?.clientName ?? 'сообщение'}`;
+    send({ kind: 'decideInbox', requestId: newRequestId(), id, action, ...(amount !== undefined ? { amount } : {}) }, label);
+  }, [inbox, send]);
+
   const answerQuestion = useCallback((id: string, text: string, onSaved?: () => void) => {
     send({ kind: 'answerQuestion', requestId: newRequestId(), id, text }, 'Ответ на вопрос', () => onSaved?.());
   }, [send]);
@@ -556,11 +579,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const setMaintenance = useCallback((on: boolean) => { fakeServer.maintenance = on; if (!on) void outboxRef.current?.kick(true); }, []);
 
   const value = useMemo<Store>(() => ({
-    loaded, online, clients, deadlines, undated, payments, activity, tasks, questions, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions,
+    loaded, online, clients, deadlines, undated, payments, activity, tasks, questions, inbox, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
+    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance,
-  }), [loaded, online, clients, deadlines, undated, payments, activity, tasks, questions, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions,
+  }), [loaded, online, clients, deadlines, undated, payments, activity, tasks, questions, inbox, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
+    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
