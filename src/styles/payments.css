@@ -256,3 +256,13 @@
   opacity: 0.35;
   cursor: default;
 }
+
+/* Месяц ещё грузится из таблицы (техника сайта): вместо суммы — спокойная строка с бегущим бликом */
+.pay-hero__value--wait {
+  position: relative;
+  overflow: hidden;
+  color: var(--ink-2);
+  font-family: var(--font);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+}

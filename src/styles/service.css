@@ -400,3 +400,26 @@
 @media (prefers-reduced-motion: reduce) {
   .login__button:empty::after { animation: none; display: none; }
 }
+
+/* «Входим… Таблица проверяет доступ» под кнопкой Google: место держим, чтобы карточка не прыгала */
+.login__status {
+  min-height: 1.5em;
+  margin: 0;
+  color: var(--ink-2);
+}
+
+.login__status:not(:empty)::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: var(--space-2);
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: 1px;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login__status:not(:empty)::before { animation: none; }
+}
