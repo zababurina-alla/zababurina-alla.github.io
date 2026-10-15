@@ -473,6 +473,7 @@ p.empty {
 
 .seg--fill .seg__opt {
   flex: 1;
+  white-space: nowrap;
   min-height: 2.5rem;
   padding: 0 var(--space-2);
   box-shadow: none;
@@ -706,4 +707,20 @@ p.empty {
 
 @keyframes draw {
   from { stroke-dashoffset: 24; }
+}
+
+/* Текст из таблицы со своим значком вместо эмодзи (<TableText>): значок — по смыслу, тихим цветом */
+.ttext {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.ttext__icon {
+  margin-top: 0.15em;
+  color: var(--ink-2);
+}
+
+.dtable__what .ttext__icon {
+  color: color-mix(in srgb, var(--accent) 70%, var(--ink-2));
 }

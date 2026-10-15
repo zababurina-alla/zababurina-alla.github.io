@@ -13,6 +13,8 @@ import { Empty } from '../ui/Empty';
 import { URGENCY_ICON } from './DeadlineTable';
 import { Modal } from '../ui/Modal';
 import { useUi } from '../app/ui-context';
+import { TableText } from '../ui/TableText';
+import { QuestionAnswer } from './Today';
 import { DeadlineTable } from './DeadlineTable';
 
 type Tab = 'overview' | 'deadlines' | 'payments' | 'history';
@@ -121,6 +123,9 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
 
   const own = c ? store.deadlines.filter((d) => d.clientId === c.id).sort((a, b) => a.due.localeCompare(b.due)) : [];
   const pays = c ? store.payments.filter((p) => p.clientId === c.id) : [];
+  // Всё про клиента на одном экране: его открытые задачи и вопросы Дмитрия о нём — прямо в обзоре.
+  const tasks = c ? store.tasks.filter((t) => t.clientId === c.id && !t.done) : [];
+  const questions = c ? store.questions.filter((q) => q.clientId === c.id) : [];
   const history = c ? store.activity.filter((a) => a.text.includes(c.name.split(' ')[0]?.slice(0, 5) ?? '#')) : [];
   const keyDays = c?.keyUntil ? daysBetween(TODAY, c.keyUntil) : null;
 
@@ -152,6 +157,38 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
             {tab === 'overview' && (
               <>
                 <section className="cp__block">
+                  <h3 className="cp__h">Ближайшие сроки{own.length > 3 && <button type="button" className="link cp__all" onClick={() => setTab('deadlines')}>все {own.length}</button>}</h3>
+                  <DeadlineTable items={own.slice(0, 3)} showClient={false} empty="Открытых сроков нет" />
+                </section>
+                {questions.length > 0 && (
+                  <section className="cp__block cp__questions">
+                    <h3 className="cp__h">Вопрос от Дмитрия</h3>
+                    {questions.map((q) => (
+                      <div key={q.id} className="question">
+                        <p className="question__text"><TableText text={q.text} /></p>
+                        <QuestionAnswer q={q} />
+                      </div>
+                    ))}
+                  </section>
+                )}
+                {tasks.length > 0 && (
+                  <section className="cp__block">
+                    <h3 className="cp__h">Задачи по клиенту</h3>
+                    <ul className="tasks cp__tasks">
+                      {tasks.map((t) => (
+                        <li key={t.id} className="tasks__row">
+                          <button type="button" className="check-btn tasks__check" aria-pressed={false} aria-label={`Сделано: ${t.text}`}
+                            onClick={() => store.toggleTask(t.id, true)}>
+                            <span className="check-btn__ring" aria-hidden="true"><Icon name="check" size={16} /></span>
+                          </button>
+                          <span className="tasks__text"><TableText text={t.text} /></span>
+                          {t.due && <span className={`tasks__when due--${statusByDays(daysBetween(TODAY, t.due))}`}>{daysLabel(daysBetween(TODAY, t.due))}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+                <section className="cp__block">
                   <h3 className="cp__h">Начисления в месяц</h3>
                   {c.monthly.length ? (
                     <dl className="charges">
@@ -176,10 +213,6 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                   <h3 className="cp__h">КВЕД</h3>
                   {c.kved.length ? <ul className="kved">{c.kved.map((k) => <li key={k.code}><span className="num kved__code">{k.code}</span>{k.title}</li>)}</ul> : <p className="nil">КВЕД в таблице не указан</p>}
                 </section>
-                <section className="cp__block">
-                  <h3 className="cp__h">Ближайшие сроки</h3>
-                  <DeadlineTable items={own.slice(0, 3)} showClient={false} empty="Открытых сроков нет" />
-                </section>
               </>
             )}
             {tab === 'deadlines' && <DeadlineTable items={own} showClient={false} empty="Открытых сроков нет" />}
@@ -190,7 +223,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
             ) : <Empty pic="wallet" title="Платежей пока нет" />)}
             {tab === 'history' && (history.length ? (
               <ul className="feed">{history.map((a) => (
-                <li key={a.id} className="feed__item"><span className="feed__icon"><Icon name="clock" size={16} /></span><span className="feed__text">{a.text}<span className="sub">{fmtDate(a.when.slice(0, 10))}, {a.when.slice(11)}, {a.source}</span></span></li>
+                <li key={a.id} className="feed__item"><span className="feed__icon"><Icon name="clock" size={16} /></span><span className="feed__text"><TableText text={a.text} /><span className="sub">{fmtDate(a.when.slice(0, 10))}, {a.when.slice(11)}, {a.source}</span></span></li>
               ))}</ul>
             ) : <p className="empty">Изменений пока не было</p>)}
           </div>

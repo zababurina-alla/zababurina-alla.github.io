@@ -15,6 +15,8 @@ import type { IconName } from '../ui/Icon';
 import { reducedMotion } from '../ui/kit';
 import { Modal } from '../ui/Modal';
 import { useToast } from '../ui/toast';
+import { TableText } from '../ui/TableText';
+import { OBLIGATION, obligationOf } from '../ui/obligation';
 import { useUi } from '../app/ui-context';
 
 // Мини-справочник КВЕД для прототипа. На живых данных — поиск по листу 📑 КВЕДы через API.
@@ -247,7 +249,7 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
             <p className="created__lead"><span className="created__ok"><Icon name="check" /></span><span><strong>{result.client.name}</strong> записан в таблицу. Система сама создала сроки:</span></p>
             <ul className="created__list">
               {(result.created ?? []).map((d, i) => (
-                <li key={d.id} className="created__item" style={{ animationDelay: `${120 * i + 150}ms` }}><Icon name="calendar" size={18} /><span>{d.what}</span><span className="num sub">до {fmtDue(d.due)}</span></li>
+                <li key={d.id} className="created__item" style={{ animationDelay: `${120 * i + 150}ms` }}><TableText text={d.what} fallback={OBLIGATION[obligationOf(d.what)].icon} /><span className="num sub">до {fmtDue(d.due)}</span></li>
               ))}
             </ul>
           </div>

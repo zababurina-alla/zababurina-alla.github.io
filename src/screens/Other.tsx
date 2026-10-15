@@ -13,6 +13,7 @@ import { Avatar, Money, SaveBadge } from '../ui/kit';
 import { Empty } from '../ui/Empty';
 import { shortName } from '../ui/names';
 import { useUi } from '../app/ui-context';
+import { TableText } from '../ui/TableText';
 import { URGENCY_ICON } from './DeadlineTable';
 
 // Группы ключей — шкала словаря (п. 1): просрочен, горит 0–7, скоро 8–30, в порядке; «нет ключа» — ⚪ (п. 3, № 79).
@@ -198,7 +199,7 @@ export function Tasks() {
                     </button>
                     <span className="tasks__text">
                       {t.priority !== 'medium' && !t.done && <Icon name={PRIORITY_ICON[t.priority]} size={18} className={`prio prio--${t.priority}`} label={PRIORITY_LABEL[t.priority]} />}
-                      <span>{t.text}</span>
+                      <TableText text={t.text} />
                       {c && <button type="button" className="link tasks__client" onClick={() => ui.openClient(c.id)}>{shortName(c.name)}</button>}
                     </span>
                     {saving ? <SaveBadge state="saving" offline={!store.online} />

@@ -12,6 +12,8 @@ import type { IconName } from '../ui/Icon';
 import { Avatar, reducedMotion } from '../ui/kit';
 import { shortName } from '../ui/names';
 import { useUi } from '../app/ui-context';
+import { TableText } from '../ui/TableText';
+import { OBLIGATION, obligationOf } from '../ui/obligation';
 import { useCloseDeadline } from './useClose';
 
 gsap.registerPlugin(Flip);
@@ -74,7 +76,7 @@ export function DeadlineTable({ items, showClient = true, empty = 'Сроков 
               </span>
             )}
             <span role="cell" className="dtable__what c-what">
-              <span>{d.what}</span>
+              <TableText text={d.what} fallback={OBLIGATION[obligationOf(d.what)].icon} />
               {warn[d.id] && <span className="inline-warn" role="status"><Icon name="clock" size={16} />{warn[d.id]}</span>}
             </span>
             <span role="cell" className="dtable__due c-due">

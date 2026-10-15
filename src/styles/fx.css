@@ -256,6 +256,32 @@
   color: color-mix(in srgb, var(--dot-green) 60%, var(--ink-2));
 }
 
+/* ═════════ Микроанимации значков статуса ═════════
+   «Горит» — мягкий пульс (масштаб, только transform) раз в 2,4 с (только у горящих сроков в списке, чтобы глаз находил их сразу);
+   «Сдано / сделано» — галочка дорисовывается при появлении. */
+.dtable__due [data-icon='burning'],
+.mini__row [data-icon='burning'],
+.ctable__state [data-icon='burning'] {
+  transform-origin: 50% 50%;
+  animation: burn-pulse 2.4s var(--ease-out) infinite;
+}
+
+@keyframes burn-pulse {
+  0%, 40%, 100% { transform: scale(1); }
+  12% { transform: scale(1.18); }
+}
+
+.ttext [data-icon='done'] .icon__line path,
+.closed__check path {
+  stroke-dasharray: 24;
+  animation: draw 420ms var(--ease-out) 200ms both;
+}
+
+.fx-ghost svg {
+  flex: none;
+  margin-right: 6px;
+}
+
 /* ═════════ Меньше движения: те же сигналы, без перемещений ═════════ */
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-old(main),
@@ -291,7 +317,10 @@
   }
 
   .is-closing .check-btn__ring,
-  .is-closing .check-btn::after {
+  .is-closing .check-btn::after,
+  [data-icon='burning'],
+  .ttext [data-icon='done'] .icon__line path,
+  .closed__check path {
     animation: none;
   }
 }
