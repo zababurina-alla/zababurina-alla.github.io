@@ -193,7 +193,7 @@ export function Today() {
         <p className="eyebrow">{weekday(TODAY)} · {fmtDayMonth(TODAY)} {TODAY.slice(0, 4)}</p>
         <h1 id="t-hello" className="hero__title">{hello},<br /><em className={overdue.length ? 'is-red' : undefined}>{headline}</em></h1>
         <p className="hero__lede">{lede.join(' ')}</p>
-        <Hint id="today.tally">Нажмите плашку — в списке ниже останутся только эти сроки. Нажмите ещё раз — снова вся неделя.</Hint>
+        <Hint id="today.tally">Нажмите плашку — в списке останутся только эти сроки, ещё раз — вся неделя.</Hint>
         <div className="tallies" role="group" aria-label="Сроки по срочности — нажмите, чтобы показать">
           <Tally icon="overdue" tone="red" n={overdue.length} label="Просрочено" note="срок прошёл" pressed={filter === 'overdue'} onClick={() => toggle('overdue')} />
           <Tally icon="burning" tone="orange" n={burning.length} label="Горит" note="0–7 дней" pressed={filter === 'burning'} onClick={() => toggle('burning')} />
@@ -229,7 +229,7 @@ export function Today() {
               { id: 'month', label: '30 дней', count: withDays.filter((x) => x.days <= 30).length },
             ]} />
           </header>
-          {list.length > 0 && <Hint id="today.tick">Круг слева — «сдано и оплачено»: нажмите, когда отчёт сдан и налог оплачен. Ошиблись — «Отменить» 10 секунд. Наведите на строку — появятся «Позвонить», «Платёж» и «Действия».</Hint>}
+          {list.length > 0 && <Hint id="today.tick" after="today.tally">Круг слева — «сдано и оплачено». Ошиблись — «Отменить» 10 секунд. <span className="only-hover">Наведите на строку — появятся «Позвонить», «Платёж» и «Действия».</span><span className="only-touch">Звонок и платёж — в «Действия».</span></Hint>}
           <DayGroups items={list} empty={
             <Empty pic="calm" title={filter === 'week' ? 'На этой неделе сдавать нечего' : 'Здесь пусто'}>
               {filter === 'week' ? 'Ни просроченных, ни горящих сроков. Можно выдохнуть.' : 'Сроков с такой срочностью нет.'}
