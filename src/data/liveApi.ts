@@ -140,6 +140,10 @@ export class LiveApi implements CabinetApi {
           }, o);
           return { ok: true, changes: [up('task', env.data.task, env.cursor)], cursor: env.cursor };
         }
+        case 'updateDeadline': {
+          const env = await this.rpc<{ deadline: Deadline }>('deadlines.update', { id: op.id, baseVersion: op.baseVersion, patch: op.patch }, o);
+          return { ok: true, changes: [up('deadline', env.data.deadline, env.cursor)], cursor: env.cursor };
+        }
         case 'answerQuestion': {
           const env = await this.rpc<{ question: Question }>('questions.answer', { id: op.id, text: op.text }, o);
           return { ok: true, changes: [up('question', env.data.question, env.cursor)], cursor: env.cursor };
@@ -160,6 +164,16 @@ export class LiveApi implements CabinetApi {
       }
       return res;
     }
+  }
+
+  async listPayments(month: string): Promise<{ payments: Payment[]; totalKopecks: number }> {
+    const env = await this.rpc<{ payments: Payment[]; totalKopecks: number }>('payments.list', { month });
+    return env.data;
+  }
+
+  async listQuestions(): Promise<Question[]> {
+    const env = await this.rpc<{ questions: Question[] }>('questions.list', {});
+    return env.data.questions;
   }
 
   /** Счётчики сервера за день (только owner, контракт 8.8) — рядом со ступенями сайта. */

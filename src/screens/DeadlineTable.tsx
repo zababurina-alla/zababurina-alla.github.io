@@ -2,6 +2,7 @@
 // Строка: круглая галочка «Сдано и оплачено» слева (как дело в списке) → клиент → что сдать → когда.
 // Срочность — значком «цвет + форма» из словаря (просрочено ●!, горит ●◷, скоро ○◷, в порядке ○✓) и словами.
 import { useLayoutEffect, useRef } from 'react';
+import { DeadlineActions, StatusTag } from './DeadlineActions';
 import gsap from 'gsap';
 import { Flip } from 'gsap/Flip';
 import { useStore } from '../data/store';
@@ -74,7 +75,8 @@ export function DeadlineTable({ items, showClient = true, empty = 'Сроков 
               </span>
             )}
             <span role="cell" className="dtable__what c-what">
-              <span>{d.what}</span>
+              <span>{d.what} <StatusTag status={d.status} /></span>
+              <DeadlineActions d={d} />
               {warn[d.id] && <span className="inline-warn" role="status"><Icon name="clock" size={16} />{warn[d.id]}</span>}
             </span>
             <span role="cell" className="dtable__due c-due">

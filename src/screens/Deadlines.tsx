@@ -1,6 +1,10 @@
 // «Сроки»: календарь месяца + список по дням; закрытие одним нажатием, «Закрыто сегодня» с честным статусом.
 // Месяц считается от сегодняшней даты и листается ‹ › (раньше был жёстко «Октябрь 2026»).
 import { useRef, useState } from 'react';
+import { OBLIGATION_LABEL, obligationKind } from '../lib/obligation';
+import type { ObligationKind } from '../lib/obligation';
+import type { ClientKind, DatedDeadline, DeadlineStatus } from '../data/types';
+import { STATUS_LABEL } from './DeadlineActions';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { useStore } from '../data/store';
@@ -74,6 +78,16 @@ function Month({ picked, onPick }: { picked: string | null; onPick: (iso: string
   );
 }
 
+type OpenStatus = Exclude<DeadlineStatus, 'done'>;
+const OPEN_STATUSES: OpenStatus[] = ['new', 'inProgress', 'waiting', 'postponed'];
+type ClientGroup = 'fop' | 'tov' | 'other';
+const CLIENT_GROUP_LABEL: Record<ClientGroup, string> = { fop: 'ФОП', tov: 'ТОВ', other: 'Другие' };
+function clientGroup(kind: ClientKind | null): ClientGroup {
+  if (kind === 'fop1' || kind === 'fop2' || kind === 'fop3' || kind === 'fopGeneral') return 'fop';
+  if (kind === 'tov3' || kind === 'tovGeneral') return 'tov';
+  return 'other';
+}
+
 export function Deadlines() {
   const store = useStore();
   const scope = useRef<HTMLDivElement>(null);
@@ -85,9 +99,18 @@ export function Deadlines() {
     gsap.from('.reveal', { y: 14, opacity: 0, duration: 0.5, stagger: 0.05, ease: 'power3.out', clearProps: 'transform,opacity' });
   }, { scope });
 
+  const [kindF, setKindF] = useState<ObligationKind | 'all'>('all');
+  const [statusF, setStatusF] = useState<OpenStatus | 'all'>('all');
+  const [clientF, setClientF] = useState<ClientGroup | 'all'>('all');
+  // Фильтры по виду, статусу и типу клиента — поверх периода; счётчики периода считают уже отфильтрованное.
+  const passes = (d: DatedDeadline) => (kindF === 'all' || obligationKind(d.what) === kindF)
+    && (statusF === 'all' || d.status === statusF)
+    && (clientF === 'all' || clientGroup(store.client(d.clientId)?.kind ?? null) === clientF);
+  const pool = store.deadlines.filter(passes);
+  const filtered = kindF !== 'all' || statusF !== 'all' || clientF !== 'all';
   const fits = (days: number, r: Range) => (r === 'overdue' ? days < 0 : r === 'week' ? days <= 7 : r === 'month' ? days <= 30 : true);
-  const items = store.deadlines.filter((d) => (picked ? d.due === picked : fits(daysBetween(TODAY, d.due), range)));
-  const count = (r: Range) => store.deadlines.filter((d) => fits(daysBetween(TODAY, d.due), r)).length;
+  const items = pool.filter((d) => (picked ? d.due === picked : fits(daysBetween(TODAY, d.due), range)));
+  const count = (r: Range) => pool.filter((d) => fits(daysBetween(TODAY, d.due), r)).length;
   const overdue = count('overdue');
 
   return (
@@ -113,6 +136,24 @@ export function Deadlines() {
                 { id: 'all', label: 'Все', count: count('all') },
               ]} />}
           </header>
+          <div className="dfilters" role="group" aria-label="Фильтры сроков">
+            <label><span className="sub">Вид</span>
+              <select className="input input--sm" value={kindF} onChange={(e) => setKindF(e.target.value as ObligationKind | 'all')}>
+                <option value="all">Все</option>
+                {(Object.keys(OBLIGATION_LABEL) as ObligationKind[]).map((k) => <option key={k} value={k}>{OBLIGATION_LABEL[k]}</option>)}
+              </select></label>
+            <label><span className="sub">Статус</span>
+              <select className="input input--sm" value={statusF} onChange={(e) => setStatusF(e.target.value as OpenStatus | 'all')}>
+                <option value="all">Все</option>
+                {OPEN_STATUSES.map((st) => <option key={st} value={st}>{STATUS_LABEL[st]}</option>)}
+              </select></label>
+            <label><span className="sub">Клиент</span>
+              <select className="input input--sm" value={clientF} onChange={(e) => setClientF(e.target.value as ClientGroup | 'all')}>
+                <option value="all">Все</option>
+                {(Object.keys(CLIENT_GROUP_LABEL) as ClientGroup[]).map((g) => <option key={g} value={g}>{CLIENT_GROUP_LABEL[g]}</option>)}
+              </select></label>
+            {filtered && <button type="button" className="link" onClick={() => { setKindF('all'); setStatusF('all'); setClientF('all'); }}>Сбросить</button>}
+          </div>
           <DayGroups items={items} empty={
             <Empty pic="calm" title={picked ? 'В этот день сроков нет' : 'На этот период открытых сроков нет'}>
               {picked ? 'Выберите другой день в календаре.' : 'Всё сдано. Новые сроки система создаст сама.'}

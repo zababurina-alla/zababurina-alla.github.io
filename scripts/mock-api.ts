@@ -15,6 +15,8 @@ interface Ctx {
 }
 interface FakeLike {
   snapshot(): Promise<{ cursor: number } & Record<string, unknown>>;
+  listPayments(month: string): Promise<unknown>;
+  listQuestions(): Promise<unknown[]>;
   changesSince(c: number): Promise<{ changes: { cursor: number; entity: string; op: string; id: string; origin: string; record?: unknown }[]; cursor: number }>;
   write(op: Record<string, unknown>): Promise<{ ok: true; changes: { entity: string; op: string; id: string; record?: { id: string } }[]; cursor: number; notifyAt?: string | null }
     | { ok: false; code: string; message: string; current?: unknown; retryAt?: string }>;
@@ -79,6 +81,8 @@ async function handle(ctx: Ctx, body: { action: string; payload?: Record<string,
     return env({ changes: r.changes.map((c) => ({ rev: c.cursor, entity: c.entity, op: c.op, id: c.id, origin: c.origin, record: c.record })), cursor: r.cursor, hasMore: false }, r.cursor);
   }
   if (body.action === 'diag.counters') return env({ received: ctx.counters.received, applied: ctx.counters.applied, rejectedByCode: ctx.counters.rejectedByCode, repeats: ctx.counters.repeats }, 0);
+  if (body.action === 'payments.list') return env(await f.listPayments(String(p.month ?? '')), 0);
+  if (body.action === 'questions.list') return env({ questions: await f.listQuestions() }, 0);
   if (body.action === 'clients.revealPassword') return env({ login: 'учебный-логин', password: 'учебный-пароль', ttlSeconds: 30 }, 0);
 
   const rid = body.requestId ?? randomUUID();
@@ -92,6 +96,7 @@ async function handle(ctx: Ctx, body: { action: string; payload?: Record<string,
     'payments.cancel': () => ({ kind: 'cancelPayment', id: p.id, baseVersion: p.baseVersion }),
     'clients.create': () => ({ kind: 'addClient', client: { ...(p.client as object), id: 'tmp', version: 0, monthly: [] } }),
     'clients.update': () => ({ kind: 'updateClient', id: p.id, baseVersion: p.baseVersion, patch: p.patch }),
+    'deadlines.update': () => ({ kind: 'updateDeadline', id: p.id, baseVersion: p.baseVersion, patch: p.patch }),
     'tasks.create': () => ({ kind: 'createTask', task: { ...(p.task as object), version: 1, done: false } }),
     'tasks.complete': () => ({ kind: 'completeTask', id: p.id, done: p.done }),
     'questions.answer': () => ({ kind: 'answerQuestion', id: p.id, text: p.text }),
@@ -114,6 +119,7 @@ async function handle(ctx: Ctx, body: { action: string; payload?: Record<string,
     case 'payments.create': return env({ payment: recs('payment')[0] }, r.cursor);
     case 'payments.cancel': return env({ cancelled: p.id }, r.cursor);
     case 'questions.answer': return env({ question: recs('question')[0] }, r.cursor);
+    case 'deadlines.update': return env({ deadline: recs('deadline')[0] }, r.cursor);
     case 'clients.create':
     case 'clients.update': return env({ client: recs('client')[0], createdDeadlines: recs('deadline') }, r.cursor);
     default: return env({ task: recs('task')[0] }, r.cursor);

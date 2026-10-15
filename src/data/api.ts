@@ -1,6 +1,6 @@
 // Интерфейс данных кабинета — тот же, что будет у JSON-API в Apps Script (контракт: docs/api-contract.md, этап 3).
 // Сейчас его реализует fakeServer.ts (выдуманная «таблица»); на этапе 4 — живой адаптер. Экраны знают только это.
-import type { Activity, Client, Deadline, Payment, Question, Task } from './types';
+import type { Activity, Client, Deadline, DeadlineStatus, Payment, Question, Task } from './types';
 
 /** Снимок данных при открытии кабинета. cursor — номер последнего изменения в таблице (выдаёт сервер, не часы браузера). */
 export interface Snapshot {
@@ -34,7 +34,9 @@ export type WriteOp =
   | { kind: 'addPayment'; requestId: string; payment: Payment }
   | { kind: 'cancelPayment'; requestId: string; id: string; baseVersion: number }
   | { kind: 'addClient'; requestId: string; client: Client }
-  | { kind: 'updateClient'; requestId: string; id: string; baseVersion: number; patch: Partial<Pick<Client, 'phone' | 'keyIssuer' | 'keyUntil'>> }
+  | { kind: 'updateClient'; requestId: string; id: string; baseVersion: number; patch: Partial<Pick<Client, 'phone' | 'keyIssuer' | 'keyFrom' | 'keyUntil'>> }
+  /** deadlines.update (контракт 8.3): дата, статус (кроме done — закрытие только close), заметка. */
+  | { kind: 'updateDeadline'; requestId: string; id: string; baseVersion: number; patch: DeadlinePatch }
   | { kind: 'createTask'; requestId: string; task: Task }
   | { kind: 'completeTask'; requestId: string; id: string; done: boolean }
   | { kind: 'answerQuestion'; requestId: string; id: string; text: string };
@@ -54,11 +56,17 @@ export type WriteResult =
       /** MAINTENANCE: когда ночные задачи закончатся (флаг сервера, не часы) — раньше не повторять. */
       retryAt?: string };
 
+export interface DeadlinePatch { due?: string; status?: Exclude<DeadlineStatus, 'done'>; note?: string }
+
 export interface CabinetApi {
   snapshot(): Promise<Snapshot>;
   changesSince(cursor: number): Promise<{ changes: Change[]; cursor: number }>;
   /** Ответ приходит только после записи в таблицу и логики системы (автоцикл, пересчёт ЄП, аудит). */
   write(op: WriteOp): Promise<WriteResult>;
+  /** payments.list — месяц вне снимка (снимок держит 90 дней). month: «2026-06». */
+  listPayments(month: string): Promise<{ payments: Payment[]; totalKopecks: number }>;
+  /** questions.list — открытые вопросы без перезагрузки снимка. */
+  listQuestions(): Promise<Question[]>;
 }
 
 export function newRequestId(): string {

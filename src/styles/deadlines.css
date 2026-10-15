@@ -499,3 +499,41 @@
   margin: 0;
   padding: 0 var(--space-5) var(--space-3);
 }
+
+/* Действия со сроком (DeadlineActions, техника сайта): раскрываются в строке. Оформление — за отделом дизайна. */
+.dactions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.dactions__date {
+  display: grid;
+  gap: 2px;
+}
+
+.dactions__toggle {
+  margin-left: var(--space-1);
+  vertical-align: middle;
+}
+
+.tag--status {
+  margin-left: var(--space-1);
+  font-size: 0.8125rem;
+}
+
+/* Фильтры сроков (техника сайта): вид, статус, тип клиента. Оформление — за отделом дизайна. */
+.dfilters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  padding: 0 var(--space-5) var(--space-3);
+}
+
+.dfilters label {
+  display: grid;
+  gap: 2px;
+}

@@ -1,6 +1,6 @@
 // «Сегодня»: за 10 секунд понять день. Сверху — одна фраза о дне из чисел и четыре плашки срочности (они же фильтр),
 // ниже — что сдать по дням; сбоку — вопрос от Дмитрия, ключи ЭЦП, деньги месяца, что изменилось.
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { useStore } from '../data/store';
@@ -120,6 +120,9 @@ function Tally({ icon, tone, n, label, note, pressed, onClick, href }: {
 
 export function Today() {
   const store = useStore();
+  // Новые вопросы от Дмитрия — при открытии «Сегодня» (не чаще раза в 2 мин, см. store.refreshQuestions).
+  const { refreshQuestions, loaded } = store;
+  useEffect(() => { if (loaded) void refreshQuestions(); }, [loaded, refreshQuestions]);
   const ui = useUi();
   const scope = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLElement>(null);

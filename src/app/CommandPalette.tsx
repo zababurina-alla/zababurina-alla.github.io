@@ -43,7 +43,8 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     { id: 'r-ref', group: 'Разделы', label: 'Справочник', icon: 'reference', run: () => navigate('#/reference') },
   ];
   const clients: Item[] = q
-    ? search(store.clients.map((c) => ({ ...c, extra: [...c.kved.map((k) => k.code), c.phone] })), q).slice(0, 6)
+    ? search(store.clients.map((c) => ({ ...c, extra: [...c.kved.map((k) => k.code), c.phone],
+      words: [...c.kved.map((k) => k.title), c.keyIssuer, ...store.deadlines.filter((d) => d.clientId === c.id).map((d) => d.what)] })), q).slice(0, 6)
       .map((c) => ({ id: c.id, group: 'Клиенты', label: c.name, hint: kindLabel(c.kind), icon: 'fop' as IconName, run: () => ui.openClient(c.id) }))
     : [];
   const items = [...clients, ...actions.filter((a) => !q || fold(a.label).includes(fold(q)))];

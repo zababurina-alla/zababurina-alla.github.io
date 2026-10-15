@@ -46,6 +46,8 @@ export interface Searchable {
   id: string;
   name: string;
   extra?: string[]; // ІПН, КВЕД, телефон
+  /** Второй уровень: название КВЕД, где выпущен ключ, тексты сроков — ищется, только если по имени ничего нет. */
+  words?: string[];
 }
 
 /** Подходит ли запись под запрос: каждое слово запроса — начало какого-то слова записи (после сведения букв и основы). */
@@ -65,6 +67,32 @@ export function matches(item: Searchable, query: string): boolean {
   });
 }
 
+// Второй уровень: таблица по-украински, мама пишет и по-русски («программирование» ↔ «програмування»):
+// сводим удвоенные буквы и засчитываем слово, если оно начало слова записи или у них общее начало от 6 букв.
+function wordForm(word: string): string {
+  return stem(fold(word)).replace(/(.)\1/g, '$1');
+}
+
+function wordHit(q: string, h: string): boolean {
+  if (h.startsWith(q) || (h.length >= 4 && q.startsWith(h))) return true;
+  let i = 0;
+  while (i < q.length && i < h.length && q[i] === h[i]) i++;
+  return i >= 6;
+}
+
+/** Сколько слов запроса (от 3 букв, не цифры) нашлось в словах записи второго уровня. */
+export function wordHits(item: Searchable, query: string): number {
+  const hay = (item.words ?? []).flatMap((t) => fold(t).split(/[\s,.;:()«»—-]+/)).filter((w) => w.length >= 3).map(wordForm);
+  if (!hay.length) return 0;
+  const words = fold(query).split(' ').filter((w) => w.length >= 3 && !/^\d/.test(w)).map(wordForm);
+  return words.filter((w) => hay.some((h) => wordHit(w, h))).length;
+}
+
+/** Сначала — по имени, коду и телефону (точно). Ничего не нашлось — по названию КВЕД, банку ключа, текстам сроков,
+ *  лучшие совпадения первыми. */
 export function search<T extends Searchable>(items: T[], query: string): T[] {
-  return items.filter((it) => matches(it, query));
+  const direct = items.filter((it) => matches(it, query));
+  if (direct.length || !query.trim()) return direct;
+  return items.map((it) => ({ it, n: wordHits(it, query) })).filter((x) => x.n > 0)
+    .sort((a, b) => b.n - a.n).map((x) => x.it);
 }

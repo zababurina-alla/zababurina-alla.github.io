@@ -146,6 +146,29 @@ describe('живой адаптер: записи', () => {
   });
 });
 
+describe('живой адаптер: новые действия (очередь 15.10)', () => {
+  it('срок: deadlines.update с baseVersion и patch; ответ — upsert срока', async () => {
+    const s = server(ok({ deadline: { ...dl('D-3'), status: 'postponed', due: '2026-11-01', version: 9 } }, 30));
+    const r = await new LiveApi(URL_, auth(), s.fetchImpl).write({ kind: 'updateDeadline', requestId: 'R20', id: 'D-3', baseVersion: 3, patch: { status: 'postponed', due: '2026-11-01' } });
+    expect(s.sent[0]).toMatchObject({ action: 'deadlines.update', requestId: 'R20', payload: { id: 'D-3', baseVersion: 3, patch: { status: 'postponed', due: '2026-11-01' } } });
+    expect(r.ok && r.changes[0]).toMatchObject({ entity: 'deadline', id: 'D-3', record: { status: 'postponed' } });
+  });
+
+  it('платежи месяца: payments.list { month } без requestId', async () => {
+    const s = server(ok({ payments: [], totalKopecks: 0 }));
+    const r = await new LiveApi(URL_, auth(), s.fetchImpl).listPayments('2026-06');
+    expect(s.sent[0]).toEqual({ v: 1, action: 'payments.list', payload: { month: '2026-06' }, session: 'S1' });
+    expect(r.totalKopecks).toBe(0);
+  });
+
+  it('вопросы: questions.list', async () => {
+    const s = server(ok({ questions: [{ id: 'Q-9' }] }));
+    const r = await new LiveApi(URL_, auth(), s.fetchImpl).listQuestions();
+    expect(s.sent[0]?.action).toBe('questions.list');
+    expect(r.map((q) => q.id)).toEqual(['Q-9']);
+  });
+});
+
 describe('живой адаптер: чтение', () => {
   it('изменения страницами до hasMore=false; незнакомую сущность пропускаем', async () => {
     const s = server(

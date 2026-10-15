@@ -1,5 +1,6 @@
 // Карточка клиента — выезжает справа (на телефоне — во весь экран). Вкладки: обзор, сроки, платежи, история.
 import { useEffect, useRef, useState } from 'react';
+import { KeyRenew } from './KeyRenew';
 import { canWrite } from '../config';
 import gsap from 'gsap';
 import { kindLabel } from '../data/fake';
@@ -167,7 +168,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                 </section>
                 <section className="cp__block cp__facts">
                   <div><h3 className="cp__h">Ключ ЭЦП</h3>{keyDays === null ? <p className="cp__key"><Icon name="inactive" size={18} className="urgency--grey" /><span className="nil">ключа нет в таблице</span></p>
-                    : <p className="cp__key"><Icon name={URGENCY_ICON[statusByDays(keyDays)]} size={18} className={`urgency--${statusByDays(keyDays)}`} /><span className="num">до {fmtDate(c.keyUntil ?? '')}</span><span className={`due--${statusByDays(keyDays)}`}>{daysLabel(keyDays)}</span></p>}</div>
+                    : <p className="cp__key"><Icon name={URGENCY_ICON[statusByDays(keyDays)]} size={18} className={`urgency--${statusByDays(keyDays)}`} /><span className="num">до {fmtDate(c.keyUntil ?? '')}</span><span className={`due--${statusByDays(keyDays)}`}>{daysLabel(keyDays)}</span></p>}<KeyRenew c={c} /></div>
                   <div><h3 className="cp__h">Ключ выпущен</h3><p>{c.keyIssuer || <span className="nil">не указано</span>}</p></div>
                   <div><h3 className="cp__h">Телефон</h3><PhoneField clientId={c.id} phone={c.phone} version={c.version} /></div>
                   <div><h3 className="cp__h">Пароль от кабинета</h3><PasswordReveal clientId={c.id} /></div>
