@@ -86,8 +86,9 @@ function normRecord(entity: Entity, raw: unknown): NonNullable<Change['record']>
   if (entity === 'task') { const t = raw as Task; return { ...t, text: t.text ?? '' }; }
   if (entity === 'inbox') {
     const i = raw as InboxItem & { file?: unknown; taxKopecks?: unknown; amount?: unknown };
+    const iso = (x: unknown) => (typeof x === 'string' && x ? x : null);
     return { ...i, at: i.at ?? '', snippet: i.snippet ?? '', clientName: i.clientName ?? '', file: i.file === true,
-      amount: num(i.amount), taxKopecks: num(i.taxKopecks) };
+      amount: num(i.amount), taxKopecks: num(i.taxKopecks), decidedAt: iso(i.decidedAt), repliedAt: iso(i.repliedAt) };
   }
   return raw as Deadline | Payment | Activity | Task | Question | InboxItem;
 }

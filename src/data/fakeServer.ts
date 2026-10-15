@@ -234,7 +234,7 @@ class FakeServer implements CabinetApi {
           this.tasks.set(t.id, t);
           changes.push(this.record('task', 'upsert', t.id, o, t));
         }
-        const upd: InboxItem = { ...it, status, version: this.cursor + 1 };
+        const upd: InboxItem = { ...it, status, version: this.cursor + 1, decidedAt: now() };
         this.inbox.set(it.id, upd);
         changes.push(this.record('inbox', 'upsert', it.id, o, upd));
         return { ok: true, changes, cursor: this.cursor };

@@ -132,6 +132,10 @@ export interface InboxItem {
   file?: boolean;
   /** Смешанное сообщение: сумма налога, копейки — для «Задача по налогу» (taxTask). */
   taxKopecks?: number | null;
+  /** Когда решено (принято / задача / отклонено) — здесь или в Telegram. Нет — сервер ещё не отдаёт. */
+  decidedAt?: string | null;
+  /** Когда мама ответила клиенту в Telegram (текст ответа сайту не нужен). Нет — неизвестно. */
+  repliedAt?: string | null;
 }
 
 export interface Activity {
