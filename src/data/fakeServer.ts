@@ -246,6 +246,22 @@ class FakeServer implements CabinetApi {
         this.tasks.set(t.id, upd);
         return { ok: true, changes: [this.record('task', 'upsert', t.id, o, upd)], cursor: this.cursor };
       }
+      case 'updateTask': {
+        const t = this.tasks.get(op.id);
+        if (!t) return { ok: false, code: 'NOT_FOUND', message: 'Этой задачи уже нет' };
+        if (t.version !== op.baseVersion) return { ok: false, code: 'CONFLICT', message: 'Задача изменилась в таблице', current: { ...t } };
+        if (t.done) return { ok: false, code: 'VALIDATION', message: 'Сделанную задачу править нельзя — сначала верните её в работу' };
+        const upd: Task = { ...t, ...op.patch, version: this.cursor + 1 };
+        this.tasks.set(t.id, upd);
+        return { ok: true, changes: [this.record('task', 'upsert', t.id, o, upd)], cursor: this.cursor };
+      }
+      case 'deleteTask': {
+        const t = this.tasks.get(op.id);
+        if (!t) return { ok: false, code: 'NOT_FOUND', message: 'Этой задачи уже нет' };
+        if (t.version !== op.baseVersion) return { ok: false, code: 'CONFLICT', message: 'Задача изменилась в таблице', current: { ...t } };
+        this.tasks.delete(t.id);
+        return { ok: true, changes: [this.record('task', 'delete', t.id, o)], cursor: this.cursor };
+      }
       case 'updateDeadline': {
         const d = this.deadlines.get(op.id);
         if (!d) return { ok: false, code: 'NOT_FOUND', message: 'Этого срока уже нет' };

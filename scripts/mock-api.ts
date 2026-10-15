@@ -106,6 +106,8 @@ async function handle(ctx: Ctx, body: { action: string; payload?: Record<string,
     'deadlines.update': () => ({ kind: 'updateDeadline', id: p.id, baseVersion: p.baseVersion, patch: p.patch }),
     'tasks.create': () => ({ kind: 'createTask', task: { ...(p.task as object), version: 1, done: false } }),
     'tasks.complete': () => ({ kind: 'completeTask', id: p.id, done: p.done }),
+    'tasks.update': () => ({ kind: 'updateTask', id: p.id, baseVersion: p.baseVersion, patch: p.patch }),
+    'tasks.delete': () => ({ kind: 'deleteTask', id: p.id, baseVersion: p.baseVersion }),
     'questions.answer': () => ({ kind: 'answerQuestion', id: p.id, text: p.text }),
     'inbox.decide': () => ({ kind: 'decideInbox', id: p.id, action: p.action, ...(p.amount !== undefined ? { amount: p.amount } : {}) }),
   };
@@ -130,15 +132,17 @@ async function handle(ctx: Ctx, body: { action: string; payload?: Record<string,
       const failed = (r as { failed?: { id: string; code: string; message: string }[] }).failed ?? [];
       const results = (p.items as { id: string }[]).map((it) => {
         const f = failed.find((x) => x.id === it.id);
-        if (f) return { id: it.id, ok: false, code: f.code, message: f.message };
+        if (f) return { id: it.id, ok: false, error: { code: f.code, message: f.message, detail: null, retryable: false, field: null, retryAt: null }, current: null };
         const closed = ds.find((d) => d.id === it.id);
         const next = ds.find((d) => d.id !== it.id && d.status !== 'done' && d.clientId === closed?.clientId && d.what === closed?.what) ?? null;
-        return { id: it.id, ok: true, closed, next };
+        return { id: it.id, ok: true, closed, next, notifyAt: null };
       });
       return env({ results, closed: results.filter((x) => x.ok).length, failed: failed.length }, r.cursor);
     }
     case 'payments.create': return env({ payment: recs('payment')[0] }, r.cursor);
     case 'payments.cancel': return env({ cancelled: p.id }, r.cursor);
+    case 'tasks.update': return env({ task: recs('task')[0] }, r.cursor);
+    case 'tasks.delete': return env({ deleted: p.id }, r.cursor);
     case 'questions.answer': return env({ question: recs('question')[0] }, r.cursor);
     case 'deadlines.update': return env({ deadline: recs('deadline')[0] }, r.cursor);
     case 'inbox.decide': return env({ inbox: recs('inbox')[0], payment: recs('payment')[0] ?? null, task: recs('task')[0] ?? null }, r.cursor);

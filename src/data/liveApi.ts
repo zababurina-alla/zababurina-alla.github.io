@@ -152,8 +152,8 @@ export class LiveApi implements CabinetApi {
           return { ok: true, changes, cursor: env.cursor, notifyAt: env.data.notifyAt };
         }
         case 'closeDeadlines': {
-          // Ответ { results[], closed, failed }: по каждому сроку — закрыт (closed + next) или отказ с кодом.
-          // Форма строки results — допущение (как у deadlines.close + { id, ok, code, message, current }).
+          // Ответ { results[], closed, failed } (форма подтверждена сервером 15.10): по каждому сроку
+          // { id, ok:true, closed, next, notifyAt } или { id, ok:false, error: { code, message, … }, current }.
           const env = await this.rpc<{ results?: unknown[] }>('deadlines.closeMany', { items: op.items }, o);
           const changes: Change[] = [];
           const failed: NonNullable<Extract<WriteResult, { ok: true }>['failed']> = [];
@@ -178,6 +178,14 @@ export class LiveApi implements CabinetApi {
           // Срок, о котором сервер ничего не сказал, не считаем закрытым.
           for (const it of op.items) if (!seen.has(it.id)) failed.push({ id: it.id, code: 'SERVER', message: 'Таблица не ответила по этому сроку' });
           return { ok: true, changes, cursor: env.cursor, failed };
+        }
+        case 'updateTask': {
+          const env = await this.rpc<{ task: Task }>('tasks.update', { id: op.id, baseVersion: op.baseVersion, patch: op.patch }, o);
+          return { ok: true, changes: [up('task', env.data.task, env.cursor)], cursor: env.cursor };
+        }
+        case 'deleteTask': {
+          const env = await this.rpc<{ deleted: string }>('tasks.delete', { id: op.id, baseVersion: op.baseVersion }, o);
+          return { ok: true, changes: [{ cursor: env.cursor, entity: 'task', op: 'delete', id: env.data.deleted, origin: o }], cursor: env.cursor };
         }
         case 'reopenDeadline': {
           const env = await this.rpc<{ reopened: Deadline }>('deadlines.reopen', { id: op.id, undoOf: op.undoOf }, o);
@@ -247,7 +255,7 @@ export class LiveApi implements CabinetApi {
       const res: WriteResult = { ok: false, code, message: e.message };
       if (e.retryAt) res.retryAt = e.retryAt;
       if (e.current && typeof e.current === 'object') {
-        res.current = 'kind' in e.current ? normClient(e.current) : e.current as Deadline | Payment | Question | InboxItem;
+        res.current = 'kind' in e.current ? normClient(e.current) : e.current as Deadline | Payment | Question | InboxItem | Task;
       }
       return res;
     }

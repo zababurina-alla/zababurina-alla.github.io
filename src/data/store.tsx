@@ -16,7 +16,7 @@ import { readSnap, saveSnap } from './snapCache';
 import { Outbox } from './outbox';
 import type { Counters, OutboxEvent, OutboxItem } from './outbox';
 import { newRequestId } from './api';
-import type { Change, DeadlinePatch, Snapshot, WriteOp, WriteResult } from './api';
+import type { Change, DeadlinePatch, Snapshot, TaskPatch, WriteOp, WriteResult } from './api';
 import type { Activity, Client, DatedDeadline, Deadline, InboxItem, Payment, Question, SaveState, Task } from './types';
 import { isDated } from './types';
 import { TODAY, addDays, fmtDate, plural } from '../lib/dates';
@@ -98,6 +98,10 @@ interface Store {
   decideInbox: (id: string, action: 'accept' | 'task' | 'reject', amount?: number) => void;
   /** clients.get: карточка целиком — строка клиента, его платежи и задачи дополняют общие списки; история — в ответе. */
   loadClientCard: (id: string) => Promise<Activity[]>;
+  /** Поправить задачу (tasks.update): текст, срок, приоритет, тип, клиент; null очищает срок/клиента. */
+  updateTask: (id: string, patch: TaskPatch) => void;
+  /** Удалить задачу (tasks.delete). «Вернуть» нет — на экране подтверждение перед удалением. */
+  deleteTask: (id: string) => void;
   /** Ответ на вопрос маме (questions.answer). */
   answerQuestion: (id: string, text: string, onSaved?: () => void) => void;
   dismissNotice: (id: string) => void;
@@ -119,7 +123,7 @@ interface Store {
 const Ctx = createContext<Store | null>(null);
 
 const AREA_OF: Record<WriteOp['kind'], WriteArea> = {
-  closeDeadline: 'deadlines', closeDeadlines: 'deadlines', reopenDeadline: 'deadlines', addPayment: 'payments', cancelPayment: 'payments',
+  closeDeadline: 'deadlines', closeDeadlines: 'deadlines', updateTask: 'tasks', deleteTask: 'tasks', reopenDeadline: 'deadlines', addPayment: 'payments', cancelPayment: 'payments',
   updateDeadline: 'deadlines', addClient: 'clients', updateClient: 'clients', createTask: 'tasks', completeTask: 'tasks', answerQuestion: 'questions', decideInbox: 'inbox',
 };
 
@@ -272,6 +276,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setDeadlines((xs) => xs.map((d) => (d.id === op.id ? { ...d, ...patch } : d)));
     } else if (op.kind === 'createTask') {
       setTasks((xs) => upsert(xs, op.task));
+    } else if (op.kind === 'updateTask') {
+      setTasks((xs) => xs.map((t) => (t.id === op.id ? { ...t, ...op.patch } : t)));
+    } else if (op.kind === 'deleteTask') {
+      setTasks((xs) => xs.filter((t) => t.id !== op.id));
     } else if (op.kind === 'completeTask') {
       setTasks((xs) => xs.map((t) => (t.id === op.id ? { ...t, done: op.done } : t)));
     } else if (op.kind === 'decideInbox') {
@@ -332,6 +340,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (op.kind === 'decideInbox' && final) {
         const cur = e.result.current && 'snippet' in e.result.current ? e.result.current : null;
         setInbox((xs) => xs.map((x) => (x.id === op.id ? (cur ?? { ...x, status: 'new' }) : x)));
+      }
+      // Задачу не поправили / не удалили — она возвращается такой, какая она в таблице (или какой была).
+      if ((op.kind === 'updateTask' || op.kind === 'deleteTask') && final) {
+        const cur = e.result.current && 'priority' in e.result.current ? e.result.current : tasksBefore.current.get(op.requestId);
+        if (cur && e.result.code !== 'NOT_FOUND') setTasks((xs) => upsert(xs, cur));
+        tasksBefore.current.delete(op.requestId);
       }
       // Правку срока таблица не приняла — срок возвращается таким, какой он в таблице.
       if (op.kind === 'updateDeadline' && e.result.current && 'periodicity' in e.result.current) putOpen(e.result.current);
@@ -560,6 +574,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     send({ kind: 'createTask', requestId, task: { ...t, id: requestId, version: 1, done: false } }, `Задача «${t.text}»`);
   }, [send]);
 
+  /** tasks.update / tasks.delete (п. 14). До ответа — задача уже изменена/убрана на экране; отказ возвращает её. */
+  const tasksBefore = useRef(new Map<string, Task>());
+  const updateTask = useCallback((id: string, patch: TaskPatch) => {
+    const t = tasks.find((x) => x.id === id);
+    if (!t) return;
+    const requestId = newRequestId();
+    tasksBefore.current.set(requestId, t);
+    send({ kind: 'updateTask', requestId, id, baseVersion: t.version, patch }, `Задача: ${t.text.slice(0, 40)}`, () => tasksBefore.current.delete(requestId));
+  }, [tasks, send]);
+  const deleteTask = useCallback((id: string) => {
+    const t = tasks.find((x) => x.id === id);
+    if (!t) return;
+    const requestId = newRequestId();
+    tasksBefore.current.set(requestId, t);
+    send({ kind: 'deleteTask', requestId, id, baseVersion: t.version }, `Удалить задачу: ${t.text.slice(0, 40)}`, () => tasksBefore.current.delete(requestId));
+  }, [tasks, send]);
+
   const toggleTask = useCallback((id: string, done: boolean) => {
     send({ kind: 'completeTask', requestId: newRequestId(), id, done }, done ? 'Задача сделана' : 'Задача снова в работе');
   }, [send]);
@@ -655,10 +686,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<Store>(() => ({
     loaded, online, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance,
   }), [loaded, online, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

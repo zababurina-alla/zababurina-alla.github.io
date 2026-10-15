@@ -35,7 +35,7 @@ const flush = async () => { for (let i = 0; i < 10; i++) await Promise.resolve()
 const invalid = { ok: false, error: { code: 'AUTH_INVALID', message: 'Не получилось войти — попробуйте ещё раз' }, current: null };
 
 describe('вход: одноразовый код (nonce)', () => {
-  beforeEach(() => { cfg = null; renders = 0; installGis(); sessionStorage.clear(); });
+  beforeEach(() => { cfg = null; renders = 0; installGis(); sessionStorage.clear(); localStorage.clear(); });
   afterEach(() => { vi.useRealTimers(); });
 
   it('отказ AUTH_INVALID → сразу новый код и кнопка заново; повтор уходит с новым кодом', async () => {
@@ -47,6 +47,8 @@ describe('вход: одноразовый код (nonce)', () => {
     cfg?.callback({ credential: 'tok1' });
     await flush();
     expect(a.getState().error).toContain('ещё раз');
+    // Причина от сервера видна на экране — по ней понятно, что именно не прошло (находка дизайна 15.10, 17:43).
+    expect(a.getState().error).toContain('(Не получилось войти — попробуйте ещё раз)');
     expect(cfg?.nonce).toBe('N2');
     expect(renders).toBe(2);
     cfg?.callback({ credential: 'tok2' });
@@ -105,6 +107,49 @@ describe('вход: одноразовый код (nonce)', () => {
     await flush();
     expect(s.sent.filter((x) => x.action === 'auth.login').map((x) => x.payload?.nonce)).toEqual(['N1']);
     expect(a.getState().status).toBe('signedIn');
+  });
+
+  it('ответ Google на код старше 9,5 мин на сервер не уходит: новый код и «нажмите ещё раз» (diag: nonce_expired)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const s = server([]);
+    const a = new Auth('https://x/exec', 'cid', s.fetchImpl);
+    await a.mountButton(document.createElement('div'));
+    vi.setSystemTime(Date.now() + 10 * 60_000); // вкладка в фоне, кнопка провисела 10 мин
+    cfg?.callback({ credential: 'tok' });
+    await flush();
+    expect(s.sent.filter((x) => x.action === 'auth.login')).toEqual([]);
+    expect(cfg?.nonce).toBe('N2');
+    expect(a.getState().error).toContain('нажмите «Войти через Google» ещё раз');
+  });
+
+  it('мышь у кнопки: код старше 5 мин обновляется до нажатия', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const a = new Auth('https://x/exec', 'cid', server([]).fetchImpl);
+    await a.mountButton(document.createElement('div'));
+    vi.setSystemTime(Date.now() + 4 * 60_000);
+    a.keepFresh(5 * 60_000);
+    await flush();
+    expect(cfg?.nonce).toBe('N1');
+    vi.setSystemTime(Date.now() + 2 * 60_000);
+    a.keepFresh(5 * 60_000);
+    await flush();
+    expect(cfg?.nonce).toBe('N2');
+  });
+
+  it('сеанс сервера — в localStorage до срока (решение владельца, «б»): новый Auth вошёл; «Выйти» и истёкший срок стирают', async () => {
+    const s = server([{ ok: true, data: { session: 'S', expiresAt: '2099-01-01T00:00:00Z', user: { email: 'a', name: 'А', role: 'owner' } }, cursor: null }]);
+    const a = new Auth('https://x/exec', 'cid', s.fetchImpl);
+    await a.mountButton(document.createElement('div'));
+    cfg?.callback({ credential: 'tok' });
+    await flush();
+    expect(JSON.parse(localStorage.getItem('buh.session') ?? '{}')).toMatchObject({ session: 'S' });
+    expect(sessionStorage.getItem('buh.session')).toBeNull();
+    expect(new Auth('https://x/exec', 'cid').getState().status).toBe('signedIn'); // открыла приложение снова
+    a.signOut();
+    expect(localStorage.getItem('buh.session')).toBeNull();
+    localStorage.setItem('buh.session', JSON.stringify({ session: 'OLD', expiresAt: '2000-01-01T00:00:00Z', user: { email: 'a', name: 'А', role: 'owner' } }));
+    expect(new Auth('https://x/exec', 'cid').getState().status).toBe('signedOut');
+    expect(localStorage.getItem('buh.session')).toBeNull();
   });
 
   it('на экране входа нет автоматического запроса One Tap: один запрос — кнопка', async () => {

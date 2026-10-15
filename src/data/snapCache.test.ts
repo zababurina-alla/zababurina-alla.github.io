@@ -29,4 +29,10 @@ describe('снимок до закрытия вкладки (п. 20)', () => {
     clearSnap();
     expect(readSnap()).toBeNull();
   });
+
+  it('открыли сайт без сеанса — снимок прошлой вкладки стирается (экран входа без данных клиентов)', () => {
+    saveSnap(SNAP);
+    new Auth('https://x/exec', 'cid');
+    expect(readSnap()).toBeNull();
+  });
 });
