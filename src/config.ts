@@ -12,6 +12,7 @@ export const WRITE_AREAS: readonly WriteArea[] = ['payments', 'tasks', 'question
 /** remindPreview — сервер умеет clients.remind { preview:true } (пробный, без отправки). Без флага не зовём:
  *  старый сервер флаг не знает и отправил бы настоящее сообщение. */
 export type Feature = 'inbox' | 'remindPreview';
+const FEATURES: readonly Feature[] = ['inbox', 'remindPreview'];
 
 /** OAuth client ID проекта Google Cloud «zababurina-alla» (…apps.googleusercontent.com). */
 export const GOOGLE_CLIENT_ID = '1078049272948-bnvonl9qah7npdq63gktbio1rm2lbgvb.apps.googleusercontent.com';
@@ -23,7 +24,11 @@ const isArea = (x: unknown): x is WriteArea => typeof x === 'string' && (WRITE_A
 
 /** config.json: { "apiUrl": "https://script.google.com/macros/s/…/exec", "writes": ["payments", "tasks"] }.
  *  Нет файла или он битый — выдуманные данные; нет "writes" — запись во всех разделах; [] — только просмотр. */
-export async function loadRuntimeConfig(fetchImpl: typeof fetch = fetch): Promise<void> {
+export async function loadRuntimeConfig(fetchImpl: typeof fetch = fetch, mode: string = import.meta.env.MODE): Promise<void> {
+  // npm run dev:mock — только учебный сервер, что бы ни лежало в config*.json: закоммиченный config.json несёт адрес
+  // ЖИВОЙ таблицы, и без этого dev:mock на чистой копии ходил в неё (находка «Качества» Н-7, 15.10.2026).
+  // На учебном всё включено — иначе там нечего проверять.
+  if (mode === 'mock') { runtime = { apiUrl: '', writes: [...WRITE_AREAS], features: [...FEATURES] }; return; }
   try {
     // Локальная проверка против тестовой копии таблицы: public/config.local.json (в .gitignore, из сборки удаляется).
     // Читается только в режиме разработки — на опубликованном сайте его нет и быть не может.
@@ -42,9 +47,15 @@ export async function loadRuntimeConfig(fetchImpl: typeof fetch = fetch): Promis
   }
 }
 
+/** Какой адрес API главнее: в режиме mock — всегда учебный сервер (VITE_API_URL из vite.config.ts), иначе — адрес из
+ *  config*.json, а без него — VITE_API_URL. */
+export function pickApiUrl(mode: string, fromConfig: string, fromEnv: string): string {
+  return mode === 'mock' ? fromEnv : fromConfig || fromEnv;
+}
+
 /** POST-адрес Apps Script. Для проверки у себя — npm run dev:mock (адрес учебного сервера задаёт vite.config.ts). */
 export function apiUrl(): string {
-  return runtime.apiUrl || (import.meta.env.VITE_API_URL ?? '');
+  return pickApiUrl(import.meta.env.MODE, runtime.apiUrl, import.meta.env.VITE_API_URL ?? '');
 }
 
 /** Живой режим: адрес задан и не включён показ на выдуманных данных (?demo=1). */

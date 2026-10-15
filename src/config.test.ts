@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { canWrite, hasFeature, isLive, loadRuntimeConfig, readOnlyAreas } from './config';
+import { apiUrl, canWrite, hasFeature, isLive, loadRuntimeConfig, pickApiUrl, readOnlyAreas } from './config';
 
 const fetchJson = (body: unknown, ok = true) => vi.fn(async () => new Response(typeof body === 'string' ? body : JSON.stringify(body), { status: ok ? 200 : 404 })) as unknown as typeof fetch;
 
@@ -43,6 +43,20 @@ describe('config.json', () => {
     expect(hasFeature('remindPreview')).toBe(false); // старый сервер preview не знает и отправил бы сообщение
     await loadRuntimeConfig(fetchJson({ apiUrl: 'https://x/exec', writes: ['deadlines', 'remind'], features: ['remindPreview'] }));
     expect([canWrite('remind'), hasFeature('remindPreview')]).toEqual([true, true]);
+  });
+
+  it('dev:mock (Н-7): адрес учебного сервера главнее config.json с живой таблицей; файлы не читаются, всё включено', async () => {
+    const LIVE = 'https://script.google.com/macros/s/LIVE/exec';
+    const MOCK = 'http://localhost:5179/mock-api';
+    expect(pickApiUrl('mock', LIVE, MOCK)).toBe(MOCK);
+    expect(pickApiUrl('mock', '', MOCK)).toBe(MOCK);
+    expect(pickApiUrl('production', LIVE, MOCK)).toBe(LIVE);
+    expect(pickApiUrl('development', '', MOCK)).toBe(MOCK);
+    const f = fetchJson({ apiUrl: LIVE, writes: [] });
+    await loadRuntimeConfig(f, 'mock');
+    expect(f).not.toHaveBeenCalled();
+    expect(apiUrl()).not.toBe(LIVE);
+    expect([canWrite('deadlines'), canWrite('remind')]).toEqual([true, true]);
   });
 
   it('битый файл — остаёмся на выдуманных данных', async () => {
