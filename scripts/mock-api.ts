@@ -18,6 +18,7 @@ interface FakeLike {
   listPayments(month: string): Promise<unknown>;
   listQuestions(): Promise<unknown[]>;
   referenceRates(year?: number): Promise<unknown>;
+  clientCard(id: string): Promise<unknown>;
   referenceKved(q: string): Promise<{ items: unknown[]; note: string | null }>;
   changesSince(c: number): Promise<{ changes: { cursor: number; entity: string; op: string; id: string; origin: string; record?: unknown }[]; cursor: number }>;
   write(op: Record<string, unknown>): Promise<{ ok: true; changes: { entity: string; op: string; id: string; record?: { id: string } }[]; cursor: number; notifyAt?: string | null }
@@ -84,6 +85,7 @@ async function handle(ctx: Ctx, body: { action: string; payload?: Record<string,
   }
   if (body.action === 'diag.counters') return env({ received: ctx.counters.received, applied: ctx.counters.applied, rejectedByCode: ctx.counters.rejectedByCode, repeats: ctx.counters.repeats }, 0);
   if (body.action === 'payments.list') return env(await f.listPayments(String(p.month ?? '')), 0);
+  if (body.action === 'clients.get') return env(await f.clientCard(String(p.id ?? '')), 0);
   if (body.action === 'reference.rates') return env(await f.referenceRates(typeof p.year === 'number' ? p.year : undefined), 0);
   if (body.action === 'reference.kved') return env(await f.referenceKved(String(p.q ?? '')), 0);
   if (body.action === 'questions.list') return env({ questions: await f.listQuestions() }, 0);
@@ -96,6 +98,7 @@ async function handle(ctx: Ctx, body: { action: string; payload?: Record<string,
   const ops: Record<string, () => Record<string, unknown>> = {
     'deadlines.close': () => ({ kind: 'closeDeadline', id: p.id, baseVersion: p.baseVersion }),
     'deadlines.reopen': () => ({ kind: 'reopenDeadline', id: p.id, undoOf: p.undoOf }),
+    'deadlines.closeMany': () => ({ kind: 'closeDeadlines', items: p.items }),
     'payments.create': () => ({ kind: 'addPayment', payment: { ...(p.payment as object), version: 0, source: 'сайт' } }),
     'payments.cancel': () => ({ kind: 'cancelPayment', id: p.id, baseVersion: p.baseVersion }),
     'clients.create': () => ({ kind: 'addClient', client: { ...(p.client as object), id: 'tmp', version: 0, monthly: [] } }),
@@ -121,6 +124,19 @@ async function handle(ctx: Ctx, body: { action: string; payload?: Record<string,
       return env({ closed: ds.find((d) => d?.id === p.id), next: ds.find((d) => d?.id !== p.id) ?? null, notifyAt: r.notifyAt ?? null }, r.cursor);
     }
     case 'deadlines.reopen': return env({ reopened: recs('deadline').find((d) => d?.id === p.id) }, r.cursor);
+    case 'deadlines.closeMany': {
+      type D = { id: string; clientId?: string; what?: string; status?: string };
+      const ds = recs('deadline') as D[];
+      const failed = (r as { failed?: { id: string; code: string; message: string }[] }).failed ?? [];
+      const results = (p.items as { id: string }[]).map((it) => {
+        const f = failed.find((x) => x.id === it.id);
+        if (f) return { id: it.id, ok: false, code: f.code, message: f.message };
+        const closed = ds.find((d) => d.id === it.id);
+        const next = ds.find((d) => d.id !== it.id && d.status !== 'done' && d.clientId === closed?.clientId && d.what === closed?.what) ?? null;
+        return { id: it.id, ok: true, closed, next };
+      });
+      return env({ results, closed: results.filter((x) => x.ok).length, failed: failed.length }, r.cursor);
+    }
     case 'payments.create': return env({ payment: recs('payment')[0] }, r.cursor);
     case 'payments.cancel': return env({ cancelled: p.id }, r.cursor);
     case 'questions.answer': return env({ question: recs('question')[0] }, r.cursor);

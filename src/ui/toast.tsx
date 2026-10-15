@@ -65,9 +65,13 @@ function ToastLayer({ children }: { children: ReactNode }) {
   useEffect(() => {
     const pick = () => setHost([...document.querySelectorAll<HTMLDialogElement>('dialog[open]')].at(-1) ?? null);
     pick();
-    const mo = new MutationObserver(pick);
-    mo.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['open'] });
-    return () => mo.disconnect();
+    // Не чаще раза за кадр: childList срабатывает на любое изменение страницы.
+    let raf = 0;
+    const mo = new MutationObserver(() => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; pick(); }); });
+    // childList — окно может не закрыться, а исчезнуть со страницы (карточка при смене экрана): иначе слой оставался
+    // в удалённом окне и все уведомления, включая ошибки, переставали быть видны.
+    mo.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['open'] });
+    return () => { mo.disconnect(); cancelAnimationFrame(raf); };
   }, []);
   return createPortal(<div className="toasts" aria-live="polite">{children}</div>, host ?? document.body);
 }

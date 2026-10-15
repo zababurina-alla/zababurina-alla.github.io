@@ -257,4 +257,32 @@ describe('живой адаптер: чтение', () => {
     const s = server(ok({ items: [], note: 'не установлена радою', matchedBy: null }));
     expect(await new LiveApi(URL_, auth(), s.fetchImpl).referenceKved('99.99')).toEqual({ items: [], note: 'не установлена радою' });
   });
+
+  it('карточка: clients.get { id } — клиент, сроки, платежи, задачи, история; пустые клетки нормализуются', async () => {
+    const s = server(ok({
+      client: { id: 'C-1', name: 'К', kind: 'fop2', phone: null, keyIssuer: null, version: 4 },
+      deadlines: [{ ...dl('D-1'), clientId: null }], payments: [{ id: 'P-1', date: '', kopecks: '', method: 'x' }],
+      tasks: [{ id: 'T-1', text: null }], history: [{ id: 'A-1', when: null, text: 'Изменён телефон', source: 'сайт' }],
+    }));
+    const r = await new LiveApi(URL_, auth(), s.fetchImpl).clientCard('C-1');
+    expect(s.sent[0]).toEqual({ v: 1, action: 'clients.get', payload: { id: 'C-1' }, session: 'S1' });
+    expect(r.client).toMatchObject({ id: 'C-1', phone: '', keyIssuer: '', marks: [], kved: [], monthly: [] });
+    expect(r.deadlines[0]?.clientId).toBe('');
+    expect(r.payments[0]).toMatchObject({ date: null, kopecks: null, method: 'other' });
+    expect(r.tasks[0]?.text).toBe('');
+    expect(r.history[0]).toMatchObject({ when: '', text: 'Изменён телефон' });
+  });
+
+  it('закрыть несколько: deadlines.closeMany — закрытые в changes, отказы в failed; молчание по сроку — тоже отказ', async () => {
+    const s = server(ok({ results: [
+      { id: 'D-1', ok: true, closed: { ...dl('D-1', 'done'), version: 5 }, next: dl('D-9') },
+      { id: 'D-2', ok: false, code: 'PERIOD_OPEN', message: 'Период ещё не закончился' },
+      { id: 'D-3', ok: false, error: { code: 'CONFLICT', message: 'Срок изменился' }, current: { ...dl('D-3'), version: 8 } },
+    ], closed: 1, failed: 2 }, 40));
+    const r = await new LiveApi(URL_, auth(), s.fetchImpl).write({ kind: 'closeDeadlines', requestId: 'B1',
+      items: [{ id: 'D-1', baseVersion: 3 }, { id: 'D-2', baseVersion: 3 }, { id: 'D-3', baseVersion: 3 }, { id: 'D-4', baseVersion: 3 }] });
+    expect(s.sent[0]).toMatchObject({ action: 'deadlines.closeMany', requestId: 'B1', payload: { items: [{ id: 'D-1', baseVersion: 3 }, { id: 'D-2', baseVersion: 3 }, { id: 'D-3', baseVersion: 3 }, { id: 'D-4', baseVersion: 3 }] } });
+    expect(r.ok && r.changes.map((c) => c.id)).toEqual(['D-1', 'D-9']);
+    expect(r.ok && r.failed?.map((f) => [f.id, f.code, f.current?.version ?? null])).toEqual([['D-2', 'PERIOD_OPEN', null], ['D-3', 'CONFLICT', 8], ['D-4', 'SERVER', null]]);
+  });
 });

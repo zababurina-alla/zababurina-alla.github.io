@@ -1,6 +1,10 @@
 // «Сроки»: календарь месяца + список по дням; закрытие одним нажатием, «Закрыто сегодня» с честным статусом.
 // Месяц считается от сегодняшней даты и листается ‹ › (раньше был жёстко «Октябрь 2026»).
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { canWrite } from '../config';
+import { roAttrs, roMessage } from '../ui/readonly';
+import { useToast } from '../ui/toast';
+import { SelectionCtx } from './selection';
 import { OBLIGATION_LABEL, obligationKind } from '../lib/obligation';
 import type { ObligationKind } from '../lib/obligation';
 import type { ClientKind, DatedDeadline, DeadlineStatus } from '../data/types';
@@ -121,6 +125,36 @@ export function Deadlines() {
   for (const d of inRange) kinds.set(obligationKind(d.what), (kinds.get(obligationKind(d.what)) ?? 0) + 1);
   const items = kindF === 'all' ? inRange : inRange.filter((d) => obligationKind(d.what) === kindF);
   const count = (r: Range) => pool.filter((d) => fits(daysBetween(TODAY, d.due), r)).length;
+
+  // «Закрыть N» (п. 5): выбор строк → подтверждение вторым нажатием → deadlines.closeMany пакетами по 20.
+  const toast = useToast();
+  const [selecting, setSelecting] = useState(false);
+  const [pickedIds, setChosen] = useState<ReadonlySet<string>>(new Set());
+  const [confirming, setConfirming] = useState(false);
+  const pickedNow = store.deadlines.filter((d) => pickedIds.has(d.id));
+  const selection = useMemo(() => ({
+    on: selecting, picked: pickedIds,
+    toggle: (id: string) => { setConfirming(false); setChosen((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; }); },
+  }), [selecting, pickedIds]);
+  const startSelecting = () => {
+    if (!canWrite('deadlines')) { toast({ text: roMessage('deadlines'), tone: 'info' }); return; }
+    setSelecting(true); setChosen(new Set()); setConfirming(false);
+  };
+  const stopSelecting = () => { setSelecting(false); setChosen(new Set()); setConfirming(false); };
+  const closePicked = () => {
+    if (!confirming) { setConfirming(true); return; }
+    const total = pickedNow.length;
+    const r = store.closeDeadlines(pickedNow.map((d) => d.id), (closed, failed) => {
+      toast(failed.length
+        ? { text: `Закрыто ${closed} из ${closed + failed.length}. Не закрылись: ${failed.map((f) => `«${f.what}» — ${f.message}`).join('; ')}`, tone: 'error' }
+        : { text: `Закрыто ${closed} ${plural(closed, 'срок', 'срока', 'сроков')} — следующие периоды система создала сама` });
+    });
+    if (r.skipped.length) {
+      toast({ text: `Не отправлены (${r.skipped.length} из ${total}): ${r.skipped.map((s) => `«${s.what}» — ${s.message}`).join('; ')}`, tone: 'info', timeout: 12_000 });
+    }
+    play('tick');
+    stopSelecting();
+  };
   const overdue = count('overdue');
   // Печать «сроки на неделю» — мамин бумажный список: неделя, по дням, без меню и кнопок (styles/print.css).
   // Сначала показываем неделю без фильтров, потом печать — в следующем кадре, когда список перерисован.
@@ -155,6 +189,11 @@ export function Deadlines() {
               ]} />}
           </header>
           <div className="dl-tools">
+            {!selecting && (
+              <button type="button" className="btn btn--secondary btn--sm dl-tools__select" onClick={startSelecting} {...roAttrs('deadlines')}>
+                <Icon name="check" size={16} />Выбрать несколько
+              </button>
+            )}
             <div className="seg seg--fill dl-tools__by" role="group" aria-label="Как сгруппировать">
               {([['day', 'По дням'], ['kind', 'По виду'], ['client', 'По клиенту']] as const).map(([id, label]) => (
                 <button key={id} type="button" className="seg__opt" aria-pressed={by === id} onClick={() => { setBy(id); play('tick'); }}>{label}</button>
@@ -184,6 +223,19 @@ export function Deadlines() {
               </div>
             )}
           </div>
+          {selecting && (
+            <div className="dsel-bar" role="region" aria-label="Закрыть несколько сроков">
+              <span><strong className="num">{pickedNow.length}</strong> {plural(pickedNow.length, 'срок выбран', 'срока выбрано', 'сроков выбрано')}</span>
+              <button type="button" className="link" onClick={() => setChosen(new Set(items.map((d) => d.id)))}>Выбрать все в списке ({items.length})</button>
+              {pickedNow.length > 0 && <button type="button" className="link" onClick={() => setChosen(new Set())}>Снять</button>}
+              <span className="dsel-bar__grow" />
+              <button type="button" className="btn btn--ghost btn--sm" onClick={stopSelecting}>Отмена</button>
+              <button type="button" className={`btn btn--sm ${confirming ? 'btn--danger' : 'btn--primary'}`} disabled={!pickedNow.length} onClick={closePicked}>
+                {confirming ? `Да, закрыть ${pickedNow.length}` : `Закрыть ${pickedNow.length || ''}`.trim()}
+              </button>
+            </div>
+          )}
+          <SelectionCtx.Provider value={selection}>
           <DayGroups by={by} items={items} empty={
             filtered ? (
               <Empty pic="search" title="По этим фильтрам сроков нет" action={
@@ -195,6 +247,7 @@ export function Deadlines() {
             </Empty>
             )
           } />
+          </SelectionCtx.Provider>
         </section>
       </div>
 

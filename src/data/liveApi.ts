@@ -2,7 +2,7 @@
 // (docs/api-contract.md v2.1). Экраны и очередь записей не знают, с кем говорят.
 import { ApiError, call } from './transport';
 import type { Envelope } from './transport';
-import type { CabinetApi, Change, Entity, ErrorCode, KvedFound, Snapshot, WriteOp, WriteResult } from './api';
+import type { CabinetApi, Change, ClientCard, Entity, ErrorCode, KvedFound, Snapshot, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Deadline, InboxItem, KvedItem, Payment, Question, RateGroup, Rates, Task } from './types';
 
 /** Откуда брать сеанс и как тихо войти заново (auth.ts). */
@@ -151,6 +151,34 @@ export class LiveApi implements CabinetApi {
           if (env.data.next) changes.push(up('deadline', env.data.next, env.cursor));
           return { ok: true, changes, cursor: env.cursor, notifyAt: env.data.notifyAt };
         }
+        case 'closeDeadlines': {
+          // Ответ { results[], closed, failed }: по каждому сроку — закрыт (closed + next) или отказ с кодом.
+          // Форма строки results — допущение (как у deadlines.close + { id, ok, code, message, current }).
+          const env = await this.rpc<{ results?: unknown[] }>('deadlines.closeMany', { items: op.items }, o);
+          const changes: Change[] = [];
+          const failed: NonNullable<Extract<WriteResult, { ok: true }>['failed']> = [];
+          const seen = new Set<string>();
+          for (const raw of env.data.results ?? []) {
+            const r = (raw ?? {}) as { id?: unknown; ok?: unknown; closed?: Deadline | null; next?: Deadline | null; code?: unknown; message?: unknown;
+              error?: { code?: unknown; message?: unknown }; current?: unknown };
+            const id = typeof r.id === 'string' ? r.id : r.closed?.id ?? '';
+            if (!id) continue;
+            seen.add(id);
+            const code = String(r.error?.code ?? r.code ?? '');
+            if (r.ok === false || code) {
+              const c = SITE_CODES.has(code) ? code as ErrorCode : 'SERVER';
+              const item: (typeof failed)[number] = { id, code: c, message: String(r.error?.message ?? r.message ?? 'Не закрылся') };
+              if (r.current && typeof r.current === 'object' && 'periodicity' in r.current) item.current = normRecord('deadline', r.current) as Deadline;
+              failed.push(item);
+              continue;
+            }
+            if (r.closed) changes.push(up('deadline', r.closed, env.cursor));
+            if (r.next) changes.push(up('deadline', r.next, env.cursor));
+          }
+          // Срок, о котором сервер ничего не сказал, не считаем закрытым.
+          for (const it of op.items) if (!seen.has(it.id)) failed.push({ id: it.id, code: 'SERVER', message: 'Таблица не ответила по этому сроку' });
+          return { ok: true, changes, cursor: env.cursor, failed };
+        }
         case 'reopenDeadline': {
           const env = await this.rpc<{ reopened: Deadline }>('deadlines.reopen', { id: op.id, undoOf: op.undoOf }, o);
           return { ok: true, changes: [up('deadline', env.data.reopened, env.cursor)], cursor: env.cursor };
@@ -233,6 +261,19 @@ export class LiveApi implements CabinetApi {
   async listQuestions(): Promise<Question[]> {
     const env = await this.rpc<{ questions: Question[] }>('questions.list', {});
     return env.data.questions;
+  }
+
+  /** Карточка целиком: чтение, без requestId. Пустые клетки нормализуются, как в снимке. */
+  async clientCard(id: string): Promise<ClientCard> {
+    const env = await this.rpc<{ client: unknown; deadlines?: unknown[]; payments?: unknown[]; tasks?: unknown[]; history?: unknown[] }>('clients.get', { id });
+    const d = env.data;
+    return {
+      client: normClient(d.client),
+      deadlines: (d.deadlines ?? []).map((x) => normRecord('deadline', x) as Deadline),
+      payments: (d.payments ?? []).map(normPayment),
+      tasks: (d.tasks ?? []).map((x) => normRecord('task', x) as Task),
+      history: (d.history ?? []).map((x) => normRecord('activity', x) as Activity),
+    };
   }
 
   /** Справочник читается без requestId и мимо очереди: это чтение. */

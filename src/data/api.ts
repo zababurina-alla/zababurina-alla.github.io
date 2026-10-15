@@ -32,6 +32,8 @@ export interface Change {
 /** Запись с сайта. requestId создаёт браузер: повтор из очереди с тем же requestId не создаёт дубль. */
 export type WriteOp =
   | { kind: 'closeDeadline'; requestId: string; id: string; baseVersion: number }
+  /** deadlines.closeMany: 1…20 сроков одним запросом; отказ по одному — в failed, остальные закрываются. */
+  | { kind: 'closeDeadlines'; requestId: string; items: { id: string; baseVersion: number }[] }
   | { kind: 'reopenDeadline'; requestId: string; id: string; undoOf: string }
   | { kind: 'addPayment'; requestId: string; payment: Payment }
   | { kind: 'cancelPayment'; requestId: string; id: string; baseVersion: number }
@@ -55,12 +57,17 @@ export const RETRYABLE: ReadonlySet<ErrorCode> = new Set<ErrorCode>(['NETWORK', 
 export type WriteResult =
   | { ok: true; changes: Change[]; cursor: number;
       /** Закрытие срока: когда уйдут уведомления (через 2 мин); null — у клиента нет Telegram, уведомления не будет. */
-      notifyAt?: string | null }
+      notifyAt?: string | null;
+      /** closeMany: сроки, которые не закрылись (PERIOD_OPEN / CONFLICT / NOT_FOUND), — остальные закрыты. */
+      failed?: { id: string; code: ErrorCode; message: string; current?: Deadline }[] }
   | { ok: false; code: ErrorCode; message: string; current?: Client | Deadline | Payment | Question | InboxItem;
       /** MAINTENANCE: когда ночные задачи закончатся (флаг сервера, не часы) — раньше не повторять. */
       retryAt?: string };
 
 export interface DeadlinePatch { due?: string; status?: Exclude<DeadlineStatus, 'done'>; note?: string }
+
+/** clients.get — всё о клиенте: строка целиком, его сроки, платежи (не только 90 дней), задачи и история изменений. */
+export interface ClientCard { client: Client; deadlines: Deadline[]; payments: Payment[]; tasks: Task[]; history: Activity[] }
 
 /** Ответ поиска КВЕД. note — пояснение сервера, когда не нашлось («не установлена радою»). */
 export interface KvedFound { items: KvedItem[]; note: string | null }
@@ -74,6 +81,8 @@ export interface CabinetApi {
   listPayments(month: string): Promise<{ payments: Payment[]; totalKopecks: number }>;
   /** questions.list — открытые вопросы без перезагрузки снимка. */
   listQuestions(): Promise<Question[]>;
+  /** clients.get — карточка целиком (п. 3) и история изменений клиента (п. 9). */
+  clientCard(id: string): Promise<ClientCard>;
   /** reference.rates — ставки года из «⚙️ Справочники». Цифр ставок в коде сайта нет. */
   referenceRates(year?: number): Promise<Rates>;
   /** reference.kved — поиск по коду или словам, до 20 строк. */

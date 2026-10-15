@@ -101,7 +101,7 @@ function ClosedCounter({ compact = false }: { compact?: boolean }) {
 const SLOW_HINT_MS = 5000;
 
 function SyncStatus() {
-  const { pending, online, loaded } = useStore();
+  const { pending, online, loaded, stale } = useStore();
   const [now, setNow] = useState(() => Date.now());
   const sending = pending.some((p) => p.state === 'sending');
   useEffect(() => {
@@ -118,11 +118,13 @@ function SyncStatus() {
   // «только просмотр» (находка «Пользователя» № 10). Очередь и ошибки важнее — их показываем как раньше.
   // С видимыми разделами, а не со всеми: «Входящие» за флагом на живом сайте не видны (иначе 5 ≠ 6 и «всё сохранено»).
   const readOnly = readOnlyAreas().length === visibleAreas().length;
-  if (!pending.length && online && (!loaded || readOnly)) {
+  // Снимок из прошлой загрузки вкладки на экране — «обновляем», пока свежий не пришёл (п. 20).
+  if (!pending.length && online && (!loaded || stale || readOnly)) {
+    const busy = !loaded || stale;
     return (
-      <p className={`sync ${loaded ? 'is-readonly' : 'is-saving'}`} role="status">
+      <p className={`sync ${busy ? 'is-saving' : 'is-readonly'}`} role="status">
         <span className="sync__dot" aria-hidden="true" />
-        <span className="sync__text">{loaded ? 'Только просмотр' : 'Связываемся с таблицей…'}</span>
+        <span className="sync__text">{!loaded ? 'Связываемся с таблицей…' : stale ? 'Обновляем из таблицы…' : 'Только просмотр'}</span>
       </p>
     );
   }

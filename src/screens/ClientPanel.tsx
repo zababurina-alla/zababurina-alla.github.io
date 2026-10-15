@@ -6,6 +6,7 @@ import gsap from 'gsap';
 import { kindLabel } from '../data/fake';
 import { useStore } from '../data/store';
 import { MARK_LABEL, METHOD_LABEL } from '../data/types';
+import type { Activity } from '../data/types';
 import { TODAY, daysBetween, daysLabel, fmtDate, statusByDays } from '../lib/dates';
 import { formatMoney, formatPayMoney } from '../lib/money';
 import { Icon } from '../ui/Icon';
@@ -144,7 +145,20 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
   // Всё про клиента на одном экране: его открытые задачи и вопросы Дмитрия о нём — прямо в обзоре.
   const tasks = c ? store.tasks.filter((t) => t.clientId === c.id && !t.done) : [];
   const questions = c ? store.questions.filter((q) => q.clientId === c.id) : [];
-  const history = c ? store.activity.filter((a) => a.text.includes(c.name.split(' ')[0]?.slice(0, 5) ?? '#')) : [];
+  // Карточка целиком и история — из clients.get (п. 3, 9): снимок показывается сразу, ответ (до 7 с) дополняет его.
+  const [card, setCard] = useState<{ id: string; history: Activity[] | null; error: string | null } | null>(null);
+  const { loadClientCard } = store;
+  useEffect(() => {
+    if (!id) return;
+    let alive = true;
+    loadClientCard(id).then(
+      (history) => { if (alive) setCard({ id, history, error: null }); },
+      (e: unknown) => { if (alive) setCard({ id, history: null, error: e instanceof Error && e.name === 'ApiError' ? e.message : 'Таблица не ответила' }); },
+    );
+    return () => { alive = false; };
+  }, [id, loadClientCard]);
+  const cardNow = card && card.id === shownId ? card : null;
+  const history = cardNow?.history ?? [];
   const keyDays = c?.keyUntil ? daysBetween(TODAY, c.keyUntil) : null;
 
   return (
@@ -246,11 +260,13 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                 <li key={p.id} className="plist__row"><span><strong className="display"><Money text={formatPayMoney(p.kopecks)} /></strong><span className="sub">{p.period}, {METHOD_LABEL[p.method]}</span></span><span className="num sub">{p.date ? fmtDate(p.date) : <span className="nil">без даты</span>}</span></li>
               ))}</ul>
             ) : <Empty pic="wallet" title="Платежей пока нет" />)}
-            {tab === 'history' && (history.length ? (
+            {tab === 'history' && !cardNow && <p className="sub" role="status">Загружаем историю из таблицы…</p>}
+            {tab === 'history' && cardNow?.error && <p className="sub" role="alert">История не загрузилась: {cardNow.error}</p>}
+            {tab === 'history' && cardNow?.history && (history.length ? (
               <ul className="feed">{history.map((a) => (
                 <li key={a.id} className="feed__item"><span className="feed__icon"><Icon name="clock" size={16} /></span><span className="feed__text"><TableText text={a.text} /><span className="sub">{fmtDate(a.when.slice(0, 10))}, {a.when.slice(11)}, {a.source}</span></span></li>
               ))}</ul>
-            ) : <p className="empty">Изменений пока не было</p>)}
+            ) : <p className="empty">Изменений пока не было. Журнал по клиентам ведётся с 15.10.2026 — правки с сайта, через бота и в таблице появятся здесь.</p>)}
           </div>
         </div>
       )}
