@@ -137,6 +137,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [conflict, setConflict] = useState<Conflict | null>(null);
   const [cursor, setCursor] = useState(0);
   const cursorRef = useRef(0);
+  /** Первый снимок пришёл — до этого опрос изменений не идёт (на живой таблице оба запроса тяжёлые, 10–20 с). */
+  const snapReady = useRef(false);
+  /** Опрос уже идёт / нужен ещё один после текущего: не больше одного sync.changes одновременно. */
+  const syncing = useRef(false);
+  const syncAgain = useRef(false);
   const mine = useRef(new Set<string>());
   const paymentsRef = useRef<Payment[]>([]);
   useEffect(() => { paymentsRef.current = payments; }, [payments]);
@@ -300,6 +305,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setClosed(snap.deadlines.filter((d) => d.status === 'done' && d.closedAt === TODAY)
       .map((d) => ({ deadline: d, next: null, save: 'saved', requestId: `snap-${d.id}`, by: 'бот' })));
     cursorRef.current = snap.cursor; setCursor(snap.cursor);
+    snapReady.current = true;
   }, []);
 
   useEffect(() => {
@@ -331,6 +337,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const reload = useCallback(() => { setLoadError(null); setLoaded(false); setAttempt((n) => n + 1); }, []);
 
   const syncNow = useCallback(async () => {
+    if (!snapReady.current) return;
+    if (syncing.current) { syncAgain.current = true; return; }
+    syncing.current = true;
     try {
       const res = await api.changesSince(cursorRef.current);
       setOnlineState(true);
@@ -350,6 +359,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // Вход не удался — экран входа покажет App; ночное обслуживание — данные на экране верны, ждём. Это не обрыв связи.
       if (e instanceof ApiError && (e.code === 'AUTH_REQUIRED' || e.code === 'FORBIDDEN' || e.code === 'MAINTENANCE')) return;
       setOnlineState(false);
+    } finally {
+      syncing.current = false;
+      // Пока шёл опрос, пришёл повод для ещё одного (возврат во вкладку, запись) — один повтор, не очередь.
+      if (syncAgain.current) { syncAgain.current = false; void syncRef.current(); }
     }
   }, [applyChanges, applySnapshot, applyOptimistic]);
   useEffect(() => { syncRef.current = syncNow; }, [syncNow]);

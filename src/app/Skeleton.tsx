@@ -1,7 +1,7 @@
 // Заготовка экрана, пока данные идут из таблицы: силуэт первого экрана, плашек и строк с бегущим бликом, а не крутилка.
 // Форма — как у «Сегодня», чтобы при приходе данных ничего не прыгало. Блик — transform на псевдоэлементе;
 // при «уменьшить движение» силуэты неподвижны.
-import { Icon } from '../ui/Icon';
+import { LoadProgress } from './LoadProgress';
 
 export function Skeleton() {
   return (
@@ -10,7 +10,7 @@ export function Skeleton() {
         <span className="sk sk--line" style={{ width: '12rem' }} />
         <span className="sk sk--title" />
         <span className="sk sk--title" style={{ width: '60%' }} />
-        <p className="sk-note"><Icon name="saving" />Загружаем из таблицы…</p>
+        <LoadProgress />
         <div className="tallies">
           {[0, 1, 2, 3].map((i) => <span key={i} className="sk sk--kpi" />)}
         </div>
