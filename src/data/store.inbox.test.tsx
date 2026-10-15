@@ -3,7 +3,7 @@
 import { act, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { describe, expect, it, vi } from 'vitest';
-import type { Change, Snapshot, WriteOp, WriteResult } from './api';
+import type { Change, Snapshot, WriteResult } from './api';
 import type { InboxItem } from './types';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -12,7 +12,7 @@ window.matchMedia ??= ((q: string) => ({ matches: false, media: q, addEventListe
 const ITEM: InboxItem = { id: 'I-1', version: 1, at: '2026-10-16T19:00', clientId: 'C-1', clientName: 'Тестовий клієнт', type: 'payment', snippet: 'Сплатив 1 200 грн', amount: 120000, status: 'new', file: false, taxKopecks: null };
 const SNAP: Snapshot = { clients: [], deadlines: [], payments: [], activity: [], tasks: [], questions: [], inbox: [], cursor: 1 };
 let feed: Change[] = [];
-const write = vi.fn(async (_op: WriteOp): Promise<WriteResult> => {
+const write = vi.fn(async (): Promise<WriteResult> => {
   await new Promise((r) => setTimeout(r, 50));
   return { ok: false, code: 'CONFLICT', message: 'Уже решено', current: { ...ITEM, status: 'accepted' } };
 });
