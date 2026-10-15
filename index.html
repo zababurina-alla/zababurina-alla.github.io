@@ -5,8 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex, nofollow" />
     <title>Бухгалтерия</title>
-    <meta name="theme-color" content="#F6F7F9" />
-    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <meta name="theme-color" content="#ECEEF1" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" sizes="any" />
+    <link rel="icon" href="./icons/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="icon" href="./icons/favicon-16.png" type="image/png" sizes="16x16" />
     <script>
       // Тема до первой отрисовки, чтобы не мигало: выбор пользователя → настройка системы. ?theme= — для скриншотов.
       (function () {
@@ -14,14 +16,16 @@
         try { t = t || localStorage.getItem('sverka.theme'); } catch (e) {}
         if (t !== 'dark' && t !== 'light') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
         document.documentElement.dataset.theme = t;
+        // Цвет полосы браузера — по теме с первой отрисовки (п. 60; дальше его меняет lib/theme.ts). = META_COLOR.
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', t === 'dark' ? '#07090C' : '#ECEEF1');
       })();
     </script>
-    <script type="module" crossorigin src="./assets/main-C3nMaYES.js"></script>
-    <link rel="modulepreload" crossorigin href="./assets/jsx-runtime-CAcoceEc.js">
-    <link rel="stylesheet" crossorigin href="./assets/jsx-runtime-PEOZu7Sw.css">
-    <link rel="stylesheet" crossorigin href="./assets/main-B9WnO9-k.css">
+    <script type="module" crossorigin src="./assets/main-CxG3rsiq.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/jsx-runtime-D1Lz2iDN.js">
+    <link rel="stylesheet" crossorigin href="./assets/jsx-runtime-BtJqvlPv.css">
+    <link rel="stylesheet" crossorigin href="./assets/main-BY1Mb4BT.css">
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"></div>
   </body>
 </html>
