@@ -641,7 +641,7 @@
 
 .dactions {
   padding: var(--space-3);
-  border-radius: var(--radius-l);
+  border-radius: var(--radius-lg);
   background: var(--surface-sunk);
   box-shadow: inset 0 0 0 1px var(--line);
   animation: warn-in var(--dur-pop) var(--spring-pop);
@@ -654,13 +654,14 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 2px;
-  margin: -6px 0;
+  margin: -8px 0; /* кнопки 40 px, строка не выше прежнего */
 }
 
+/* Кнопки строки — малая высота сайта (40 px, как btn--sm), а не своя 36 (аудит окон 16.10: две высоты кнопок — 44 и 40) */
 .dtable__tool,
 .dtable__tools .dactions__toggle {
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 2.5rem;
+  height: 2.5rem;
   margin: 0;
   color: var(--ink-2);
 }
@@ -710,7 +711,7 @@
 /* «Действия» — явная кнопка со словом, а не бледное «⋯» под текстом (№ 9) */
 .dtable__tools .dactions__toggle {
   width: auto;
-  height: 2.25rem;
+  height: 2.5rem;
   min-height: 0;
   padding: 0 var(--space-2);
   gap: 4px;
@@ -747,7 +748,7 @@
   gap: var(--space-2) var(--space-3);
   margin: 0 var(--space-3) var(--space-2);
   padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
-  border-radius: var(--radius-l);
+  border-radius: var(--radius-lg);
   background: var(--glass);
   -webkit-backdrop-filter: blur(14px) saturate(1.3);
   backdrop-filter: blur(14px) saturate(1.3);

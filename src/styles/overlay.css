@@ -37,7 +37,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-5) var(--space-4) var(--space-3) var(--space-6);
+  padding: var(--space-5) calc(var(--space-6) - 8px) var(--space-3) var(--space-6); /* справа: боковой − 8, крестик по краю текста */
 }
 
 .modal__grip {
@@ -80,9 +80,9 @@
 }
 
 .modal--dialog .modal__box {
-  width: min(38rem, 100%);
+  width: min(var(--win-m), 100%);
   max-height: min(54rem, calc(100dvh - 3rem));
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-win);
   transition: transform var(--dur-pop) var(--spring-soft), opacity var(--dur-base) var(--ease-out);
 
   @starting-style {
@@ -124,7 +124,7 @@
   .modal--dialog .modal__box {
     width: 100%;
     max-height: 94dvh;
-    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    border-radius: var(--radius-win) var(--radius-win) 0 0;
     transform-origin: 50% 100% !important;
     transition: transform var(--dur-move) var(--ease-drawer);
 
@@ -153,7 +153,12 @@
   }
 
   .modal__head {
-    padding: var(--space-5) var(--space-3) var(--space-3) var(--space-4);
+    padding: var(--space-5) calc(var(--space-4) - 8px) var(--space-3) var(--space-4); /* та же формула: боковой − 8 */
+  }
+
+  /* Заголовок окна на телефоне — как имя в карточке клиента (22 px), а не 26 */
+  .modal__title {
+    font-size: 1.375rem;
   }
 
   .modal__body {
@@ -179,7 +184,7 @@
 
 .modal--panel .modal__box {
   height: 100%;
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-win);
   overflow-y: auto;
   overscroll-behavior: contain;
   transition: transform var(--dur-move) var(--ease-drawer);
@@ -283,7 +288,7 @@
   width: min(32rem, 100%);
   min-height: 3.75rem;
   padding: var(--space-3) var(--space-2) var(--space-3) var(--space-4);
-  border-radius: var(--radius-l);
+  border-radius: var(--radius-lg);
   background: var(--toast);
   color: var(--on-toast);
   box-shadow: var(--shadow-3);
@@ -537,8 +542,8 @@
 }
 
 .palette__box {
-  width: min(42rem, 100%);
-  border-radius: var(--radius-lg);
+  width: min(var(--win-l), 100%);
+  border-radius: var(--radius-win);
   background: var(--surface);
   box-shadow: inset 0 1px 0 var(--edge), 0 0 0 1px var(--line), var(--shadow-3);
   overflow: hidden;

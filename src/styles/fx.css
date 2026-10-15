@@ -168,7 +168,7 @@
 
 .feed__item.is-fresh::after {
   inset: -4px -8px;
-  border-radius: var(--radius-s);
+  border-radius: var(--radius-sm);
 }
 
 /* ═════════ Свет за курсором: мягкое пятно и подсветка рамки у курсора (как у образца) ═════════
