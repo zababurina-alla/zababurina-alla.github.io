@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PAYMENTS } from '../data/fake';
-import { monthStats } from './monthStats';
+import { growthLabel, monthStats } from './monthStats';
 import { daysInMonth, kyivToday, monthName, prevMonthKey } from './dates';
 
 describe('суммы за месяц', () => {
@@ -49,5 +49,13 @@ describe('суммы за месяц', () => {
     ], '2026-10-14');
     expect([s.total, s.count, s.prevTotal]).toEqual([100, 1, 7]);
     expect(s.cumulative.at(-1)).toBe(100);
+  });
+
+  it('рост со знаком: «−100 %», когда месяц пустой, а прошлый — нет (п. 39)', () => {
+    const s = monthStats([{ kopecks: 905000, date: '2026-06-10' }], '2026-07-31');
+    expect([s.total, s.growth, growthLabel(s.growth)]).toEqual([0, -100, '−100 %']);
+    expect(growthLabel(12)).toBe('+12 %');
+    expect(growthLabel(0)).toBeNull();
+    expect(growthLabel(null)).toBeNull();
   });
 });

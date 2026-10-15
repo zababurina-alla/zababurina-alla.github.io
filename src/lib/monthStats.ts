@@ -15,6 +15,13 @@ export interface MonthStats {
   growth: number | null;
 }
 
+/** Рост к прошлому месяцу со знаком: «+12 %», «−100 %» (п. 39: без знака «↘ 100 %» читалось как «столько же»).
+ *  null — сравнивать не с чем или поровну. */
+export function growthLabel(growth: number | null): string | null {
+  if (growth === null || growth === 0) return null;
+  return `${growth > 0 ? '+' : '−'}${Math.abs(growth)} %`;
+}
+
 export function monthStats(payments: Pay[], today: string): MonthStats {
   const key = monthKey(today);
   const prevKey = prevMonthKey(key);

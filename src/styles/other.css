@@ -413,3 +413,9 @@
   flex-wrap: wrap;
   gap: var(--space-1);
 }
+
+/* «Платежи»: месяц ещё грузится — вместо суммы спокойная строка (временно, оформление за дизайном) */
+.pay-hero__value--wait {
+  color: var(--ink-2);
+  font-size: var(--text-lg);
+}

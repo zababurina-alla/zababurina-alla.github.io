@@ -30,7 +30,8 @@ export type CloseResult = { ok: true } | { ok: false; reason: string };
 export type ExternalKind = 'payment' | 'key' | 'close' | 'phone' | 'inbox';
 
 /** Окончательный отказ таблицы (повтор не поможет): маме — что случилось, её словами. */
-export interface Notice { id: string; text: string }
+/** info — подсказка (раздел пока только для просмотра): спокойная, уходит сама, одна на раздел. */
+export interface Notice { id: string; text: string; info?: boolean; key?: string }
 
 export interface Conflict {
   requestId: string;
@@ -413,7 +414,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // Раздел ещё только для просмотра (config.json → writes): в таблицу не пишем, говорим, где сделать.
     const area = AREA_OF[op.kind];
     if (!canWrite(area)) {
-      setNotices((ns) => [...ns, { id: op.requestId, text: `${label}: ${roMessage(area)}` }]);
+      setNotices((ns) => [...ns, { id: op.requestId, text: roMessage(area), info: true, key: `ro-${area}` }]);
       return;
     }
     mine.current.add(op.requestId);

@@ -29,7 +29,8 @@ export function FailureWatcher() {
   const shown = useRef(new Set<string>());
   useEffect(() => {
     for (const n of notices) {
-      toast({ key: `notice-${n.id}`, text: n.text, tone: 'error' });
+      // Отказ записи — ошибка, висит до закрытия; «пока в таблице» — подсказка на 7 с, одна на раздел (п. 7).
+      toast(n.info ? { key: n.key ?? `notice-${n.id}`, text: n.text, tone: 'info', timeout: 7000 } : { key: `notice-${n.id}`, text: n.text, tone: 'error' });
       dismissNotice(n.id);
     }
   }, [notices, dismissNotice, toast]);

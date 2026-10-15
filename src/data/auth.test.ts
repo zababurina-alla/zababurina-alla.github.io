@@ -101,6 +101,7 @@ describe('вход: одноразовый код (nonce)', () => {
     expect(cfg?.nonce).toBe('N1');
     expect(renders).toBe(1);
     cfg?.callback({ credential: 'tok' });
+    expect(a.getState().status).toBe('signingIn'); // экран входа пишет «Входим…», пока таблица проверяет
     await flush();
     expect(s.sent.filter((x) => x.action === 'auth.login').map((x) => x.payload?.nonce)).toEqual(['N1']);
     expect(a.getState().status).toBe('signedIn');

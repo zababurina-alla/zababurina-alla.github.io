@@ -48,12 +48,16 @@ export function Keys() {
   const store = useStore();
   const withKey = store.clients.filter((c) => c.keyUntil).sort((a, b) => (a.keyUntil ?? '').localeCompare(b.keyUntil ?? ''));
   const noKey = store.clients.filter((c) => !c.keyUntil);
-  const soon = withKey.filter((c) => daysBetween(TODAY, c.keyUntil ?? TODAY) <= 14).length;
+  // Закончились и заканчиваются — разные вещи (п. 4): «7 заканчиваются», когда 4 уже закончились, вводило в заблуждение.
+  const gone = withKey.filter((c) => daysBetween(TODAY, c.keyUntil ?? TODAY) < 0).length;
+  const soon = withKey.filter((c) => { const d = daysBetween(TODAY, c.keyUntil ?? TODAY); return d >= 0 && d <= 14; }).length;
+  const title = [gone ? `${gone} ${plural(gone, 'закончился', 'закончились', 'закончились')}` : '', soon ? `${soon} продлить в ближайшие 14 дней` : '']
+    .filter(Boolean).join(', ') || 'продлевать пока нечего';
   return (
     <div className="page">
       <header className="page__head">
         <div>
-          <h1 className="page__title">Ключи ЭЦП <em>{soon ? `${soon} продлить в ближайшие 14 дней` : 'продлевать пока нечего'}</em></h1>
+          <h1 className="page__title">Ключи ЭЦП <em>{title}</em></h1>
           <p className="page__sub">По дате окончания. Продлить лучше за 14 дней — бот напомнит.</p>
         </div>
       </header>

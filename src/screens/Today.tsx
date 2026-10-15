@@ -6,7 +6,7 @@ import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { useStore } from '../data/store';
 import { TODAY, addDays, daysBetween, daysInMonth, daysLabel, fmtDate, monthName, plural, statusByDays, weekday, fmtDayMonth } from '../lib/dates';
-import { monthStats } from '../lib/monthStats';
+import { growthLabel, monthStats } from '../lib/monthStats';
 import { formatMoney } from '../lib/money';
 import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
@@ -122,6 +122,11 @@ export function Today() {
   const PRIO = { critical: 0, high: 1, medium: 2, low: 3 } as const;
   const todayTasks = store.tasks.filter((t) => !t.done && t.due && t.due <= TODAY)
     .sort((a, b) => PRIO[a.priority] - PRIO[b.priority] || (a.due ?? '').localeCompare(b.due ?? ''));
+  // Просроченные задачи — отдельно от сегодняшних (п. 3, 43): «8 задач на сегодня», когда все 8 просрочены, — неправда.
+  const tasksLate = todayTasks.filter((t) => (t.due ?? TODAY) < TODAY).length;
+  const tasksToday = todayTasks.length - tasksLate;
+  const tasksTitle = tasksLate ? (tasksToday ? 'Задачи: просроченные и на сегодня' : 'Просроченные задачи') : 'Задачи на сегодня';
+  const tasksN = [tasksLate ? `${tasksLate} ${plural(tasksLate, 'просрочена', 'просрочены', 'просрочено')}` : '', tasksToday ? `${tasksToday} на сегодня` : ''].filter(Boolean).join(', ');
 
   const pick = { week: [...overdue, ...burning], overdue, burning, soon, month: withDays.filter((x) => x.days <= 30) }[filter];
   const list = pick.map((x) => x.d);
@@ -148,7 +153,7 @@ export function Today() {
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' });
   const plan = [
     overdue.length && { key: 'overdue', icon: 'overdue' as const, tone: 'red', title: 'Закрыть просроченные', n: `${overdue.length} ${plural(overdue.length, 'срок', 'срока', 'сроков')}` },
-    todayTasks.length && { key: 'tasks', icon: 'tasks' as const, tone: 'accent', title: 'Задачи на сегодня', n: `${todayTasks.length} ${plural(todayTasks.length, 'задача', 'задачи', 'задач')}` },
+    todayTasks.length && { key: 'tasks', icon: 'tasks' as const, tone: tasksLate ? 'red' : 'accent', title: tasksTitle, n: tasksN },
     store.questions.length && { key: 'q', icon: 'questions' as const, tone: 'wheat', title: 'Ответить Дмитрию', n: `${store.questions.length} ${plural(store.questions.length, 'вопрос', 'вопроса', 'вопросов')}` },
     keys.length && { key: 'keys', icon: 'keys' as const, tone: keysGone ? 'red' : 'accent', title: keysGone ? 'Ключи ЭЦП: закончились' : 'Продлить ключи ЭЦП', n: `${keys.length} ${plural(keys.length, 'клиент', 'клиента', 'клиентов')}` },
     burning.length && { key: 'burning', icon: 'burning' as const, tone: 'orange', title: 'Горит на неделе', n: `${burning.length} ${plural(burning.length, 'срок', 'срока', 'сроков')}` },
@@ -175,7 +180,8 @@ export function Today() {
   if (!overdue.length && !burning.length) lede.push(soon.length ? `Ближайшие сроки — через 8–30 дней, их ${soon.length}.` : 'Открытых сроков на месяц вперёд нет.');
   if (keysGone) lede.push(`${keysGone} ${plural(keysGone, 'ключ ЭЦП уже закончился', 'ключа ЭЦП уже закончились', 'ключей ЭЦП уже закончились')}.`);
   if (keysSoon) lede.push(`${keysSoon} ${plural(keysSoon, 'ключ ЭЦП заканчивается', 'ключа ЭЦП заканчиваются', 'ключей ЭЦП заканчиваются')} в ближайшие ${KEY_DAYS} дней.`);
-  if (todayTasks.length) lede.push(`${todayTasks.length} ${plural(todayTasks.length, 'задача', 'задачи', 'задач')} на сегодня.`);
+  if (tasksLate) lede.push(`${tasksLate} ${plural(tasksLate, 'задача просрочена', 'задачи просрочены', 'задач просрочено')}.`);
+  if (tasksToday) lede.push(`${tasksToday} ${plural(tasksToday, 'задача', 'задачи', 'задач')} на сегодня.`);
   if (store.questions.length) lede.push(`Дмитрий ждёт ответа на ${store.questions.length} ${plural(store.questions.length, 'вопрос', 'вопроса', 'вопросов')}.`);
   if (overdue.length) lede.push('Начните с красных.');
 
@@ -241,7 +247,7 @@ export function Today() {
 
           {todayTasks.length > 0 && (
             <section className="panel reveal" aria-labelledby="t-tasks">
-              <header className="panel__head"><h2 id="t-tasks" className="panel__title">Задачи на сегодня<span className="sub num">{todayTasks.length}</span></h2><a className="link" href="#/tasks">Все задачи</a></header>
+              <header className="panel__head"><h2 id="t-tasks" className="panel__title">{tasksTitle}<span className="sub num">{tasksN}</span></h2><a className="link" href="#/tasks">Все задачи</a></header>
               <ul className="tasks">
                 {todayTasks.slice(0, 6).map((t) => {
                   const c = t.clientId ? store.client(t.clientId) : undefined;
@@ -295,7 +301,7 @@ export function Today() {
               <p className="money-card__sum display"><RollingNumber value={month.total} format={(n) => formatMoney(n)} /></p>
               <p className="sub">в {monthName(month.prevKey, 'prep')} — <Money text={formatMoney(month.prevTotal)} />
                 {month.growth !== null && month.growth !== 0 && (
-                  <> · <span className={month.growth > 0 ? 'up' : 'trend-down'}><Icon name={month.growth > 0 ? 'arrowUp' : 'arrowDown'} size={14} />{Math.abs(month.growth)}{' '}% к{' '}{monthName(month.prevKey, 'dat')}</span></>
+                  <> · <span className={month.growth > 0 ? 'up' : 'trend-down'}><Icon name={month.growth > 0 ? 'arrowUp' : 'arrowDown'} size={14} />{growthLabel(month.growth)} к{' '}{monthName(month.prevKey, 'dat')}</span></>
                 )}</p>
               <AreaChart cumulative={month.cumulative} month={month.key} />
             </div>

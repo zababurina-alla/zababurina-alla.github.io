@@ -10,7 +10,7 @@ import type { PayMethod, Payment } from '../data/types';
 
 type DatedPayment = Payment & { date: string };
 import { TODAY, addDays, daysInMonth, fmtDayMonth, monthKey, monthName, plural, prevMonthKey, weekday } from '../lib/dates';
-import { monthStats } from '../lib/monthStats';
+import { growthLabel, monthStats } from '../lib/monthStats';
 import { formatMoney, formatPayMoney } from '../lib/money';
 import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
@@ -47,20 +47,26 @@ export function Payments() {
   const scope = useRef<HTMLDivElement>(null);
   const current = monthKey(TODAY);
   const [month, setMonth] = useState(current);
-  const [loading, setLoading] = useState<string | null>(null);
-  const loaded = useRef(new Set<string>());
+  // Месяцы старше снимка: догружены ('ok'), не загрузились ('error'); нет записи — ещё не пришли.
+  const [months, setMonths] = useState<Record<string, 'ok' | 'error'>>({});
+  const inflight = useRef(new Set<string>());
   const { loadPaymentsMonth } = store;
+  const outside = (k: string) => `${k}-01` < SNAPSHOT_FROM;
   // Месяц (и прошлый — для сравнения), который весь или частично старше снимка, — догрузить из таблицы один раз.
   useEffect(() => {
-    const need = [month, prevMonthKey(month)].filter((k) => `${k}-01` < SNAPSHOT_FROM && !loaded.current.has(k));
-    if (!need.length) return;
-    let alive = true;
-    setLoading(month);
-    void Promise.all(need.map((k) => loadPaymentsMonth(k).then(() => { loaded.current.add(k); })))
-      .catch(() => undefined)
-      .finally(() => { if (alive) setLoading(null); });
-    return () => { alive = false; };
-  }, [month, loadPaymentsMonth]);
+    for (const k of [month, prevMonthKey(month)]) {
+      if (!outside(k) || months[k] || inflight.current.has(k)) continue;
+      inflight.current.add(k);
+      void loadPaymentsMonth(k).then(() => 'ok' as const, () => 'error' as const).then((st) => {
+        inflight.current.delete(k);
+        setMonths((m) => ({ ...m, [k]: st }));
+      });
+    }
+  }, [month, months, loadPaymentsMonth]);
+  // Пока месяц не пришёл из таблицы, итога нет: «0,00 ₴» читалось бы как «платежей не было» (п. 38).
+  const monthLoading = [month, prevMonthKey(month)].some((k) => outside(k) && !months[k]);
+  const monthFailed = [month, prevMonthKey(month)].some((k) => months[k] === 'error');
+  const retryMonth = () => setMonths((m) => Object.fromEntries(Object.entries(m).filter(([, st]) => st !== 'error')));
   const last = month === current ? TODAY : `${month}-${String(daysInMonth(month)).padStart(2, '0')}`;
   const stats = monthStats(store.payments, last);
   // Пустая дата или сумма в листе — не в днях и не в итогах, а отдельной группой: маме видно, что поправить в таблице.
@@ -89,7 +95,7 @@ export function Payments() {
             <button type="button" className="icon-btn" onClick={() => setMonth(prevMonthKey(month))} aria-label={`Платежи за ${monthName(prevMonthKey(month), 'nom').toLowerCase()}`}><Icon name="chevronLeft" size={18} /></button>
             <button type="button" className="icon-btn" onClick={() => setMonth(nextMonthKey(month))} disabled={month === current} aria-label={`Платежи за ${monthName(nextMonthKey(month), 'nom').toLowerCase()}`}><Icon name="chevronRight" size={18} /></button>
             {month !== current && <button type="button" className="link" onClick={() => setMonth(current)}>к текущему месяцу</button>}
-            {loading === month && <span className="sub" role="status">Загружаем {monthName(month, 'nom').toLowerCase()} из таблицы…</span>}
+            {monthFailed && <span className="sub" role="alert">Не загрузилось из таблицы. <button type="button" className="link" onClick={retryMonth}>Ещё раз</button></span>}
           </p>
         </div>
         <button type="button" className="btn btn--primary" onClick={() => ui.openPayment()} {...roAttrs('payments')}><Icon name="plus" />Записать платёж</button>
@@ -98,14 +104,18 @@ export function Payments() {
       <section className="hero pay-hero reveal" aria-label="Итог месяца">
         <div className="pay-hero__sum">
           <p className="eyebrow">Получено в {monthName(stats.key, 'prep')}</p>
+          {monthLoading ? (
+            <p className="pay-hero__value pay-hero__value--wait" role="status">Загружаем {monthName(month, 'nom').toLowerCase()} из таблицы…</p>
+          ) : <>
           <p className="pay-hero__value display"><RollingNumber value={stats.total} format={(n) => formatMoney(n)} /></p>
           <p className="pay-hero__note">
             <span>{stats.count} {plural(stats.count, 'платёж', 'платежа', 'платежей')}</span>
             <span>в {monthName(stats.prevKey, 'prep')} — <Money text={formatMoney(stats.prevTotal)} /></span>
             {growth !== null && growth !== 0 && (
-              <span className={growth > 0 ? 'up' : 'trend-down'}><Icon name={growth > 0 ? 'arrowUp' : 'arrowDown'} size={14} />{Math.abs(growth)}{' '}% к{' '}{monthName(stats.prevKey, 'dat')}</span>
+              <span className={growth > 0 ? 'up' : 'trend-down'}><Icon name={growth > 0 ? 'arrowUp' : 'arrowDown'} size={14} />{growthLabel(growth)} к{' '}{monthName(stats.prevKey, 'dat')}</span>
             )}
           </p>
+          </>}
           {waiting.length > 0 && (
             <p className="pay-hero__wait"><Icon name="waiting" size={16} />Ещё {waiting.length} {plural(waiting.length, 'платёж', 'платежа', 'платежей')} не в кассе: <Money text={formatMoney(waiting.reduce((s, p) => s + (p.kopecks ?? 0), 0))} /> — в итог не входят</p>
           )}
@@ -122,7 +132,8 @@ export function Payments() {
       </section>
 
       <section className="panel reveal" aria-label="Платежи по дням">
-        {byDay.size === 0 && check.length === 0 && (
+        {monthLoading && byDay.size === 0 && <p className="panel__note sub" role="status">Загружаем платежи из таблицы…</p>}
+        {!monthLoading && byDay.size === 0 && check.length === 0 && (
           <Empty pic="wallet" title={`В ${monthName(stats.key, 'prep')} платежей пока нет`} action={
             <button type="button" className="btn btn--primary" onClick={() => ui.openPayment()} {...roAttrs('payments')}><Icon name="plus" />Записать платёж</button>
           }>Записанные с сайта, через бота и в таблице появятся здесь.</Empty>
