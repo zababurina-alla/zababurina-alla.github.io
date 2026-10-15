@@ -69,7 +69,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     : [];
   const payments: Item[] = deep
     ? search(store.payments.map((p) => ({ ...p, name: `${who(p.clientId)} ${p.period}`, extra: [String(Math.round((p.kopecks ?? 0) / 100))] })), q)
-      .sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4)
+      .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '')).slice(0, 4)
       .map((p) => ({ id: `p-${p.id}`, group: 'Платежи', label: `${shortName(who(p.clientId)) || 'Клиент не указан'} — ${p.period}`,
         hint: formatPayMoney(p.kopecks), icon: 'payments' as IconName, run: () => (p.clientId ? ui.openClient(p.clientId) : navigate('#/payments')) }))
     : [];

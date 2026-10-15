@@ -147,12 +147,18 @@ export function Today() {
   // Каждый шаг — одно нажатие к нужному: фильтр списка, лист задач или вопросов, экран ключей.
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' });
   const plan = [
-    overdue.length && { key: 'overdue', icon: 'overdue' as const, tone: 'red', title: 'Закрыть просроченные', n: `${overdue.length} ${plural(overdue.length, 'срок', 'срока', 'сроков')}`, go: () => toggle('overdue') },
-    todayTasks.length && { key: 'tasks', icon: 'tasks' as const, tone: 'accent', title: 'Задачи на сегодня', n: `${todayTasks.length} ${plural(todayTasks.length, 'задача', 'задачи', 'задач')}`, go: () => scrollTo('t-tasks') },
-    store.questions.length && { key: 'q', icon: 'questions' as const, tone: 'wheat', title: 'Ответить Дмитрию', n: `${store.questions.length} ${plural(store.questions.length, 'вопрос', 'вопроса', 'вопросов')}`, go: () => scrollTo('t-q') },
-    keys.length && { key: 'keys', icon: 'keys' as const, tone: keysGone ? 'red' : 'accent', title: keysGone ? 'Ключи ЭЦП: закончились' : 'Продлить ключи ЭЦП', n: `${keys.length} ${plural(keys.length, 'клиент', 'клиента', 'клиентов')}`, go: () => navigate('#/keys') },
-    burning.length && { key: 'burning', icon: 'burning' as const, tone: 'orange', title: 'Горит на неделе', n: `${burning.length} ${plural(burning.length, 'срок', 'срока', 'сроков')}`, go: () => toggle('burning') },
-  ].filter(Boolean) as { key: string; icon: IconName; tone: string; title: string; n: string; go: () => void }[];
+    overdue.length && { key: 'overdue', icon: 'overdue' as const, tone: 'red', title: 'Закрыть просроченные', n: `${overdue.length} ${plural(overdue.length, 'срок', 'срока', 'сроков')}` },
+    todayTasks.length && { key: 'tasks', icon: 'tasks' as const, tone: 'accent', title: 'Задачи на сегодня', n: `${todayTasks.length} ${plural(todayTasks.length, 'задача', 'задачи', 'задач')}` },
+    store.questions.length && { key: 'q', icon: 'questions' as const, tone: 'wheat', title: 'Ответить Дмитрию', n: `${store.questions.length} ${plural(store.questions.length, 'вопрос', 'вопроса', 'вопросов')}` },
+    keys.length && { key: 'keys', icon: 'keys' as const, tone: keysGone ? 'red' : 'accent', title: keysGone ? 'Ключи ЭЦП: закончились' : 'Продлить ключи ЭЦП', n: `${keys.length} ${plural(keys.length, 'клиент', 'клиента', 'клиентов')}` },
+    burning.length && { key: 'burning', icon: 'burning' as const, tone: 'orange', title: 'Горит на неделе', n: `${burning.length} ${plural(burning.length, 'срок', 'срока', 'сроков')}` },
+  ].filter(Boolean) as { key: string; icon: IconName; tone: string; title: string; n: string }[];
+  const goPlan = (key: string) => {
+    if (key === 'overdue' || key === 'burning') toggle(key);
+    else if (key === 'tasks') scrollTo('t-tasks');
+    else if (key === 'q') scrollTo('t-q');
+    else if (key === 'keys') navigate('#/keys');
+  };
 
   const hour = new Date().getHours();
   const hello = hour < 12 ? 'Доброе утро' : hour < 18 ? 'Добрый день' : 'Добрый вечер';
@@ -195,7 +201,7 @@ export function Today() {
           <ol className="plan__steps">
             {plan.map((p, i) => (
               <li key={p.key}>
-                <button type="button" className={`plan__step plan__step--${p.tone}`} onClick={p.go}>
+                <button type="button" className={`plan__step plan__step--${p.tone}`} onClick={() => goPlan(p.key)}>
                   <span className="plan__n display">{i + 1}</span>
                   <span className="plan__text"><strong>{p.title}</strong><span className="sub">{p.n}</span></span>
                   <Icon name={p.icon} size={20} className={`urgency--${p.tone === 'accent' || p.tone === 'wheat' ? 'grey' : p.tone}`} />

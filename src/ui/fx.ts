@@ -23,7 +23,7 @@ function frame() {
   el.style.setProperty('--fx-on', '1');
 }
 
-if (typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+if (typeof window !== 'undefined' && window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) {
   document.addEventListener('pointermove', (e) => {
     if (e.pointerType !== 'mouse') return;
     last = e;

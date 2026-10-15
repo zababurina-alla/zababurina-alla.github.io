@@ -160,7 +160,9 @@ export function Payments() {
         <span className="paylist__how sub"><Icon name={METHOD_ICON[p.method]} size={16} />{METHOD_LABEL[p.method]}<span className="paylist__src" title={`Записано ${src.text}`}><Icon name={src.icon} size={14} />{src.text}</span></span>
         {p.save ? <SaveBadge state={p.save} offline={!store.online} onRetry={() => store.retry(p.id)} />
           : !got && p.status ? <span className="pill pill--grey">{PAY_STATUS_LABEL[p.status]}</span> : <span />}
-        <span className="paylist__sum display"><Money text={formatPayMoney(p.kopecks)} /></span>
+        {p.kopecks === null
+          ? <span className="paylist__sum paylist__sum--none nil">сумма не указана</span>
+          : <span className="paylist__sum display"><Money text={formatPayMoney(p.kopecks)} /></span>}
       </li>
     );
   }

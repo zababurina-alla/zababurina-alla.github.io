@@ -550,3 +550,29 @@
 .fab[aria-disabled='true'] {
   display: none;
 }
+
+/* Шапка телефона: когда связи есть что сказать (сохраняется, нет связи, не сохранилось, только просмотр) — название
+   прячется, остаётся знак «Б»; текст статуса — в одну строку с многоточием. Иначе шапка была шире экрана (511 px при 360). */
+.topbar__tools {
+  flex: 1;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.topbar .sync {
+  min-width: 0;
+}
+
+.topbar .sync__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar:has(.sync.is-saving, .sync.is-offline, .sync.is-failed, .sync.is-readonly) .brand__name {
+  display: none;
+}
+
+.topbar .closed-chip--compact {
+  flex: none;
+}
