@@ -1,4 +1,4 @@
-// «Входящие» на сайте: новое сообщение клиента из синхронизации — заметное уведомление со ссылкой; «уже решено» в
+// «Входящие» на сайте: новое сообщение клиента из синхронизации — заметное уведомление со ссылкой в его чат; «уже решено» в
 // Telegram (CONFLICT с current) — спокойная подсказка «Уже решено: записано», а не ошибка; сообщение встаёт в статус.
 import { act, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -41,7 +41,7 @@ describe('входящие на сайте', () => {
     await act(async () => { await box.s?.syncNow(); });
     expect(box.s?.inbox.map((x) => x.id)).toEqual(['I-1']);
     const fresh = box.s?.notices.find((n) => n.text.startsWith('Новое сообщение'));
-    expect(fresh).toMatchObject({ info: true, href: '#/inbox' });
+    expect(fresh).toMatchObject({ info: true, href: '#/inbox/C-1' }); // сразу в чат клиента
     expect(fresh?.text).toContain('Тестовий клієнт');
 
     await act(async () => { box.s?.decideInbox('I-1', 'accept'); });

@@ -88,12 +88,27 @@ export const TASKS: Task[] = [
 ];
 
 export const INBOX: InboxItem[] = [
+  // Калиновська — платежи: решённый вчера, новый сегодня (с налогом), вопрос
+  { id: 'in5', at: '2026-10-12T10:15', clientId: 'c3', clientName: 'Калиновська Ірина', type: 'payment',
+    snippet: 'Оплатила ЄСВ за вересень, 1 902,34', amount: 190234, status: 'accepted', decidedAt: '2026-10-12T10:40', repliedAt: '2026-10-12T10:41' },
+  { id: 'in6', at: '2026-10-13T18:02', clientId: 'c3', clientName: 'Калиновська Ірина', type: 'question',
+    snippet: 'А коли треба платити за жовтень?', amount: null, status: 'task', decidedAt: '2026-10-13T19:10' },
   { id: 'in1', at: '2026-10-14T08:52', clientId: 'c3', clientName: 'Калиновська Ірина', type: 'payment',
     snippet: 'Добрий день! Оплатила ЄП за жовтень, 1 200 грн, квитанцію надішлю', amount: 120000, status: 'new', taxKopecks: 120000 },
+  { id: 'in7', at: '2026-10-14T08:55', clientId: 'c3', clientName: 'Калиновська Ірина', type: 'file',
+    snippet: 'квитанція.pdf', amount: null, status: 'new', file: true },
+  // Мирошниченко — документы: длинное сообщение, файл, отклонённое
+  { id: 'in8', at: '2026-10-12T14:20', clientId: 'c12', clientName: 'Мирошниченко Ольга', type: 'question',
+    snippet: 'Підкажіть, будь ласка: я з листопада хочу перейти на третю групу, бо з’явились клієнти-юрособи, а на другій мені з ними працювати не можна. Що для цього треба подати і до якого числа? І чи зміниться у мене ЄСВ?',
+    amount: null, status: 'task', decidedAt: '2026-10-12T15:00', repliedAt: '2026-10-12T15:02' },
+  { id: 'in9', at: '2026-10-13T09:05', clientId: 'c12', clientName: 'Мирошниченко Ольга', type: 'document',
+    snippet: 'Це не вам, вибачте', amount: null, status: 'rejected', decidedAt: '2026-10-13T09:30' },
   { id: 'in2', at: '2026-10-14T08:30', clientId: 'c12', clientName: 'Мирошниченко Ольга', type: 'document',
     snippet: 'Надсилаю виписку з банку за вересень', amount: null, status: 'new', file: true },
+  // Ясенко — вопрос
   { id: 'in3', at: '2026-10-13T19:05', clientId: 'c5', clientName: 'Ясенко Микола', type: 'question',
     snippet: 'Чи треба мені подавати щось через новий КВЕД?', amount: null, status: 'new' },
+  // Неизвестный номер — свой чат по имени
   { id: 'in4', at: '2026-10-13T12:10', clientId: null, clientName: 'Невідомий номер +380…', type: 'question',
     snippet: 'Добрий день, мені порадили вас як бухгалтера', amount: null, status: 'new' },
 ];

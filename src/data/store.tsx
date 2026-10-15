@@ -20,7 +20,8 @@ import type { Change, DeadlinePatch, InboxAction, RemindPreview, RemindRequest, 
 import type { Activity, Client, DatedDeadline, Deadline, InboxItem, Payment, Question, SaveState, Task } from './types';
 import { isDated } from './types';
 import { TODAY, addDays, fmtDate, plural } from '../lib/dates';
-import { play } from '../lib/sound';
+import { play, soundSettings } from '../lib/sound';
+import { threadKey } from '../lib/inboxThreads';
 
 // Опрос изменений из таблицы: бриф — раз в 30–60 с. Квоты Apps Script дневного лимита на запросы не задают
 // (developers.google.com/apps-script/guides/services/quotas), но одновременных выполнений — 30 на владельца.
@@ -240,7 +241,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           // Новое сообщение клиента (не наше, раньше не было) — заметное уведомление, а не только цифра в меню.
           if (!own && rec.status === 'new' && hasFeature('inbox')) {
             setInbox((xs) => {
-              if (!xs.some((x) => x.id === rec.id)) setNotices((ns) => [...ns, { id: `in-${rec.id}`, text: `Новое сообщение: ${rec.clientName} — «${rec.snippet.slice(0, 60)}${rec.snippet.length > 60 ? '…' : ''}»`, info: true, key: `inbox-new-${rec.id}`, href: '#/inbox' }]);
+              if (!xs.some((x) => x.id === rec.id)) {
+                setNotices((ns) => [...ns, { id: `in-${rec.id}`, text: `Новое сообщение: ${rec.clientName} — «${rec.snippet.slice(0, 60)}${rec.snippet.length > 60 ? '…' : ''}»`, info: true, key: `inbox-new-${rec.id}`, href: `#/inbox/${encodeURIComponent(threadKey(rec))}` }]);
+                // Звук на новое сообщение — даже без нажатия (владелец, 16.10).
+                if (soundSettings.on) play('incoming', true); // force — без нажатия; on — «выкл» и «ночью тихо» соблюдаются
+              }
               return upsert(xs, rec);
             });
           } else setInbox((xs) => upsert(xs, rec));
