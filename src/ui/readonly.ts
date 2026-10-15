@@ -19,5 +19,6 @@ const DO_IT: Record<WriteArea, string> = {
 };
 
 export function roMessage(area: WriteArea): string {
-  return `${DO_IT[area]} — на сайте появится само`;
+  // Напоминание, отправленное самой в Telegram, на сайте не появится — без этого хвоста.
+  return area === 'remind' ? DO_IT[area] : `${DO_IT[area]} — на сайте появится само`;
 }
