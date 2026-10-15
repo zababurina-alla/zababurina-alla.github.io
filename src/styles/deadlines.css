@@ -201,6 +201,8 @@
   height: 1.75rem;
   border-radius: 50%;
   box-shadow: inset 0 0 0 2px var(--field-border);
+  /* Бледная галочка внутри — кружок читается как «отметить сделанным» и без наведения (находка «Пользователя» № 7) */
+  color: color-mix(in srgb, var(--ink-2) 40%, transparent);
   transition: box-shadow var(--dur-fast) ease, background-color var(--dur-base) ease, color var(--dur-fast) ease,
     transform var(--dur-pop) var(--spring-pop);
 }

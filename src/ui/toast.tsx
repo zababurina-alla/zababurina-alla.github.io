@@ -70,7 +70,7 @@ function Toast({ t, index, onClose }: { t: ToastItem; index: number; onClose: (i
     onPointerCancel: () => { drag.current = null; setDx(0); },
   };
   return (
-    <div className={`toast toast--${t.tone ?? 'ok'}${t.from ? ' toast--message' : ''}${t.leaving ? ' is-leaving' : ''}${dx ? ' is-dragging' : ''}`} role={t.tone === 'error' ? 'alert' : 'status'}
+    <div className={`toast toast--${t.tone ?? 'ok'}${t.from ? ' toast--message' : ''}${!t.from && t.action && t.text.length + t.action.label.length > 70 ? ' toast--stack' : ''}${t.leaving ? ' is-leaving' : ''}${dx ? ' is-dragging' : ''}`} role={t.tone === 'error' ? 'alert' : 'status'}
       style={{ '--i': index, '--dx': `${dx}px`, '--drag-o': String(Math.max(0.2, 1 - Math.abs(dx) / 220)) } as React.CSSProperties}
       onPointerEnter={() => setPaused(true)} onPointerLeave={() => setPaused(document.hidden)}
       onFocus={() => setPaused(true)} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setPaused(document.hidden); }}

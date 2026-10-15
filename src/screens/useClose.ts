@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import gsap from 'gsap';
 import { useStore } from '../data/store';
-import { TODAY, addDays, fmtDate, fmtDue, daysBetween, plural } from '../lib/dates';
+import { TODAY, addDays, fmtDate, daysBetween, plural } from '../lib/dates';
 import { play } from '../lib/sound';
 import { reducedMotion } from '../ui/kit';
 import { useToast } from '../ui/toast';
@@ -12,6 +12,19 @@ import { canWrite } from '../config';
 import { roMessage } from '../ui/readonly';
 
 const FAR_DAYS = 30;
+
+// Находка «Пользователя» № 8: строка закрытого срока уезжает, список поднимается — под курсором оказывается кружок
+// следующего срока, и второй щелчок закрыл бы чужой срок. Поэтому 1,2 с после закрытия нажатие на кружок без движения
+// мыши (меньше 12 px) не считается: кружок только качнётся. Сдвинули мышь или нажали позже — закрывается как обычно.
+const GUARD_MS = 1200;
+const GUARD_PX = 12;
+let guard: { until: number; x: number; y: number } | null = null;
+let px = 0;
+let py = 0;
+if (typeof window !== 'undefined') {
+  window.addEventListener('pointermove', (e) => { px = e.clientX; py = e.clientY; }, { capture: true, passive: true });
+}
+const guarded = () => guard !== null && Date.now() < guard.until && Math.hypot(px - guard.x, py - guard.y) < GUARD_PX;
 
 export function useCloseDeadline(rowSelector = '[data-row]') {
   const store = useStore();
@@ -24,6 +37,11 @@ export function useCloseDeadline(rowSelector = '[data-row]') {
   function close(id: string) {
     const d = store.deadlines.find((x) => x.id === id);
     if (!d || closing) return;
+    if (guarded()) {
+      const btn = document.querySelector<HTMLElement>(`${rowSelector}[data-id="${id}"] .check-btn`);
+      if (btn && !reducedMotion()) gsap.fromTo(btn, { x: -3 }, { x: 0, duration: 0.4, ease: 'elastic.out(1, 0.35)' });
+      return;
+    }
     // Сроки с сайта пока не закрываются (только просмотр) — подпись в строке, как с периодом.
     if (!canWrite('deadlines')) {
       setWarn((w) => ({ ...w, [id]: roMessage('deadlines') }));
@@ -47,15 +65,19 @@ export function useCloseDeadline(rowSelector = '[data-row]') {
     setClosing(id);
     const row = document.querySelector<HTMLElement>(`${rowSelector}[data-id="${id}"]`);
     const animate = Boolean(row) && !reducedMotion();
+    guard = { until: Date.now() + (animate ? 600 : 0) + GUARD_MS, x: px, y: py };
     const name = store.client(d.clientId)?.name.split(' ').slice(0, 2).join(' ') ?? '';
     // Запись уходит в очередь сразу по нажатию. «Закрыто в таблице» — только после ответа сервера (бриф, п. 6).
-    const res = store.closeDeadline(id, (next, notifyAt) => {
+    const res = store.closeDeadline(id, (_next, notifyAt) => {
       play('closed');
-      // Уведомление клиенту уходит через 2 мин (контракт v2, п. 31) — «Отменить» успевает его остановить.
-      const notice = notifyAt ? ' Клиенту сообщим через 2 мин — можно отменить.' : '';
+      // Уведомление клиенту уходит через 2 мин (контракт v2, п. 31) — «Вернуть срок» успевает его остановить.
+      // Находки «Пользователя» № 7, № 9: одна строка «кто и какой срок», без «сообщим… можно отменить»; кнопка говорит,
+      // что вернёт. Следующий срок виден в списке — в уведомлении не нужен.
+      const what = d.what.replace(/^\p{Extended_Pictographic}️?\s*/u, '');
       toast({
-        text: (next ? `Закрыто в таблице: ${name}. Следующий срок создан — до ${fmtDue(next.due)}.` : `Закрыто в таблице: ${name}.`) + notice,
-        action: { label: 'Отменить', run: () => store.reopenDeadline(id) },
+        text: `Закрыт: ${name} — ${what}.${notifyAt ? ' Клиенту — через 2 мин.' : ''}`,
+        action: { label: 'Вернуть срок', run: () => store.reopenDeadline(id) },
+        timeout: 12_000,
       });
     }, animate ? 600 : 0);
     window.setTimeout(() => setClosing(null), animate ? 600 : 0);

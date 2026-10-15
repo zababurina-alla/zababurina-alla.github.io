@@ -437,6 +437,23 @@
   to { transform: scaleX(0); }
 }
 
+/* Кнопка под текстом: всегда на телефоне и у длинного текста с длинной кнопкой (toast--stack) — текст во всю ширину,
+   «Закрыто… Следующий… Клиент узнает…» в две строки, а не в четыре (находка № 9) */
+.toast--stack {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.toast--stack .toast__action {
+  grid-column: 2 / -1;
+  justify-self: start;
+  margin-left: calc(var(--space-2) * -1);
+}
+
+.toast--stack .toast__close {
+  grid-row: 1;
+  grid-column: 3;
+}
+
 @media (max-width: 479px) {
   .toast {
     grid-template-columns: auto minmax(0, 1fr) auto;

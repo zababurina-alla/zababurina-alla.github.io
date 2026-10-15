@@ -49,6 +49,7 @@ const hhmm = (at: string) => at.slice(11, 16);
 function InboxActions({ it }: { it: InboxItem }) {
   const store = useStore();
   const [editing, setEditing] = useState(false);
+  const [taskPick, setTaskPick] = useState(false);
   const [sum, setSum] = useState(it.amount ? String(it.amount / 100) : '');
   const can = canWrite('inbox');
   const saving = store.pending.some((p) => p.op.kind === 'decideInbox' && p.op.id === it.id);
@@ -79,9 +80,19 @@ function InboxActions({ it }: { it: InboxItem }) {
       ) : it.clientId && (
         <button type="button" className="btn btn--primary btn--sm" onClick={() => decide('accept')} {...roAttrs('inbox')}>{INBOX_TYPE[it.type].accept}</button>
       )}
-      {it.taxKopecks ? <button type="button" className="btn btn--secondary btn--sm" onClick={() => decide('taxTask')} {...roAttrs('inbox')}>Задача по налогу</button> : null}
-      <button type="button" className="btn btn--secondary btn--sm" onClick={() => decide('task')} {...roAttrs('inbox')}>Задача</button>
-      <button type="button" className="btn btn--ghost btn--sm" onClick={() => decide('reject')} {...roAttrs('inbox')}>Нет</button>
+      {/* Одна «Задача» (находка № 16): если в сообщении есть налог — выбор вида тут же, а не вторая кнопка рядом */}
+      {it.taxKopecks && taskPick ? (
+        <span className="inbox__pick" role="group" aria-label="Какую задачу создать">
+          <button type="button" className="btn btn--secondary btn--sm" onClick={() => decide('task')} {...roAttrs('inbox')}>Обычная задача</button>
+          <button type="button" className="btn btn--secondary btn--sm" onClick={() => decide('taxTask')} {...roAttrs('inbox')}>По налогу {formatMoney(it.taxKopecks)}</button>
+          <button type="button" className="btn btn--ghost btn--sm" onClick={() => setTaskPick(false)}>Отмена</button>
+        </span>
+      ) : (
+        <button type="button" className="btn btn--secondary btn--sm" aria-expanded={it.taxKopecks ? false : undefined}
+          onClick={() => (it.taxKopecks ? setTaskPick(true) : decide('task'))} {...roAttrs('inbox')}>Задача</button>
+      )}
+      {/* «Нет» читалось как «откажем клиенту» (находка № 14) — это просто «не нужно, скрыть»; клиенту ничего не уходит */}
+      {!taskPick && <button type="button" className="btn btn--ghost btn--sm" title="Скрыть — клиенту ничего не отправим" onClick={() => decide('reject')} {...roAttrs('inbox')}>Не нужно</button>}
     </div>
   );
 }
