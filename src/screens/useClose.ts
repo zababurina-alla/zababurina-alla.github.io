@@ -25,6 +25,8 @@ if (typeof window !== 'undefined') {
   window.addEventListener('pointermove', (e) => { px = e.clientX; py = e.clientY; }, { capture: true, passive: true });
 }
 const guarded = () => guard !== null && Date.now() < guard.until && Math.hypot(px - guard.x, py - guard.y) < GUARD_PX;
+/** Включить защиту: с этой точки курсора, на время анимации строки + GUARD_MS. */
+const armGuard = (animMs: number) => { guard = { until: Date.now() + animMs + GUARD_MS, x: px, y: py }; };
 
 export function useCloseDeadline(rowSelector = '[data-row]') {
   const store = useStore();
@@ -65,7 +67,7 @@ export function useCloseDeadline(rowSelector = '[data-row]') {
     setClosing(id);
     const row = document.querySelector<HTMLElement>(`${rowSelector}[data-id="${id}"]`);
     const animate = Boolean(row) && !reducedMotion();
-    guard = { until: Date.now() + (animate ? 600 : 0) + GUARD_MS, x: px, y: py };
+    armGuard(animate ? 600 : 0);
     const name = store.client(d.clientId)?.name.split(' ').slice(0, 2).join(' ') ?? '';
     // Запись уходит в очередь сразу по нажатию. «Закрыто в таблице» — только после ответа сервера (бриф, п. 6).
     const res = store.closeDeadline(id, (_next, notifyAt) => {
@@ -77,6 +79,8 @@ export function useCloseDeadline(rowSelector = '[data-row]') {
       toast({
         text: `Закрыт: ${name} — ${what}.${notifyAt ? ' Клиенту — через 2 мин.' : ''}`,
         action: { label: 'Вернуть срок', run: () => store.reopenDeadline(id) },
+        // № 7: срок закрыт, но клиенту не писать — кнопка есть, только если сервер это умеет (иначе cancelCloseNotice — null)
+        ...(notifyAt && store.cancelCloseNotice ? { secondary: { label: 'Не писать клиенту', run: () => { void cancelNotice(id); } } } : {}),
         timeout: 12_000,
       });
     }, animate ? 600 : 0);
@@ -90,6 +94,17 @@ export function useCloseDeadline(rowSelector = '[data-row]') {
     const what = row.querySelector<HTMLElement>('.dtable__what') ?? row;
     window.setTimeout(() => { void flyToCounter(what, d.what); }, 320);
     gsap.to(row, { opacity: 0, x: 16, duration: 0.24, ease: 'power2.in', delay: 0.34 });
+  }
+
+  async function cancelNotice(id: string) {
+    const cancel = store.cancelCloseNotice;
+    if (!cancel) return;
+    try {
+      const r = await cancel(id);
+      toast({ text: r.status === 'sent' ? (r.sentAt ? `Уже отправлено в ${r.sentAt.slice(11, 16)}` : 'Уже отправлено клиенту') : 'Клиенту не напишем — срок остаётся закрытым', tone: 'info' });
+    } catch {
+      toast({ text: 'Не получилось снять сообщение: таблица не ответила', tone: 'error' });
+    }
   }
 
   return { close, closing, warn };

@@ -394,6 +394,24 @@
   transition: background-color var(--dur-fast) ease, transform var(--dur-press) var(--ease-out);
 }
 
+/* Две кнопки ("Вернуть срок" + "Не писать клиенту") — рядом под текстом; вторая тише, без подложки */
+.toast__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.toast--stack .toast__actions {
+  grid-column: 2 / -1;
+  margin-left: calc(var(--space-2) * -1);
+}
+
+.toast__action--quiet {
+  background: transparent;
+  color: var(--on-toast);
+  font-weight: var(--weight-semibold);
+}
+
 .toast__action:active {
   transform: scale(0.96);
 }
@@ -443,13 +461,13 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
-.toast--stack .toast__action {
+.toast--stack > .toast__action {
   grid-column: 2 / -1;
   justify-self: start;
   margin-left: calc(var(--space-2) * -1);
 }
 
-.toast--stack .toast__close {
+.toast--stack > .toast__close {
   grid-row: 1;
   grid-column: 3;
 }

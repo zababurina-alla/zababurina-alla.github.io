@@ -12,6 +12,8 @@ export interface ToastInput {
   text: string;
   tone?: 'ok' | 'error' | 'info';
   action?: { label: string; run: () => void };
+  /** Вторая кнопка, тише главной: «Не писать клиенту» рядом с «Вернуть срок». */
+  secondary?: { label: string; run: () => void };
   /** мс; по умолчанию 5 с, с действием «Отменить» — 10 с (бриф, п. 4), ошибка — без таймера. */
   timeout?: number;
   /** Одно и то же событие (например, отказ по одной записи) — одно уведомление, даже если о нём сообщили дважды. */
@@ -71,7 +73,7 @@ function Toast({ t, index, onClose }: { t: ToastItem; index: number; onClose: (i
     onPointerCancel: () => { drag.current = null; setDx(0); },
   };
   return (
-    <div className={`toast toast--${t.tone ?? 'ok'}${t.from ? ' toast--message' : ''}${!t.from && t.action && t.text.length + t.action.label.length > 70 ? ' toast--stack' : ''}${t.leaving ? ' is-leaving' : ''}${dx ? ' is-dragging' : ''}`} role={t.tone === 'error' ? 'alert' : 'status'}
+    <div className={`toast toast--${t.tone ?? 'ok'}${t.from ? ' toast--message' : ''}${!t.from && t.action && (t.secondary || t.text.length + t.action.label.length > 70) ? ' toast--stack' : ''}${t.leaving ? ' is-leaving' : ''}${dx ? ' is-dragging' : ''}`} role={t.tone === 'error' ? 'alert' : 'status'}
       style={{ '--i': index, '--dx': `${dx}px`, '--drag-o': String(Math.max(0.2, 1 - Math.abs(dx) / 220)) } as React.CSSProperties}
       onPointerEnter={() => setPaused(true)} onPointerLeave={() => setPaused(document.hidden)}
       onFocus={() => setPaused(true)} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setPaused(document.hidden); }}
@@ -80,9 +82,14 @@ function Toast({ t, index, onClose }: { t: ToastItem; index: number; onClose: (i
       {t.from
         ? <span className="toast__text"><span className="toast__from"><strong>{t.from.name}</strong><time className="num" dateTime={t.from.at}>{t.from.at.slice(11, 16)}</time></span><span className="toast__msg">{t.text}</span></span>
         : <span className="toast__text">{t.text}</span>}
-      {t.action && (
+      {t.action && (t.secondary ? (
+        <span className="toast__actions">
+          <button type="button" className="toast__action" onClick={() => { t.action?.run(); onClose(t.id); }}>{t.action.label}</button>
+          <button type="button" className="toast__action toast__action--quiet" onClick={() => { t.secondary?.run(); onClose(t.id); }}>{t.secondary.label}</button>
+        </span>
+      ) : (
         <button type="button" className="toast__action" onClick={() => { t.action?.run(); onClose(t.id); }}>{t.action.label}</button>
-      )}
+      ))}
       <button type="button" className="toast__close" aria-label="Скрыть" onClick={() => onClose(t.id)}><Icon name="close" size={16} /></button>
       {total > 0 && <span className="toast__timer" style={{ animationDuration: `${total}ms`, animationPlayState: paused ? 'paused' : 'running' }} aria-hidden="true" />}
     </div>
