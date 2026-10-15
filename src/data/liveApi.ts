@@ -2,7 +2,7 @@
 // (docs/api-contract.md v2.1). Экраны и очередь записей не знают, с кем говорят.
 import { ApiError, call } from './transport';
 import type { Envelope } from './transport';
-import type { CabinetApi, Change, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, Snapshot, WriteOp, WriteResult } from './api';
+import type { CabinetApi, Change, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Deadline, InboxItem, KvedItem, Payment, Question, RateGroup, Rates, Task } from './types';
 
 /** Откуда брать сеанс и как тихо войти заново (auth.ts). */
@@ -269,6 +269,27 @@ export class LiveApi implements CabinetApi {
   async listQuestions(): Promise<Question[]> {
     const env = await this.rpc<{ questions: Question[] }>('questions.list', {});
     return env.data.questions;
+  }
+
+  /** Напоминание клиенту: запись с requestId (сервер не отправит дважды), но мимо очереди — ответ показываем сразу. */
+  async remindClient(req: RemindRequest, requestId: string): Promise<RemindResult> {
+    const payload: Record<string, unknown> = { clientId: req.clientId, kind: req.kind, text: req.text };
+    if (req.deadlineId) payload.deadlineId = req.deadlineId;
+    if (req.period) payload.period = req.period;
+    try {
+      const env = await this.rpc<{ sent?: unknown; sentAt?: unknown; preview?: unknown; reason?: unknown; message?: unknown }>('clients.remind', payload, requestId);
+      const d = env.data;
+      if (d.sent === true) return { sent: true, sentAt: text(d.sentAt) || null, preview: text(d.preview) || null };
+      const reason = d.reason === 'noBot' || d.reason === 'test' ? d.reason : 'unknown';
+      return { sent: false, reason, message: text(d.message) || (reason === 'noBot' ? 'У клиента нет бота в Telegram' : reason === 'test' ? 'Тестовый режим — сообщение не ушло' : 'Не знаю, ушло ли — проверьте в Telegram') };
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'RATE_LIMIT') {
+        const r: RemindResult = { sent: false, reason: 'rateLimit', message: e.message || 'Этому клиенту уже напоминали недавно' };
+        if (e.retryAt) r.retryAt = e.retryAt;
+        return r;
+      }
+      throw e;
+    }
   }
 
   /** Карточка целиком: чтение, без requestId. Пустые клетки нормализуются, как в снимке. */

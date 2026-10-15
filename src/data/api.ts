@@ -74,6 +74,13 @@ export interface DeadlinePatch { due?: string; status?: Exclude<DeadlineStatus, 
 /** clients.get — всё о клиенте: строка целиком, его сроки, платежи (не только 90 дней), задачи и история изменений. */
 export interface ClientCard { client: Client; deadlines: Deadline[]; payments: Payment[]; tasks: Task[]; history: Activity[] }
 
+/** clients.remind — напоминание клиенту в Telegram. text — ровно то, что мама видела в превью и отправила. */
+export interface RemindRequest { clientId: string; kind: 'deadline' | 'key' | 'docs' | 'custom'; deadlineId?: string; period?: string; text: string }
+/** Ушло; не ушло (нет бота / тестовый режим); неизвестно — проверить в Telegram; рано — «12 ч на клиента и повод». */
+export type RemindResult =
+  | { sent: true; sentAt: string | null; preview: string | null }
+  | { sent: false; reason: 'noBot' | 'test' | 'unknown' | 'rateLimit'; message: string; retryAt?: string };
+
 /** Ответ поиска КВЕД. note — пояснение сервера, когда не нашлось («не установлена радою»). */
 export interface KvedFound { items: KvedItem[]; note: string | null }
 
@@ -89,6 +96,8 @@ export interface CabinetApi {
   listPayments(month: string): Promise<{ payments: Payment[]; totalKopecks: number }>;
   /** questions.list — открытые вопросы без перезагрузки снимка. */
   listQuestions(): Promise<Question[]>;
+  /** clients.remind — мимо очереди: результат нужен сразу, повтор не должен отправить сообщение дважды (requestId). */
+  remindClient(req: RemindRequest, requestId: string): Promise<RemindResult>;
   /** clients.get — карточка целиком (п. 3) и история изменений клиента (п. 9). */
   clientCard(id: string): Promise<ClientCard>;
   /** reference.rates — ставки года из «⚙️ Справочники». Цифр ставок в коде сайта нет. */

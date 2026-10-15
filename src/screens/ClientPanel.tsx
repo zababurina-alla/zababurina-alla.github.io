@@ -1,5 +1,7 @@
 // Карточка клиента — выезжает справа (на телефоне — во весь экран). Вкладки: обзор, сроки, платежи, история.
 import { useEffect, useRef, useState } from 'react';
+import { RemindDialog } from './RemindDialog';
+import { roAttrs } from '../ui/readonly';
 import { KeyRenew } from './KeyRenew';
 import { canWrite } from '../config';
 import gsap from 'gsap';
@@ -160,6 +162,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
   const cardNow = card && card.id === shownId ? card : null;
   const history = cardNow?.history ?? [];
   const keyDays = c?.keyUntil ? daysBetween(TODAY, c.keyUntil) : null;
+  const [remindKey, setRemindKey] = useState(false);
 
   return (
     <Modal open={Boolean(id)} onClose={onClose} kind="panel" labelledBy="cp-name">
@@ -238,7 +241,11 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                 </section>
                 <section className="cp__block cp__facts">
                   <div><h3 className="cp__h">Ключ ЭЦП</h3>{keyDays === null ? <p className="cp__key"><Icon name="inactive" size={18} className="urgency--grey" /><span className="nil">ключа нет в таблице</span></p>
-                    : <p className="cp__key"><Icon name={URGENCY_ICON[statusByDays(keyDays)]} size={18} className={`urgency--${statusByDays(keyDays)}`} /><span className="num">до {fmtDate(c.keyUntil ?? '')}</span><span className={`due--${statusByDays(keyDays)}`}>{daysLabel(keyDays)}</span></p>}{c.keyFrom && <p className="sub">выпущен {fmtDate(c.keyFrom)}</p>}<KeyRenew c={c} /></div>
+                    : <p className="cp__key"><Icon name={URGENCY_ICON[statusByDays(keyDays)]} size={18} className={`urgency--${statusByDays(keyDays)}`} /><span className="num">до {fmtDate(c.keyUntil ?? '')}</span><span className={`due--${statusByDays(keyDays)}`}>{daysLabel(keyDays)}</span></p>}{c.keyFrom && <p className="sub">выпущен {fmtDate(c.keyFrom)}</p>}<KeyRenew c={c} />
+                    {keyDays !== null && keyDays <= 30 && (
+                      <button type="button" className="btn btn--secondary btn--sm cp__remind" onClick={() => setRemindKey(true)} {...roAttrs('deadlines')}>Напомнить про ключ</button>
+                    )}
+                    {remindKey && <RemindDialog open onClose={() => setRemindKey(false)} client={c} keyReminder />}</div>
                   <div><h3 className="cp__h">Ключ выпущен</h3><p>{c.keyIssuer ? <TableText text={c.keyIssuer} tidy /> : <span className="nil">не указано</span>}</p></div>
                   <div><h3 className="cp__h">Телефон</h3><PhoneField clientId={c.id} phone={c.phone} version={c.version} /></div>
                   <div><h3 className="cp__h">Почта</h3><EditableField clientId={c.id} value={c.email ?? ''} version={c.version} label="Почта" inputMode="email"
