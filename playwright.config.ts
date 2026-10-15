@@ -17,7 +17,8 @@ export default defineConfig({
   snapshotPathTemplate: '{testDir}/__screenshots__/{projectName}/{arg}{ext}',
   fullyParallel: false,
   workers: 1, // один учебный сервер: записи одного теста не должны попасть в снимок другого
-  retries: 0,
+  retries: 1, // занятый ПК: браузер изредка не открывает страницу за 60 с; повтор виден в отчёте как flaky
+  timeout: 60_000, // занятый ПК: загрузка + поиск пятен + снимок до 30 с
   reporter: [['list'], ['html', { outputFolder: 'tests/visual/.report', open: 'never' }]],
   expect: {
     // Порог: 0,2 % пикселей и 0,2 по цвету пикселя (0–1) — сглаживание шрифтов не в счёт, сдвиг блока на 8 px — в счёт.
