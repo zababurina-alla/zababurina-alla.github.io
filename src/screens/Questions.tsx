@@ -72,14 +72,21 @@ export function QuestionsPanel() {
       <header className="panel__head">
         <h2 id="t-q" className="panel__title"><Icon name="questions" tile="wheat" />
           {active.length === 1 ? 'Вопрос от Дмитрия' : active.length ? `Вопросы от Дмитрия: ${active.length}` : 'Вопросы отложены'}</h2>
+        {all && <button type="button" className="link" onClick={() => setAll(false)}>Свернуть</button>}
       </header>
       {!all && active.slice(0, SHOWN).map((q) => <QuestionItem key={q.id} q={q} later={false} />)}
-      {all && [...groups.entries()].map(([id, list]) => (
-        <div key={id || 'none'} className="qgroup">
-          <h3 className="qgroup__title"><Icon name={id ? 'clients' : 'questions'} size={16} />{title(id)}<span className="sub num">{list.length}</span></h3>
-          {list.map((q) => <QuestionItem key={q.id} q={q} later={false} />)}
+      {/* Все вопросы — в листе со своей прокруткой (не выше 70 % экрана): 48 вопросов растягивали «Сегодня» на 10 000 px
+          (находки «Пользователя» № 2, 44). Имя клиента прилипает сверху, «Свернуть» — в шапке. */}
+      {all && (
+        <div className="qall" tabIndex={0} aria-label="Все вопросы по клиентам">
+          {[...groups.entries()].map(([id, list]) => (
+            <div key={id || 'none'} className="qgroup">
+              <h3 className="qgroup__title"><Icon name={id ? 'clients' : 'questions'} size={16} />{title(id)}<span className="sub num">{list.length}</span></h3>
+              {list.map((q) => <QuestionItem key={q.id} q={q} later={false} />)}
+            </div>
+          ))}
         </div>
-      ))}
+      )}
       {!all && active.length > SHOWN && (
         <button type="button" className="dgroup__more" onClick={() => setAll(true)}>
           Показать все {active.length} {plural(active.length, 'вопрос', 'вопроса', 'вопросов')} — по клиентам
