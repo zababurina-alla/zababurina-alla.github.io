@@ -3,7 +3,7 @@
 // кэшируем только GET своего сайта (бриф: данных клиентов на устройстве не хранить).
 // Страница и config.json — сначала сеть (новая сборка и включённые разделы видны сразу), кэш — только без связи.
 // Файлы сборки (assets/*) с хэшем в имени не меняются — из кэша.
-const CACHE = 'buh-shell-v1';
+const CACHE = 'buh-shell-v2';
 const MAX_ASSETS = 80;
 
 self.addEventListener('install', () => self.skipWaiting());
@@ -15,14 +15,17 @@ self.addEventListener('activate', (e) => {
   })());
 });
 
+// Страница одна, адреса разные (?demo=1, ?v=…): храним её под одним ключом — корнем сайта, а не под каждым адресом.
+const keyOf = (req) => (req.mode === 'navigate' ? new Request(self.registration.scope) : req);
+
 async function networkFirst(req) {
   const cache = await caches.open(CACHE);
   try {
     const res = await fetch(req);
-    if (res.ok) await cache.put(req, res.clone());
+    if (res.ok) await cache.put(keyOf(req), res.clone());
     return res;
   } catch {
-    const hit = await cache.match(req, { ignoreSearch: req.mode === 'navigate' });
+    const hit = await cache.match(keyOf(req));
     if (hit) return hit;
     throw new Error('Нет связи');
   }
