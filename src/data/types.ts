@@ -113,8 +113,11 @@ export interface Question {
 }
 
 /** «Входящие»: сообщение клиента маме из Telegram (бизнес-бот), превращённое в предложение. */
-/** Формат сервера v5.72: «кто это» сервер строкой не отдаёт (это вопросы бота маме). */
-export type InboxType = 'payment' | 'document' | 'question' | 'file';
+/** Формат сервера v5.72: «кто это» сервер строкой не отдаёт (это вопросы бота маме).
+ *  16.10: order — поручение (клиент просит маму оплатить за него, amount — сумма), voice — голосовое без текста,
+ *  tax — налог (раньше приходил как payment). Незнакомый тип сервер не отдаёт; на всякий случай сайт читает его как question. */
+export const INBOX_TYPES = ['payment', 'tax', 'order', 'document', 'question', 'voice', 'file'] as const;
+export type InboxType = typeof INBOX_TYPES[number];
 export type InboxStatus = 'new' | 'accepted' | 'task' | 'rejected';
 
 export interface InboxItem {
@@ -125,7 +128,7 @@ export interface InboxItem {
   clientName: string;
   type: InboxType;
   snippet: string;
-  /** Сумма из сообщения, копейки (для type: payment). */
+  /** Сумма из сообщения, копейки (payment — платёж, order — сумма поручения). */
   amount?: number | null;
   status: InboxStatus;
   /** К сообщению приложен файл (📎). */

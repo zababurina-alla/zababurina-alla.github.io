@@ -3,7 +3,8 @@
 import { ApiError, call } from './transport';
 import type { Envelope } from './transport';
 import type { CabinetApi, Change, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
-import type { Activity, Client, Deadline, InboxItem, KvedItem, Payment, Question, RateGroup, Rates, Task } from './types';
+import type { Activity, Client, Deadline, InboxItem, InboxType, KvedItem, Payment, Question, RateGroup, Rates, Task } from './types';
+import { INBOX_TYPES } from './types';
 
 /** Откуда брать сеанс и как тихо войти заново (auth.ts). */
 export interface SessionProvider {
@@ -87,7 +88,8 @@ function normRecord(entity: Entity, raw: unknown): NonNullable<Change['record']>
   if (entity === 'inbox') {
     const i = raw as InboxItem & { file?: unknown; taxKopecks?: unknown; amount?: unknown };
     const iso = (x: unknown) => (typeof x === 'string' && x ? x : null);
-    return { ...i, at: i.at ?? '', snippet: i.snippet ?? '', clientName: i.clientName ?? '', file: i.file === true,
+    const type: InboxType = (INBOX_TYPES as readonly string[]).includes(i.type) ? i.type : 'question';
+    return { ...i, type, at: i.at ?? '', snippet: i.snippet ?? '', clientName: i.clientName ?? '', file: i.file === true,
       amount: num(i.amount), taxKopecks: num(i.taxKopecks), decidedAt: iso(i.decidedAt), repliedAt: iso(i.repliedAt) };
   }
   return raw as Deadline | Payment | Activity | Task | Question | InboxItem;

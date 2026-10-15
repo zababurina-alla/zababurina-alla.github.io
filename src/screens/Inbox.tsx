@@ -15,11 +15,15 @@ import { Empty } from '../ui/Empty';
 import { roAttrs } from '../ui/readonly';
 import { useUi } from '../app/ui-context';
 
-export const INBOX_TYPE: Record<InboxType, { label: string; icon: IconName }> = {
-  payment: { label: 'Платёж', icon: 'wallet' },
-  document: { label: 'Документ', icon: 'documents' },
-  question: { label: 'Вопрос', icon: 'questions' },
-  file: { label: 'Файл', icon: 'documents' },
+/** accept — главная кнопка, как в боте: у платежа — «Записать», у остальных сервер ставит задачу своего вида. */
+export const INBOX_TYPE: Record<InboxType, { label: string; icon: IconName; accept: string }> = {
+  payment: { label: 'Платёж', icon: 'wallet', accept: 'Записать' },
+  tax: { label: 'Налог', icon: 'taxPay', accept: 'Принято' },
+  order: { label: 'Поручение', icon: 'transfer', accept: 'В задачи: оплатить' },
+  document: { label: 'Документ', icon: 'documents', accept: 'Принято' },
+  question: { label: 'Вопрос', icon: 'questions', accept: 'В задачи: ответить' },
+  voice: { label: 'Голосовое', icon: 'mic', accept: 'В задачи: ответить' },
+  file: { label: 'Файл', icon: 'documents', accept: 'Принято' },
 };
 
 const DONE_LABEL: Record<Exclude<InboxStatus, 'new'>, string> = { accepted: 'принято', task: 'задача создана', rejected: 'отклонено' };
@@ -55,6 +59,7 @@ export function InboxCard({ it, compact = false }: { it: InboxItem; compact?: bo
         {it.file && <span className="tag inbox__file" title="К сообщению приложен файл — он в Telegram"><Icon name="attach" size={14} />файл</span>}
       </div>
       <p className="inbox__snippet">«{it.snippet}»</p>
+      {it.type === 'order' && it.amount ? <p className="sub inbox__tax">Оплатить за клиента: {formatMoney(it.amount)}</p> : null}
       {it.taxKopecks ? <p className="sub inbox__tax">В сообщении и налог: {formatMoney(it.taxKopecks)}</p> : null}
       {it.status !== 'new' ? (
         <p className="sub inbox__done"><Icon name="check" size={14} />{DONE_LABEL[it.status]}</p>
@@ -78,7 +83,7 @@ export function InboxCard({ it, compact = false }: { it: InboxItem; compact?: bo
               <button type="button" className="btn btn--secondary btn--sm" onClick={() => (can ? setEditing(true) : decide('accept'))} {...roAttrs('inbox')}>{it.amount ? 'Изменить сумму' : 'Указать сумму'}</button>
             </>
           ) : it.clientId && (
-            <button type="button" className="btn btn--primary btn--sm" onClick={() => decide('accept')} {...roAttrs('inbox')}>Принято</button>
+            <button type="button" className="btn btn--primary btn--sm" onClick={() => decide('accept')} {...roAttrs('inbox')}>{t.accept}</button>
           )}
           {it.taxKopecks ? <button type="button" className="btn btn--secondary btn--sm" onClick={() => decide('taxTask')} {...roAttrs('inbox')}>Задача по налогу</button> : null}
           <button type="button" className="btn btn--secondary btn--sm" onClick={() => decide('task')} {...roAttrs('inbox')}>Задача</button>
