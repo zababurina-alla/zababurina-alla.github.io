@@ -102,7 +102,7 @@
 .paylist__row {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(13rem, 1.3fr) minmax(10rem, 1fr) auto 9.5rem;
+  grid-template-columns: minmax(13rem, 1.3fr) minmax(10rem, 1fr) auto 9.5rem 7.5rem; /* последняя — «Отменить» */
   align-items: center;
   gap: var(--space-4);
   min-height: 4rem;
@@ -200,6 +200,33 @@
   }
 }
 
+/* «Отменить» платёж: своя колонка постоянной ширины (иначе суммы соседних строк гуляют, когда одна — «Да, отменить»).
+   На мыши проступает при наведении на строку; «Да, отменить» — красным и видно всегда. */
+.paylist__cancel {
+  justify-self: end;
+  min-height: 2.25rem;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.paylist__cancel.is-sure {
+  color: var(--st-red-ink);
+  font-weight: var(--weight-semibold);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .paylist__cancel:not(.is-sure) {
+    opacity: 0;
+    transition: opacity var(--dur-fast) ease;
+  }
+
+  .paylist__row:hover .paylist__cancel,
+  .paylist__cancel:focus-visible {
+    opacity: 1;
+  }
+}
+
 /* Листание месяцев (техника сайта). Оформление — за отделом дизайна. */
 .month-nav {
   display: flex;
@@ -251,6 +278,16 @@
 
   .paylist__row:has(> .pill) > .paylist__how {
     grid-column: 1;
+  }
+
+  .paylist__cancel {
+    grid-column: 2;
+    justify-self: end;
+  }
+
+  /* На касании «Отменить» видна всегда — без пустого места: строка короче на мыши не станет */
+  .paylist__cancel:not(.is-sure) {
+    opacity: 1;
   }
 }
 

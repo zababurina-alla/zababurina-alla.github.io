@@ -52,7 +52,7 @@ export function InboxCard({ it, compact = false }: { it: InboxItem; compact?: bo
           : <span className="inbox__who"><Avatar name={it.clientName} /><strong>{it.clientName}</strong></span>}
         <span className="tag"><Icon name={t.icon} size={14} />{t.label}</span>
         <span className="sub num">{when(it.at)}</span>
-        {it.file && <span className="tag inbox__file" title="К сообщению приложен файл — он в Telegram">📎 файл</span>}
+        {it.file && <span className="tag inbox__file" title="К сообщению приложен файл — он в Telegram"><Icon name="attach" size={14} />файл</span>}
       </div>
       <p className="inbox__snippet">«{it.snippet}»</p>
       {it.taxKopecks ? <p className="sub inbox__tax">В сообщении и налог: {formatMoney(it.taxKopecks)}</p> : null}

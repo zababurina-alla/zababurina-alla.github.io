@@ -412,6 +412,34 @@
   margin: 0;
 }
 
+/* «файл» в шапке — нейтральная метка со скрепкой: отличается от метки типа сообщения (та — «море») */
+.inbox__file {
+  background: var(--surface-sunk);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink-2);
+}
+
+/* «В сообщении и налог: N ₴» — мягкая пшеничная плашка под отрывком, как подсказка: заметно, но не тревога */
+.inbox__tax {
+  justify-self: start;
+  margin: 0;
+  padding: 4px var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--wheat-soft);
+  color: var(--wheat-ink);
+  font-weight: var(--weight-medium);
+}
+
+/* Своя сумма: ошибки — строкой под полем и кнопками, на всю ширину */
+.inbox__act > .field__error {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.inbox__act > .input {
+  width: 9rem;
+}
+
 /* Справочник с сервера — временно, оформление за отделом дизайна */
 .rates__note {
   margin-top: calc(var(--space-2) * -1);
