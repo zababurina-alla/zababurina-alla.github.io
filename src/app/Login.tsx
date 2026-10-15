@@ -12,12 +12,17 @@ export function Login() {
     void a.mountButton(el);
     // Одноразовый код входа живёт на сервере 10 мин: обновляем, пока экран виден и вход не идёт. Щелчок по кнопке
     // Google (iframe) уводит фокус со страницы — это начало входа: до ответа Google кнопку не трогаем.
-    const tick = () => { if (!document.hidden && document.hasFocus()) a.keepFresh(); };
+    // Без условий «видно» и «в фокусе»: вкладка в фоне держала код дольше 10 мин, и вход отказывал (17:42, 15.10).
+    // Фоновый таймер браузер реже раза в минуту не зовёт — запас до 10 мин остаётся.
+    const tick = () => a.keepFresh();
+    // Мышь подошла к кнопке — код старше 5 мин обновить до нажатия, чтобы окно Google не открылось на старом коде.
+    const onEnter = () => a.keepFresh(5 * 60_000);
+    el.addEventListener('pointerenter', onEnter);
     const onBlur = () => { if (document.activeElement instanceof HTMLIFrameElement && el.contains(document.activeElement)) a.markAttempt(); };
     const t = window.setInterval(tick, 30_000);
     document.addEventListener('visibilitychange', tick);
     window.addEventListener('blur', onBlur);
-    return () => { window.clearInterval(t); document.removeEventListener('visibilitychange', tick); window.removeEventListener('blur', onBlur); a.unmountButton(el); };
+    return () => { window.clearInterval(t); document.removeEventListener('visibilitychange', tick); window.removeEventListener('blur', onBlur); el.removeEventListener('pointerenter', onEnter); a.unmountButton(el); };
   }, []);
   return (
     <main className="login">

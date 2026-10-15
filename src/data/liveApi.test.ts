@@ -276,8 +276,8 @@ describe('живой адаптер: чтение', () => {
   it('закрыть несколько: deadlines.closeMany — закрытые в changes, отказы в failed; молчание по сроку — тоже отказ', async () => {
     const s = server(ok({ results: [
       { id: 'D-1', ok: true, closed: { ...dl('D-1', 'done'), version: 5 }, next: dl('D-9') },
-      { id: 'D-2', ok: false, code: 'PERIOD_OPEN', message: 'Период ещё не закончился' },
-      { id: 'D-3', ok: false, error: { code: 'CONFLICT', message: 'Срок изменился' }, current: { ...dl('D-3'), version: 8 } },
+      { id: 'D-2', ok: false, error: { code: 'PERIOD_OPEN', message: 'Период ещё не закончился', detail: null, retryable: false, field: null, retryAt: null }, current: null },
+      { id: 'D-3', ok: false, error: { code: 'CONFLICT', message: 'Срок изменился', detail: null, retryable: false, field: null, retryAt: null }, current: { ...dl('D-3'), version: 8 } },
     ], closed: 1, failed: 2 }, 40));
     const r = await new LiveApi(URL_, auth(), s.fetchImpl).write({ kind: 'closeDeadlines', requestId: 'B1',
       items: [{ id: 'D-1', baseVersion: 3 }, { id: 'D-2', baseVersion: 3 }, { id: 'D-3', baseVersion: 3 }, { id: 'D-4', baseVersion: 3 }] });

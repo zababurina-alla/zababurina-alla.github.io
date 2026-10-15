@@ -130,10 +130,10 @@ async function handle(ctx: Ctx, body: { action: string; payload?: Record<string,
       const failed = (r as { failed?: { id: string; code: string; message: string }[] }).failed ?? [];
       const results = (p.items as { id: string }[]).map((it) => {
         const f = failed.find((x) => x.id === it.id);
-        if (f) return { id: it.id, ok: false, code: f.code, message: f.message };
+        if (f) return { id: it.id, ok: false, error: { code: f.code, message: f.message, detail: null, retryable: false, field: null, retryAt: null }, current: null };
         const closed = ds.find((d) => d.id === it.id);
         const next = ds.find((d) => d.id !== it.id && d.status !== 'done' && d.clientId === closed?.clientId && d.what === closed?.what) ?? null;
-        return { id: it.id, ok: true, closed, next };
+        return { id: it.id, ok: true, closed, next, notifyAt: null };
       });
       return env({ results, closed: results.filter((x) => x.ok).length, failed: failed.length }, r.cursor);
     }

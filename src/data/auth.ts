@@ -1,6 +1,8 @@
 // Вход через Google (контракт, раздел 3): одноразовый nonce от сервера → ID-токен Google Identity Services →
-// auth.login → свой сеанс сервера на 12 ч. Сеанс живёт в памяти и sessionStorage (не localStorage): закрыла вкладку —
-// при следующем открытии тихий вход. ID-токен никуда не сохраняется.
+// auth.login → свой сеанс сервера на 12 ч. Сеанс сервера (и только он — не ID-токен Google и не данные клиентов) живёт
+// в localStorage до своего срока: приложение на телефоне не просит входить при каждом открытии (решение владельца
+// 15.10.2026, вариант «б»). «Выйти», отказ сервера (AUTH_REQUIRED) или истёкший срок — стирают. Отозвать все сеансы —
+// на сервере (apiRevokeAllSessions). Снимок таблицы — отдельно и только в sessionStorage (snapCache.ts).
 // Справка GIS: https://developers.google.com/identity/gsi/web/reference/js-reference
 import { ApiError, call } from './transport';
 import { clearSnap } from './snapCache';
@@ -23,6 +25,8 @@ const GIS_SRC = 'https://accounts.google.com/gsi/client';
 const SILENT_MS = 15_000;
 /** nonce на сервере живёт 10 мин (v5.63): экран входа берёт новый через 8 мин — только если вход сейчас не идёт. */
 const REARM_MS = 8 * 60_000;
+/** Ответ Google на код старше этого на сервер не отправляем: тот откажет «nonce просрочен» (diag 15.10, 17:42). */
+const NONCE_SAFE_MS = 9.5 * 60_000;
 /** После нажатия кнопки Google (окно выбора аккаунта открыто) код не трогаем столько, сколько длится выбор. */
 const ATTEMPT_MS = 3 * 60_000;
 
@@ -47,9 +51,12 @@ function loadGis(): Promise<Gis> {
 
 function readStored(): Stored | null {
   try {
-    const raw = sessionStorage.getItem(KEY);
+    sessionStorage.removeItem(KEY); // сеанс прежних сборок жил здесь
+    const raw = localStorage.getItem(KEY);
     const s = raw ? JSON.parse(raw) as Stored : null;
-    return s && Date.parse(s.expiresAt) > Date.now() ? s : null;
+    if (s && Date.parse(s.expiresAt) > Date.now()) return s;
+    if (raw) localStorage.removeItem(KEY); // истёк — не держим
+    return null;
   } catch {
     return null;
   }
@@ -62,7 +69,8 @@ function loginMessage(e: unknown): string {
   if (e.code === 'RATE_LIMIT') return 'Слишком много попыток входа — попробуйте через час';
   if (e.code === 'NETWORK') return 'Нет связи — проверьте интернет и попробуйте ещё раз';
   // Чаще всего — устаревший одноразовый код входа: кнопка уже обновлена, повтор пройдёт.
-  if (e.code === 'AUTH_INVALID') return 'Вход не прошёл — нажмите кнопку «Войти через Google» ещё раз';
+  // Причина от сервера — в скобках: по ней видно, что именно не прошло (код входа устарел, не тот аккаунт…).
+  if (e.code === 'AUTH_INVALID') return `Вход не прошёл${e.message ? ` (${e.message})` : ''} — нажмите кнопку «Войти через Google» ещё раз`;
   return e.message || 'Не получилось войти — попробуйте ещё раз';
 }
 
@@ -81,6 +89,8 @@ export class Auth {
   private set(next: AuthState) { this.state = next; for (const fn of this.listeners) fn(); }
 
   private armedAt = 0;
+  /** Сколько раз брали код входа (для диагностики в консоли). */
+  private arms = 0;
   /** Одноразовые коды входа, уже отправленные серверу: второй раз тот же не уходит никогда. */
   private usedNonces = new Set<string>();
   private buttonEl: HTMLElement | null = null;
@@ -104,6 +114,11 @@ export class Auth {
     const g = await loadGis();
     const env = await call<{ nonce: string }>({ url: this.url, action: 'auth.nonce', fetchImpl: this.fetchImpl });
     const nonce = env.data.nonce;
+    const issuedAt = Date.now();
+    this.arms += 1;
+    const no = this.arms;
+    // Диагностика входа — без кода входа, токена и почты: номер выдачи и возраст кода.
+    console.info(`Вход: код входа №${no} получен`);
     g.initialize({
       client_id: this.clientId,
       nonce,
@@ -115,6 +130,15 @@ export class Auth {
         if (this.usedNonces.has(nonce)) {
           // Кнопка не успела обновиться, а код уже потрачен: не отправляем, берём новый.
           this.set({ ...this.state, error: 'Нажмите кнопку «Войти через Google» ещё раз' });
+          void this.rearm();
+          return;
+        }
+        const age = Date.now() - issuedAt;
+        console.info(`Вход: Google ответил (код №${no}, выдан ${Math.round(age / 1000)} с назад${r.credential ? '' : ', без токена'})`);
+        if (age > NONCE_SAFE_MS) {
+          // Кнопка провисела дольше жизни кода (вкладка в фоне): не тратим попытку на заведомый отказ.
+          this.attemptAt = 0;
+          this.set({ ...this.state, error: 'Кнопка входа устарела — обновил её, нажмите «Войти через Google» ещё раз' });
           void this.rearm();
           return;
         }
@@ -154,12 +178,12 @@ export class Auth {
     try {
       const env = await call<Stored>({ url: this.url, action: 'auth.login', payload: { idToken, nonce }, fetchImpl: this.fetchImpl });
       this.stored = env.data;
-      try { sessionStorage.setItem(KEY, JSON.stringify(env.data)); } catch { /* приватное окно — сеанс останется в памяти */ }
+      try { localStorage.setItem(KEY, JSON.stringify(env.data)); } catch { /* приватное окно — сеанс останется в памяти */ }
       this.set({ status: 'signedIn', user: env.data.user, error: null });
       waiting?.resolve(env.data.session);
     } catch (e) {
       // Код отказа — в консоль (без токена и почты): по нему видно, что именно не прошло.
-      console.warn('Вход: отказ', e instanceof ApiError ? e.code : e instanceof Error ? e.name : 'unknown');
+      console.warn('Вход: отказ', e instanceof ApiError ? `${e.code}: ${e.message}` : e instanceof Error ? e.name : 'unknown');
       this.signOutLocal(loginMessage(e));
       waiting?.reject(e);
       // Код потрачен (или устарел) — сразу новый, чтобы следующее нажатие прошло.
@@ -180,9 +204,10 @@ export class Auth {
     if (this.buttonEl === el) this.buttonEl = null;
   }
 
-  /** Пока виден экран входа и вход не идёт: код старше 8 мин — взять новый (сервер держит его 10 мин). */
-  keepFresh(): void {
-    if (this.buttonEl && !this.arming && !this.signingIn() && Date.now() - this.armedAt >= REARM_MS) void this.rearm();
+  /** Пока открыт экран входа и вход не идёт: код старше maxAge (8 мин) — взять новый (сервер держит его 10 мин).
+   *  Зовётся и в фоновой вкладке: кнопка не должна дожидаться маму с кодом, который сервер уже не примет. */
+  keepFresh(maxAge = REARM_MS): void {
+    if (this.buttonEl && !this.arming && !this.signingIn() && Date.now() - this.armedAt >= maxAge) void this.rearm();
   }
 
   /** Тихий вход, когда сеанс истёк посреди работы. Не вышло за 15 с — экран входа. */
@@ -205,7 +230,7 @@ export class Auth {
   private signOutLocal(error: string | null) {
     this.stored = null;
     clearSnap(); // данные клиентов этой вкладки — вместе с сеансом
-    try { sessionStorage.removeItem(KEY); } catch { /* нечего чистить */ }
+    try { localStorage.removeItem(KEY); sessionStorage.removeItem(KEY); } catch { /* нечего чистить */ }
     this.set({ status: 'signedOut', user: null, error });
   }
 

@@ -152,8 +152,8 @@ export class LiveApi implements CabinetApi {
           return { ok: true, changes, cursor: env.cursor, notifyAt: env.data.notifyAt };
         }
         case 'closeDeadlines': {
-          // Ответ { results[], closed, failed }: по каждому сроку — закрыт (closed + next) или отказ с кодом.
-          // Форма строки results — допущение (как у deadlines.close + { id, ok, code, message, current }).
+          // Ответ { results[], closed, failed } (форма подтверждена сервером 15.10): по каждому сроку
+          // { id, ok:true, closed, next, notifyAt } или { id, ok:false, error: { code, message, … }, current }.
           const env = await this.rpc<{ results?: unknown[] }>('deadlines.closeMany', { items: op.items }, o);
           const changes: Change[] = [];
           const failed: NonNullable<Extract<WriteResult, { ok: true }>['failed']> = [];
