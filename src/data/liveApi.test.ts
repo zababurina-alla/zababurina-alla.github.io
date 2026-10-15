@@ -226,4 +226,30 @@ describe('живой адаптер: чтение', () => {
     expect(s.sent[0]).toEqual({ v: 1, action: 'clients.revealPassword', payload: { id: 'C-1', confirm: true }, session: 'S1' });
     expect(r.ttlSeconds).toBe(30);
   });
+
+  it('платёж с пустыми клетками: дата и сумма → null, способ → «другое» (снимок, изменения, payments.list)', async () => {
+    const raw = { id: 'P-1', version: 1, clientId: null, kopecks: '', period: null, method: '', date: '', source: 'таблица' };
+    const s = server(ok({ clients: [], deadlines: [], payments: [raw], tasks: [], activity: [], cursor: 1 }), ok({ payments: [raw], totalKopecks: 0 }));
+    const api = new LiveApi(URL_, auth(), s.fetchImpl);
+    const want = { date: null, kopecks: null, method: 'other', period: '', clientId: '' };
+    expect((await api.snapshot()).payments[0]).toMatchObject(want);
+    expect((await api.listPayments('2026-10')).payments[0]).toMatchObject(want);
+  });
+
+  it('справочник: reference.rates — числа как есть, пустые клетки → null; группа строкой → число', async () => {
+    const s = server(ok({ year: 2026, mzpKopecks: 864700, pmKopecks: '', esvMonthlyKopecks: 190234, esvRatePct: 22,
+      groups: [{ group: '2', limitKopecks: 721159800, limitMzp: 834, epRule: '20 % МЗП' }, { group: null }], updatedAt: '2026-01-02',
+      source: 'fallback', limitsSource: 'code' }));
+    const r = await new LiveApi(URL_, auth(), s.fetchImpl).referenceRates();
+    expect(s.sent[0]).toEqual({ v: 1, action: 'reference.rates', payload: {}, session: 'S1' });
+    expect(r).toMatchObject({ year: 2026, mzpKopecks: 864700, pmKopecks: null, esvRatePct: 22, source: 'fallback', limitsSource: 'code' });
+    expect(r.groups).toEqual([{ group: 2, limitKopecks: 721159800, limitMzp: 834, epRule: '20 % МЗП' }]);
+  });
+
+  it('справочник: reference.kved { q } — до 20 строк, решение горсовета пустое → null', async () => {
+    const s = server(ok({ items: [{ code: '56.30', title: 'Обслуговування напоями', epByGroup: { 2: '20 % МЗП', 3: null }, councilDecision: '' }, { title: 'без кода' }] }));
+    const r = await new LiveApi(URL_, auth(), s.fetchImpl).referenceKved('56.3');
+    expect(s.sent[0]?.payload).toEqual({ q: '56.3' });
+    expect(r).toEqual([{ code: '56.30', title: 'Обслуговування напоями', epByGroup: { '2': '20 % МЗП' }, councilDecision: null }]);
+  });
 });

@@ -65,7 +65,8 @@ export interface Payment {
   kopecks: number | null;
   period: string;
   method: PayMethod;
-  date: string; // ISO
+  /** ISO; null — дата в таблице пустая: платёж в группе «Без даты — проверьте в таблице», в суммы не идёт. */
+  date: string | null;
   source: 'сайт' | 'бот' | 'таблица';
   /** Колонка F «📌 Статус»; пустой в таблице сервер отдаёт как expected. Нет поля — считаем полученным. */
   status?: 'received' | 'expected' | 'notReceived' | 'returned';
@@ -148,4 +149,37 @@ export function marksProblem(kind: ClientKind, marks: ClientMark[]): string | nu
   if (marks.includes('pensioner') && marks.includes('employed')) return 'Пенсионер и наёмный работник вместе не бывают — выберите одно';
   if (marks.includes('allUkraine') && kind !== 'fop1' && kind !== 'fop2') return 'Ставка по всей Украине — только для ФОП 1 и 2 группы';
   return null;
+}
+
+/** reference.rates — ставки года из листа «⚙️ Справочники» (контракт 8.6). Суммы — копейки; null — в листе пусто. */
+export interface RateGroup {
+  group: number;
+  limitKopecks: number | null;
+  /** Предел дохода в МЗП (167 / 834 / 1167). */
+  limitMzp: number | null;
+  /** Ставка ЄП словами из листа: «10 % ПМ», «20 % МЗП», «5 % дохода». */
+  epRule: string;
+}
+
+export interface Rates {
+  year: number;
+  mzpKopecks: number | null;
+  pmKopecks: number | null;
+  esvMonthlyKopecks: number | null;
+  esvRatePct: number | null;
+  groups: RateGroup[];
+  updatedAt: string | null;
+  /** 'fallback' — лист не прочитался, сервер отдал запасные цифры: на экране «не из таблицы». */
+  source: string;
+  /** 'code' — пределы доходов групп пока из кода сервера, не из листа. */
+  limitsSource: string;
+}
+
+/** reference.kved — строка листа «📑 КВЕДы». epByGroup: { "2": "20 % МЗП" }. */
+export interface KvedItem {
+  code: string;
+  title: string;
+  epByGroup: Record<string, string>;
+  /** Номер решения горсовета; null — в листе его нет. */
+  councilDecision: string | null;
 }

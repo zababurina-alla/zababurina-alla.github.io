@@ -41,4 +41,13 @@ describe('суммы за месяц', () => {
     // Зимнее время (UTC+2): 22:30 UTC 31.12 — в Киеве 01.01.
     expect(kyivToday(new Date('2026-12-31T22:30:00Z'))).toBe('2027-01-01');
   });
+
+  it('пустая дата или сумма в листе — не роняет и в итоги не идёт (живые данные 15.10)', () => {
+    const s = monthStats([
+      { kopecks: 100, date: '2026-10-02' }, { kopecks: 1000, date: null }, { kopecks: null, date: '2026-10-03' }, { kopecks: null, date: null },
+      { kopecks: 7, date: '2026-09-30' },
+    ], '2026-10-14');
+    expect([s.total, s.count, s.prevTotal]).toEqual([100, 1, 7]);
+    expect(s.cumulative.at(-1)).toBe(100);
+  });
 });

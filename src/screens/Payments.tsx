@@ -6,7 +6,9 @@ import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { useStore } from '../data/store';
 import { METHOD_LABEL, PAY_STATUS_LABEL, isReceived } from '../data/types';
-import type { PayMethod } from '../data/types';
+import type { PayMethod, Payment } from '../data/types';
+
+type DatedPayment = Payment & { date: string };
 import { TODAY, addDays, daysInMonth, fmtDayMonth, monthKey, monthName, plural, prevMonthKey, weekday } from '../lib/dates';
 import { monthStats } from '../lib/monthStats';
 import { formatMoney, formatPayMoney } from '../lib/money';
@@ -61,11 +63,13 @@ export function Payments() {
   }, [month, loadPaymentsMonth]);
   const last = month === current ? TODAY : `${month}-${String(daysInMonth(month)).padStart(2, '0')}`;
   const stats = monthStats(store.payments, last);
-  const inMonth = store.payments.filter((p) => p.date.startsWith(stats.key));
+  // Пустая дата или сумма в листе — не в днях и не в итогах, а отдельной группой: маме видно, что поправить в таблице.
+  const inMonth = store.payments.filter((p): p is DatedPayment => Boolean(p.date?.startsWith(stats.key)) && p.kopecks !== null);
+  const check = store.payments.filter((p) => !p.date || (p.kopecks === null && p.date.startsWith(stats.key)));
   const today = Number(last.slice(8, 10));
-  const byDay = new Map<string, typeof inMonth>();
+  const byDay = new Map<string, DatedPayment[]>();
   for (const p of [...inMonth].sort((a, b) => b.date.localeCompare(a.date))) byDay.set(p.date, [...(byDay.get(p.date) ?? []), p]);
-  const daySum = (xs: typeof inMonth) => xs.filter(isReceived).reduce((s, p) => s + (p.kopecks ?? 0), 0);
+  const daySum = (xs: Payment[]) => xs.filter(isReceived).reduce((s, p) => s + (p.kopecks ?? 0), 0);
   const maxDay = Math.max(1, ...[...byDay.values()].map(daySum));
   const waiting = inMonth.filter((p) => !isReceived(p));
 
@@ -118,39 +122,46 @@ export function Payments() {
       </section>
 
       <section className="panel reveal" aria-label="Платежи по дням">
-        {byDay.size === 0 && (
+        {byDay.size === 0 && check.length === 0 && (
           <Empty pic="wallet" title={`В ${monthName(stats.key, 'prep')} платежей пока нет`} action={
             <button type="button" className="btn btn--primary" onClick={() => ui.openPayment()} {...roAttrs('payments')}><Icon name="plus" />Записать платёж</button>
           }>Записанные с сайта, через бота и в таблице появятся здесь.</Empty>
+        )}
+        {check.length > 0 && (
+          <div className="dgroup">
+            <h2 className="dgroup__title"><span>Без даты или суммы — проверьте в таблице</span>
+              <span className="dgroup__count">{check.length}</span></h2>
+            <ul className="paylist">{check.map(row)}</ul>
+          </div>
         )}
         {[...byDay.entries()].map(([day, list]) => (
           <div key={day} className="dgroup">
             <h2 className="dgroup__title"><span>{dayTitle(day)}</span>
               <span className="dgroup__count"><Money text={formatMoney(daySum(list))} /></span></h2>
-            <ul className="paylist">
-              {list.map((p, i) => {
-                const c = p.clientId ? store.client(p.clientId) : undefined;
-                const src = SOURCE[p.source] ?? { icon: 'sync' as const, text: '' };
-                const got = isReceived(p);
-                return (
-                  <li key={p.id} style={{ '--i': i } as React.CSSProperties}
-                    className={`paylist__row${p.save === 'saving' ? ' is-saving' : ''}${got ? '' : ' is-pending'}${store.fresh.includes(p.id) ? ' is-fresh' : ''}`}>
-                    {c ? (
-                      <button type="button" className="linklike paylist__who" onClick={() => ui.openClient(c.id)}>
-                        <Avatar name={c.name} /><span><strong>{shortName(c.name)}</strong><span className="sub">{p.period || <span className="nil">период не указан</span>}</span></span>
-                      </button>
-                    ) : <span className="paylist__who"><span><strong className="nil">Клиент не указан</strong><span className="sub">{p.period}</span></span></span>}
-                    <span className="paylist__how sub"><Icon name={METHOD_ICON[p.method]} size={16} />{METHOD_LABEL[p.method]}<span className="paylist__src" title={`Записано ${src.text}`}><Icon name={src.icon} size={14} />{src.text}</span></span>
-                    {p.save ? <SaveBadge state={p.save} offline={!store.online} onRetry={() => store.retry(p.id)} />
-                      : !got && p.status ? <span className="pill pill--grey">{PAY_STATUS_LABEL[p.status]}</span> : <span />}
-                    <span className="paylist__sum display"><Money text={formatPayMoney(p.kopecks)} /></span>
-                  </li>
-                );
-              })}
-            </ul>
+            <ul className="paylist">{list.map(row)}</ul>
           </div>
         ))}
       </section>
     </div>
   );
+
+  function row(p: Payment, i: number) {
+    const c = p.clientId ? store.client(p.clientId) : undefined;
+    const src = SOURCE[p.source] ?? { icon: 'sync' as const, text: '' };
+    const got = isReceived(p);
+    return (
+      <li key={p.id} style={{ '--i': i } as React.CSSProperties}
+        className={`paylist__row${p.save === 'saving' ? ' is-saving' : ''}${got ? '' : ' is-pending'}${store.fresh.includes(p.id) ? ' is-fresh' : ''}`}>
+        {c ? (
+          <button type="button" className="linklike paylist__who" onClick={() => ui.openClient(c.id)}>
+            <Avatar name={c.name} /><span><strong>{shortName(c.name)}</strong><span className="sub">{p.period || <span className="nil">период не указан</span>}</span></span>
+          </button>
+        ) : <span className="paylist__who"><span><strong className="nil">Клиент не указан</strong><span className="sub">{p.period}</span></span></span>}
+        <span className="paylist__how sub"><Icon name={METHOD_ICON[p.method]} size={16} />{METHOD_LABEL[p.method]}<span className="paylist__src" title={`Записано ${src.text}`}><Icon name={src.icon} size={14} />{src.text}</span></span>
+        {p.save ? <SaveBadge state={p.save} offline={!store.online} onRetry={() => store.retry(p.id)} />
+          : !got && p.status ? <span className="pill pill--grey">{PAY_STATUS_LABEL[p.status]}</span> : <span />}
+        <span className="paylist__sum display"><Money text={formatPayMoney(p.kopecks)} /></span>
+      </li>
+    );
+  }
 }

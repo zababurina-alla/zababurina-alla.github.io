@@ -68,7 +68,7 @@ describe('вход: одноразовый код (nonce)', () => {
     expect(s.sent.filter((x) => x.action === 'auth.login').map((x) => x.payload?.nonce)).toEqual(['N1']);
   });
 
-  it('экран входа открыт дольше 4 мин — код обновляется', async () => {
+  it('экран входа открыт дольше 8 мин — код обновляется; раньше — нет', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     const s = server([]);
     const a = new Auth('https://x/exec', 'cid', s.fetchImpl);
@@ -77,9 +77,40 @@ describe('вход: одноразовый код (nonce)', () => {
     a.keepFresh();
     await flush();
     expect(cfg?.nonce).toBe('N1');
-    vi.setSystemTime(Date.now() + 4 * 60_000 + 1000);
+    vi.setSystemTime(Date.now() + 5 * 60_000);
+    a.keepFresh();
+    await flush();
+    expect(cfg?.nonce).toBe('N1');
+    vi.setSystemTime(Date.now() + 3 * 60_000 + 1000);
     a.keepFresh();
     await flush();
     expect(cfg?.nonce).toBe('N2');
+  });
+
+  it('пока открыт выбор аккаунта Google, кнопку не переинициализируем (FedCM AbortError)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const s = server([{ ok: true, data: { session: 'S', expiresAt: '2099-01-01T00:00:00Z', user: { email: 'a', name: 'А', role: 'owner' } }, cursor: null }]);
+    const a = new Auth('https://x/exec', 'cid', s.fetchImpl);
+    const el = document.createElement('div');
+    await a.mountButton(el);
+    vi.setSystemTime(Date.now() + 8 * 60_000);
+    a.markAttempt(); // нажала кнопку: окно Google открыто
+    vi.setSystemTime(Date.now() + 60_000); // вернулась во вкладку, пока выбирает
+    a.keepFresh();
+    await flush();
+    expect(cfg?.nonce).toBe('N1');
+    expect(renders).toBe(1);
+    cfg?.callback({ credential: 'tok' });
+    await flush();
+    expect(s.sent.filter((x) => x.action === 'auth.login').map((x) => x.payload?.nonce)).toEqual(['N1']);
+    expect(a.getState().status).toBe('signedIn');
+  });
+
+  it('на экране входа нет автоматического запроса One Tap: один запрос — кнопка', async () => {
+    const prompt = vi.fn();
+    (window as unknown as { google: { accounts: { id: { prompt: unknown } } } }).google.accounts.id.prompt = prompt;
+    const a = new Auth('https://x/exec', 'cid', server([]).fetchImpl);
+    await a.mountButton(document.createElement('div'));
+    expect(prompt).not.toHaveBeenCalled();
   });
 });

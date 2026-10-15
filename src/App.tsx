@@ -15,6 +15,7 @@ import { AddClientDialog } from './screens/AddClientDialog';
 import { Keys, More, Reference, Tasks } from './screens/Other';
 import { IconGallery } from './screens/IconGallery';
 import { Skeleton } from './app/Skeleton';
+import { ScreenBoundary } from './app/ScreenBoundary';
 import { DebugDock } from './app/DebugDock';
 import { CommandPalette } from './app/CommandPalette';
 import { ConflictDialog, FailureWatcher, OfflineBanner } from './app/SyncUi';
@@ -63,7 +64,7 @@ function Screens() {
         <ReadOnlyBanner />
         {store.loadError && <ServerDown message={store.loadError} onRetry={store.reload} />}
         {!store.loaded && !store.loadError && <Skeleton />}
-        {store.loaded && !store.loadError && <>
+        {store.loaded && !store.loadError && <ScreenBoundary key={route.name}>
         {route.name === 'today' && <Today />}
         {route.name === 'clients' && <Clients focusSearch={route.params[0] === 'search'} />}
         {route.name === 'deadlines' && <Deadlines />}
@@ -74,13 +75,13 @@ function Screens() {
         {route.name === 'more' && <More />}
         {route.name === 'icons' && <IconGallery />}
         {route.name === 'inbox' && (hasFeature('inbox') ? <Inbox /> : <Today />)}
-        </>}
+        </ScreenBoundary>}
       </Shell>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <DebugDock />
       <ConflictDialog />
       <FailureWatcher />
-      <ClientPanel id={clientId} onClose={() => setClientId(null)} />
+      <ScreenBoundary key={clientId ?? ''} what="карточку клиента"><ClientPanel id={clientId} onClose={() => setClientId(null)} /></ScreenBoundary>
       <PaymentDialog open={payFor.open} clientId={payFor.clientId} onClose={() => setPayFor((p) => ({ ...p, open: false }))} />
       <AddClientDialog open={addOpen} onClose={() => setAddOpen(false)} />
     </UiCtx.Provider>

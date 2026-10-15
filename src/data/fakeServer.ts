@@ -2,9 +2,10 @@
 // — запись подтверждается с задержкой; — автоцикл создаёт следующий период; — проверка «период закончился»;
 // — версии записей и ошибка CONFLICT; — журнал изменений с курсором; — повтор того же requestId не создаёт дубль.
 // Рычаги отладки (обрыв связи, отказ, правка извне) — для кнопок в режиме отладки.
-import { ACTIVITY, CLIENTS, DEADLINES, INBOX, PAYMENTS, QUESTIONS, TASKS } from './fake';
+import { ACTIVITY, CLIENTS, DEADLINES, INBOX, KVEDS, PAYMENTS, QUESTIONS, RATES, TASKS } from './fake';
 import type { CabinetApi, Change, Entity, Snapshot, WriteOp, WriteResult } from './api';
-import type { Activity, Client, Deadline, InboxItem, Payment, Question, Task } from './types';
+import type { Activity, Client, Deadline, InboxItem, KvedItem, Payment, Question, Rates, Task } from './types';
+import { fold } from '../lib/search';
 import { TODAY, addDays, endOfMonth, fmtDate, fmtDue } from '../lib/dates';
 import { formatPayMoney } from '../lib/money';
 
@@ -258,7 +259,7 @@ class FakeServer implements CabinetApi {
   async listPayments(month: string): Promise<{ payments: Payment[]; totalKopecks: number }> {
     await wait(READ_MS);
     if (!this.online) throw new Error('NETWORK');
-    const payments = [...this.payments.values()].filter((p) => p.date.startsWith(month)).map((p) => ({ ...p }));
+    const payments = [...this.payments.values()].filter((p) => p.date?.startsWith(month)).map((p) => ({ ...p }));
     const totalKopecks = payments.filter((p) => !p.status || p.status === 'received').reduce((s, p) => s + (p.kopecks ?? 0), 0);
     return { payments, totalKopecks };
   }
@@ -267,6 +268,20 @@ class FakeServer implements CabinetApi {
     await wait(READ_MS);
     if (!this.online) throw new Error('NETWORK');
     return [...this.questions.values()].filter((q) => q.answer === null).map((q) => ({ ...q, options: [...q.options] }));
+  }
+
+  async referenceRates(year?: number): Promise<Rates> {
+    await wait(READ_MS);
+    if (!this.online) throw new Error('NETWORK');
+    return { ...RATES, year: year ?? RATES.year, groups: RATES.groups.map((g) => ({ ...g })) };
+  }
+
+  async referenceKved(q: string): Promise<KvedItem[]> {
+    await wait(READ_MS);
+    if (!this.online) throw new Error('NETWORK');
+    const t = q.trim();
+    return KVEDS.filter((k) => k.code.startsWith(t) || fold(`${k.title} ${k.words}`).includes(fold(t))).slice(0, 20)
+      .map(({ code, title, epByGroup, councilDecision }) => ({ code, title, epByGroup: { ...epByGroup }, councilDecision }));
   }
 
   // ── Правки «извне» для режима отладки: так выглядят изменения в таблице и через бота ──

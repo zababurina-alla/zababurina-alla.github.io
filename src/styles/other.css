@@ -398,3 +398,18 @@
   gap: var(--space-1);
   margin: 0;
 }
+
+/* Справочник с сервера — временно, оформление за отделом дизайна */
+.rates__note {
+  margin-top: calc(var(--space-2) * -1);
+}
+
+.kved__council {
+  display: block;
+}
+
+.kved__rates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}

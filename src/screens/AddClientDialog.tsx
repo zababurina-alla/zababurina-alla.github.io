@@ -6,10 +6,10 @@ import { KIND_LABEL } from '../data/fake';
 import { useStore } from '../data/store';
 import { useDraft } from '../data/drafts';
 import { MARK_LABEL, marksProblem } from '../data/types';
-import type { Client, ClientKind, ClientMark, Deadline } from '../data/types';
+import type { Client, ClientKind, ClientMark, Deadline, Rates } from '../data/types';
+import { useKvedSearch, useRates } from '../data/reference';
 import { TODAY, addDays, fmtDate, fmtDue } from '../lib/dates';
 import { formatMoney } from '../lib/money';
-import { fold } from '../lib/search';
 import { play } from '../lib/sound';
 import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
@@ -21,25 +21,16 @@ import { OBLIGATION_ICON } from '../ui/obligationIcon';
 import { obligationKind } from '../lib/obligation';
 import { useUi } from '../app/ui-context';
 
-// Мини-справочник КВЕД для прототипа. На живых данных — поиск по листу 📑 КВЕДы через API.
-const KVEDS = [
-  ['96.02', 'Надання послуг перукарнями та салонами краси', 'перукар салон краси'],
-  ['47.91', 'Роздрібна торгівля через інтернет', 'інтернет магазин торгівля онлайн'],
-  ['62.01', "Комп'ютерне програмування", 'програміст айті програмування'],
-  ['56.10', 'Діяльність ресторанів', 'кафе ресторан їжа'],
-  ['47.81', 'Роздрібна торгівля з лотків харчовими продуктами', 'ринок продукти лоток'],
-  ['45.20', 'Технічне обслуговування автотранспортних засобів', 'сто авто ремонт машин'],
-  ['85.59', 'Інші види освіти', 'репетитор курси навчання'],
-  ['74.10', 'Спеціалізована діяльність із дизайну', 'дизайн дизайнер'],
-  ['69.20', 'Діяльність у сфері бухгалтерського обліку', 'бухгалтер облік'],
-] as const;
+const GROUP: Partial<Record<ClientKind, number>> = { fop1: 1, fop2: 2, fop3: 3 };
 
-// Начисления по типу — те же ставки 2026, что в fake.ts (бриф: МЗП 8 647, ПМ 3 328). На живых данных их отдаёт сервер.
-function charges(kind: ClientKind): Client['monthly'] {
-  const esv = { name: 'ЄСВ', kopecks: 190234, note: '22 % МЗП' };
-  if (kind === 'fop1') return [{ name: 'ЄП', kopecks: 33280, note: '10 % ПМ' }, esv, { name: 'ВЗ', kopecks: 86470, note: '10 % МЗП' }];
-  if (kind === 'fop2') return [{ name: 'ЄП', kopecks: 172940, note: '20 % МЗП' }, esv, { name: 'ВЗ', kopecks: 86470, note: '10 % МЗП' }];
-  if (kind === 'fop3') return [{ name: 'ЄП', kopecks: null, note: '5 % дохода — введите оборот' }, esv];
+// Начисления для предпросмотра — из reference.rates, цифр в коде нет. Окончательные посчитает таблица, карточка
+// получит их в ответе clients.create. Сумму ЄП не выводим из текста ставки («20 % МЗП») — пусть считает сервер.
+function charges(kind: ClientKind, r: Rates | null): Client['monthly'] {
+  if (!r) return [];
+  const esv = { name: 'ЄСВ', kopecks: r.esvMonthlyKopecks, note: r.esvRatePct !== null ? `${r.esvRatePct} % МЗП` : 'минимальный взнос' };
+  const g = GROUP[kind];
+  const rule = g ? r.groups.find((x) => x.group === g)?.epRule : undefined;
+  if (g) return [...(rule ? [{ name: 'ЄП', kopecks: null, note: rule }] : []), esv];
   if (kind === 'fopGeneral') return [esv];
   return [];
 }
@@ -69,6 +60,10 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
   const [employer, setEmployer] = useState(false);
   const [kq, setKq] = useState('');
   const [kved, setKved] = useState<string | null>(null);
+  const [kvedTitle, setKvedTitle] = useState('');
+  const found = useKvedSearch(kq);
+  const rates = useRates();
+  const r = rates.state === 'ok' ? rates.data : null;
   const [phone, setPhone] = useState('');
   const [bank, setBank] = useState('ПриватБанк');
   const [marks, setMarks] = useState<ClientMark[]>([]);
@@ -78,8 +73,8 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
   const [result, setResult] = useState<{ client: Client; created: Deadline[] | null } | null>(null);
   const savedClient = Boolean(result?.created);
   // Черновик в IndexedDB: незаконченный ввод переживает закрытие окна и перезагрузку страницы.
-  const draft = useDraft('addClient', open && step < 4, { step, name, kind, employer, marks, kved, phone, bank, keyUntil },
-    (v) => { setStep(Math.min(v.step, 3)); setName(v.name); setKind(v.kind); setEmployer(v.employer); setMarks(v.marks ?? []); setKved(v.kved); setPhone(v.phone); setBank(v.bank); setKeyUntil(v.keyUntil); },
+  const draft = useDraft('addClient', open && step < 4, { step, name, kind, employer, marks, kved, kvedTitle, phone, bank, keyUntil },
+    (v) => { setStep(Math.min(v.step, 3)); setName(v.name); setKind(v.kind); setEmployer(v.employer); setMarks(v.marks ?? []); setKved(v.kved); setKvedTitle(v.kvedTitle ?? ''); setPhone(v.phone); setBank(v.bank); setKeyUntil(v.keyUntil); },
     (v) => !v.name && !v.kind);
 
   // Звук «сохранено» — в момент подтверждения сервером, не раньше.
@@ -89,7 +84,7 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
   if (open !== lastOpen) {
     setLastOpen(open);
     // Незаконченный ввод не теряется: окно открывается там, где остановились. (Переживёт перезагрузку — этап 2, IndexedDB.)
-    if (open && (result || !name)) { setStep(1); setName(''); setKind(null); setEmployer(false); setMarks([]); setKq(''); setKved(null); setPhone(''); setKeyUntil(null); setTried(false); setResult(null); }
+    if (open && (result || !name)) { setStep(1); setName(''); setKind(null); setEmployer(false); setMarks([]); setKq(''); setKved(null); setKvedTitle(''); setPhone(''); setKeyUntil(null); setTried(false); setResult(null); }
   }
 
   // Смена шага: новый шаг въезжает справа (24 px) и проявляется — видно направление движения по шагам.
@@ -98,7 +93,6 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
     gsap.fromTo(stepRef.current, { x: 24, opacity: 0 }, { x: 0, opacity: 1, duration: 0.28, ease: 'power3.out', clearProps: 'transform,opacity' });
   }, [step]);
 
-  const kveds = KVEDS.filter(([code, title, words]) => !kq || code.startsWith(kq.trim()) || fold(`${title} ${words}`).includes(fold(kq)));
   const err1 = !name.trim() ? 'Напишите ФИО или название' : !kind ? 'Выберите тип' : marksProblem(kind, marks) ?? '';
   const err2 = !kved ? 'Выберите КВЕД — можно искать по словам' : '';
 
@@ -113,10 +107,9 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
     if (step === 2 && err2) { play('attention'); document.getElementById('ac-kved')?.focus(); return; }
     setTried(false);
     if (step < 3) { setStep(step + 1); return; }
-    const k = KVEDS.find(([code]) => code === kved);
     const added = store.addClient({
-      name: name.trim(), kind: kind ?? 'fop2', marks, employer, kved: k ? [{ code: k[0], title: k[1] }] : [], phone: phone || '—',
-      keyIssuer: bank, keyUntil, monthly: charges(kind ?? 'fop2'),
+      name: name.trim(), kind: kind ?? 'fop2', marks, employer, kved: kved ? [{ code: kved, title: kvedTitle }] : [], phone: phone || '—',
+      keyIssuer: bank, keyUntil, monthly: isLive() ? [] : charges(kind ?? 'fop2', r),
     }, (created, client) => setResult((r) => (r ? { client, created } : r)));
     setResult({ client: added, created: null });
     void draft.clear();
@@ -142,7 +135,7 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
       {step < 4 && draft.restoredAt && (
         <p className="draft-note" role="status">
           <Icon name="edited" size={16} />Продолжаем с того места, где остановились
-          <button type="button" className="link" onClick={() => { void draft.clear(); setStep(1); setName(''); setKind(null); setKved(null); setPhone(''); setKeyUntil(null); }}>Начать заново</button>
+          <button type="button" className="link" onClick={() => { void draft.clear(); setStep(1); setName(''); setKind(null); setKved(null); setKvedTitle(''); setPhone(''); setKeyUntil(null); }}>Начать заново</button>
         </p>
       )}
       {step < 4 && (
@@ -196,15 +189,24 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
                 <span className="combo__icon"><Icon name="search" /></span>
                 <input id="ac-kved" className="input input--icon" value={kq} onChange={(e) => setKq(e.target.value)} placeholder="Код или слово: «перукар», «інтернет»…" autoComplete="off" autoFocus={finePointer} />
               </div>
-              <ul className="kved-list" aria-label="КВЕД">
-                {kveds.map(([code, title]) => (
-                  <li key={code}>
-                    <button type="button" className="kved-opt" aria-pressed={kved === code} onClick={() => setKved(code)}>
-                      <span className="num kved__code">{code}</span><span>{title}</span>{kved === code && <Icon name="check" />}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              {kved && <p className="field__hint">Выбран: <span className="num">{kved}</span> {kvedTitle}</p>}
+              <div aria-live="polite">
+                {found.state === 'idle' && !kved && <p className="field__hint">Наберите хотя бы два знака — поиск по листу «📑 КВЕДы».</p>}
+                {found.state === 'loading' && <p className="field__hint">Ищу в таблице…</p>}
+                {found.state === 'error' && <p className="field__hint">{found.message}</p>}
+                {found.state === 'ok' && !found.data.length && <p className="field__hint">«{kq.trim()}» в таблице не нашёлся — попробуйте код или другое слово.</p>}
+              </div>
+              {found.state === 'ok' && found.data.length > 0 && (
+                <ul className="kved-list" aria-label="КВЕД">
+                  {found.data.map((k) => (
+                    <li key={k.code}>
+                      <button type="button" className="kved-opt" aria-pressed={kved === k.code} onClick={() => { setKved(k.code); setKvedTitle(k.title); }}>
+                        <span className="num kved__code">{k.code}</span><span>{k.title}</span>{kved === k.code && <Icon name="check" />}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
             {kind && isLive() && (
               <p className="sub">Начисления в месяц посчитает таблица по ставкам из «⚙️ Справочники» — они появятся в карточке после добавления.</p>
@@ -213,11 +215,11 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
               <div className="estimate">
                 <p className="field__label">Начисления в месяц ({KIND_LABEL[kind]})</p>
                 <dl className="charges charges--sm">
-                  {charges(kind).map((m) => (
-                    <div key={m.name} className="charges__item"><dt>{m.name}</dt><dd className="charges__sum num">{m.kopecks !== null ? formatMoney(m.kopecks) : 'по доходу'}</dd><dd className="sub">{m.note}</dd></div>
+                  {charges(kind, r).map((m) => (
+                    <div key={m.name} className="charges__item"><dt>{m.name}</dt><dd className="charges__sum num">{m.kopecks !== null ? formatMoney(m.kopecks) : kind === 'fop3' ? 'по доходу' : '—'}</dd><dd className="sub">{m.note}</dd></div>
                   ))}
                 </dl>
-                <p className="sub">Ставки 2026 из справочника. Ставку ЄП по рішенню Миколаївської міськради сервер подставит сам.</p>
+                <p className="sub">{r ? `Ставки ${r.year} из справочника.` : 'Ставки загружаются из справочника…'} Сумму ЄП по рішенню Миколаївської міськради сервер подставит сам.</p>
               </div>
             )}
             {tried && err2 && <p className="field__error" role="alert">{err2}</p>}
