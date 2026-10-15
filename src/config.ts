@@ -11,8 +11,8 @@ export const WRITE_AREAS: readonly WriteArea[] = ['payments', 'tasks', 'question
 /** Возможности, которые включаются, когда их готов отдавать сервер. На выдуманных данных — все. */
 /** remindPreview — сервер умеет clients.remind { preview:true } (пробный, без отправки). Без флага не зовём:
  *  старый сервер флаг не знает и отправил бы настоящее сообщение. */
-export type Feature = 'inbox' | 'remindPreview';
-const FEATURES: readonly Feature[] = ['inbox', 'remindPreview'];
+export type Feature = 'inbox' | 'remindPreview' | 'cancelNotify';
+const FEATURES: readonly Feature[] = ['inbox', 'remindPreview', 'cancelNotify'];
 
 /** OAuth client ID проекта Google Cloud «zababurina-alla» (…apps.googleusercontent.com). */
 export const GOOGLE_CLIENT_ID = '1078049272948-bnvonl9qah7npdq63gktbio1rm2lbgvb.apps.googleusercontent.com';
@@ -40,7 +40,7 @@ export async function loadRuntimeConfig(fetchImpl: typeof fetch = fetch, mode: s
     runtime = {
       apiUrl: typeof j.apiUrl === 'string' ? j.apiUrl.trim() : '',
       writes: Array.isArray(j.writes) ? j.writes.filter(isArea) : [...WRITE_AREAS],
-      features: Array.isArray(j.features) ? j.features.filter((f): f is Feature => f === 'inbox' || f === 'remindPreview') : [],
+      features: Array.isArray(j.features) ? j.features.filter((f): f is Feature => (FEATURES as readonly unknown[]).includes(f)) : [],
     };
   } catch {
     // нет связи или файл битый — остаёмся на выдуманных данных

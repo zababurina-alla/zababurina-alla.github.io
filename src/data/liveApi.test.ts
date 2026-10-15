@@ -341,6 +341,15 @@ describe('живой адаптер: чтение', () => {
     const c = await api.write({ kind: 'decideInbox', requestId: 'R2', id: 'I-1', action: 'accept' });
     expect(!c.ok && [c.code, c.current && 'status' in c.current ? c.current.status : null]).toEqual(['CONFLICT', 'accepted']);
   });
+  it('«Не писать клиенту»: снято / снимать нечего / уже ушло (CONFLICT с sentAt); requestId — свой на нажатие', async () => {
+    const s = server(ok({ id: 'D-1', cancelled: true }), ok({ id: 'D-1', cancelled: false }), fail('CONFLICT', 'Уже отправлено', {}, { id: 'D-1', sentAt: '2026-10-16T02:10:00+03:00' }));
+    const api = new LiveApi(URL_, auth(), s.fetchImpl);
+    expect(await api.cancelNotify('D-1', 'R1')).toEqual({ status: 'cancelled' });
+    expect(s.sent[0]).toMatchObject({ action: 'deadlines.cancelNotify', requestId: 'R1', payload: { id: 'D-1' } });
+    expect(await api.cancelNotify('D-1', 'R2')).toEqual({ status: 'nothing' });
+    expect(await api.cancelNotify('D-1', 'R3')).toEqual({ status: 'sent', sentAt: '2026-10-16T02:10:00+03:00' });
+  });
+
   it('входящие 16.10: order / voice / tax читаются как есть; незнакомый тип — как вопрос (экран не падает)', async () => {
     const base = { version: 1, at: '2026-10-16T09:00', clientId: 'C-1', clientName: 'К', snippet: '…', amount: null, status: 'new' };
     const s = server(ok({ clients: [], deadlines: [], payments: [], tasks: [], activity: [], cursor: 1,

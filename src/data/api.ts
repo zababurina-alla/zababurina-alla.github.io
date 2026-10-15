@@ -83,6 +83,10 @@ export type RemindResult =
   | { sent: true; sentAt: string | null; preview: string | null }
   | { sent: false; reason: 'noBot' | 'test' | 'unknown' | 'rateLimit'; message: string; retryAt?: string };
 
+/** deadlines.cancelNotify: сообщение клиенту о закрытии снято (срок остаётся закрытым); снимать было нечего;
+ *  уже забрано на отправку (sentAt — примерно когда ушло). */
+export type CancelNotifyResult = { status: 'cancelled' } | { status: 'nothing' } | { status: 'sent'; sentAt: string | null };
+
 /** Пробный прогон: текст на языке клиента; для «нет бота» / тестового клиента — preview null и причина. */
 export interface RemindPreview { preview: string | null; lang: string | null; reason: 'noBot' | 'test' | null; message: string | null }
 
@@ -108,6 +112,7 @@ export interface CabinetApi {
   remindClient(req: RemindRequest, requestId: string): Promise<RemindResult>;
   /** clients.remind { preview:true } — текст сообщения на языке клиента, без отправки и без расхода лимита. */
   remindPreview(req: Omit<RemindRequest, 'text'>): Promise<RemindPreview>;
+  cancelNotify(deadlineId: string, requestId: string): Promise<CancelNotifyResult>;
   /** clients.get — карточка целиком (п. 3) и история изменений клиента (п. 9). */
   clientCard(id: string): Promise<ClientCard>;
   /** reference.rates — ставки года из «⚙️ Справочники». Цифр ставок в коде сайта нет. */

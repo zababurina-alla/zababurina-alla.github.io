@@ -3,7 +3,7 @@
 // — версии записей и ошибка CONFLICT; — журнал изменений с курсором; — повтор того же requestId не создаёт дубль.
 // Рычаги отладки (обрыв связи, отказ, правка извне) — для кнопок в режиме отладки.
 import { ACTIVITY, CLIENTS, DEADLINES, INBOX, KVEDS, PAYMENTS, QUESTIONS, RATES, TASKS } from './fake';
-import type { CabinetApi, Change, ClientCard, Entity, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
+import type { CabinetApi, CancelNotifyResult, Change, ClientCard, Entity, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Deadline, InboxItem, KvedItem, Payment, Question, Rates, Task } from './types';
 import { fold } from '../lib/search';
 import { TODAY, addDays, endOfMonth, fmtDate, fmtDue } from '../lib/dates';
@@ -55,6 +55,8 @@ class FakeServer implements CabinetApi {
   private done = new Map<string, WriteResult>();
   /** Что закрыл requestId — для отмены (удалить созданный автоциклом период, вернуть закрытый). */
   private closedBy = new Map<string, { closed: Deadline; next: Deadline | null }>();
+  /** Срок → когда уйдёт сообщение клиенту о закрытии (через 2 мин, п. 31). */
+  private notifyAt = new Map<string, number>();
 
   // Рычаги отладки
   online = true;
@@ -136,6 +138,7 @@ class FakeServer implements CabinetApi {
         const name = this.clients.get(d.clientId)?.name ?? '';
         changes.push(this.act(`Закрыт срок «${d.what}» — ${short(name)}${next ? `. Следующий создан: до ${fmtDue(next.due)}` : ''}`, o, 'сайт'));
         // Уведомления клиенту и маме — через 2 мин, если закрытие не отменили (п. 31).
+        this.notifyAt.set(d.id, Date.now() + 120_000);
         const notifyAt = new Date(Date.now() + 120_000).toISOString();
         return { ok: true, changes, cursor: this.cursor, notifyAt };
       }
@@ -322,6 +325,17 @@ class FakeServer implements CabinetApi {
     const d = req.deadlineId ? this.deadlines.get(req.deadlineId) : undefined;
     const hi = `Добрий день${c ? `, ${c.name.split(' ')[1] ?? ''}` : ''}!`;
     return { preview: d ? `${hi} 📅 Нагадую: ${d.what} — до ${fmtDate(d.due ?? TODAY)}.` : `${hi} 🔐 Ключ ЕЦП діє до ${fmtDate(c?.keyUntil ?? TODAY)} — час продовжити.`, lang: 'uk', reason: null, message: null };
+  }
+
+  async cancelNotify(deadlineId: string, requestId: string): Promise<CancelNotifyResult> {
+    await wait(READ_MS);
+    if (!this.online) throw new Error('NETWORK');
+    void requestId;
+    const at = this.notifyAt.get(deadlineId);
+    if (at === undefined) return { status: 'nothing' };
+    if (Date.now() >= at) return { status: 'sent', sentAt: new Date(at).toISOString() };
+    this.notifyAt.delete(deadlineId);
+    return { status: 'cancelled' };
   }
 
   private reminded = new Map<string, number>();
