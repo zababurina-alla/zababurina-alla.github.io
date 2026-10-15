@@ -111,6 +111,23 @@ export interface Question {
   answer: string | null;
 }
 
+/** «Входящие»: сообщение клиента маме из Telegram (бизнес-бот), превращённое в предложение. */
+export type InboxType = 'payment' | 'document' | 'question' | 'file' | 'who';
+export type InboxStatus = 'new' | 'accepted' | 'task' | 'rejected';
+
+export interface InboxItem {
+  id: string;
+  version?: number;
+  at: string; // ISO date-time
+  clientId: string | null;
+  clientName: string;
+  type: InboxType;
+  snippet: string;
+  /** Сумма из сообщения, копейки (для type: payment). */
+  amount?: number | null;
+  status: InboxStatus;
+}
+
 export interface Activity {
   id: string;
   when: string; // ISO date-time

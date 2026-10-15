@@ -1,5 +1,6 @@
 // Оболочка: плавающее стеклянное меню слева на ноутбуке; верхняя полоса, нижние вкладки и кнопка «+» на телефоне.
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { hasFeature } from '../config';
 import { auth, useAuth } from '../data/session';
 import { roAttrs } from '../ui/readonly';
 import { getTheme, subscribeTheme, toggleTheme } from '../lib/theme';
@@ -18,6 +19,7 @@ import '../ui/fx';
 
 const NAV: { id: RouteName; label: string; icon: IconName; group: 'work' | 'ref' }[] = [
   { id: 'today', label: 'Сегодня', icon: 'today', group: 'work' },
+  { id: 'inbox', label: 'Входящие', icon: 'message', group: 'work' },
   { id: 'clients', label: 'Клиенты', icon: 'clients', group: 'work' },
   { id: 'deadlines', label: 'Сроки', icon: 'calendar', group: 'work' },
   { id: 'payments', label: 'Платежи', icon: 'wallet', group: 'work' },
@@ -144,7 +146,8 @@ function Me() {
 }
 
 export function Shell({ route, children }: { route: RouteName; children: ReactNode }) {
-  const { deadlines } = useStore();
+  const { deadlines, inbox } = useStore();
+  const inboxNew = inbox.filter((i) => i.status === 'new').length;
   const ui = useUi();
   const [theme, toggleTheme] = useTheme();
   const overdue = deadlines.filter((d) => daysBetween(TODAY, d.due) < 0).length;
@@ -199,6 +202,7 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
       <Icon name={n.icon} />
       <span>{n.label}</span>
       {n.id === 'deadlines' && overdue > 0 && <span className="nav__badge num" title="Просрочено"><span aria-hidden="true">{overdue}</span><span className="visually-hidden">, просрочено: {overdue}</span></span>}
+      {n.id === 'inbox' && inboxNew > 0 && <span className="nav__badge num" title="Новые сообщения"><span aria-hidden="true">{inboxNew}</span><span className="visually-hidden">, новых: {inboxNew}</span></span>}
     </a>
   );
 
@@ -219,7 +223,7 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
         </button>
         <nav ref={navRef} className="nav" aria-label="Разделы">
           <span ref={pillRef} className="nav__pill" aria-hidden="true" />
-          {NAV.filter((n) => n.group === 'work').map(navLink)}
+          {NAV.filter((n) => n.group === 'work' && (n.id !== 'inbox' || hasFeature('inbox'))).map(navLink)}
           <p className="nav__group">Справка</p>
           {NAV.filter((n) => n.group === 'ref').map(navLink)}
         </nav>

@@ -3,7 +3,7 @@
 import { ApiError, call } from './transport';
 import type { Envelope } from './transport';
 import type { CabinetApi, Change, Entity, ErrorCode, Snapshot, WriteOp, WriteResult } from './api';
-import type { Activity, Client, Deadline, Payment, Question, Task } from './types';
+import type { Activity, Client, Deadline, InboxItem, Payment, Question, Task } from './types';
 
 /** Откуда брать сеанс и как тихо войти заново (auth.ts). */
 export interface SessionProvider {
@@ -22,7 +22,7 @@ export interface DiagCounters {
 
 interface ServerChange { rev: number; entity: string; op: 'upsert' | 'delete'; id: string; origin: string; record?: unknown }
 
-const ENTITIES: ReadonlySet<string> = new Set<Entity>(['client', 'deadline', 'payment', 'activity', 'task', 'question']);
+const ENTITIES: ReadonlySet<string> = new Set<Entity>(['client', 'deadline', 'payment', 'activity', 'task', 'question', 'inbox']);
 const SITE_CODES: ReadonlySet<string> = new Set<ErrorCode>(['NETWORK', 'CONFLICT', 'PERIOD_OPEN', 'NOT_FOUND', 'SERVER', 'VALIDATION',
   'UNDO_TOO_LATE', 'DUPLICATE', 'BUSY', 'MAINTENANCE', 'QUOTA', 'RATE_LIMIT', 'AUTH_EXPIRED', 'AUTH_REQUIRED', 'FORBIDDEN']);
 const MAX_PAGES = 20;
@@ -37,7 +37,7 @@ function normRecord(entity: Entity, raw: unknown): NonNullable<Change['record']>
   if (entity === 'client') return normClient(raw);
   // Срок, чьего клиента нет в «Клиентах», сервер отдаёт с clientId: null.
   if (entity === 'deadline') { const d = raw as Deadline & { clientId: string | null }; return { ...d, clientId: d.clientId ?? '' }; }
-  return raw as Deadline | Payment | Activity | Task | Question;
+  return raw as Deadline | Payment | Activity | Task | Question | InboxItem;
 }
 
 function toChange(c: ServerChange): Change | null {
@@ -65,7 +65,7 @@ export class LiveApi implements CabinetApi {
   }
 
   async snapshot(): Promise<Snapshot> {
-    const env = await this.rpc<{ clients: unknown[]; deadlines: Deadline[]; payments: Payment[]; tasks: Task[]; activity: Activity[]; questions?: Question[]; cursor: number }>('sync.snapshot', {});
+    const env = await this.rpc<{ clients: unknown[]; deadlines: Deadline[]; payments: Payment[]; tasks: Task[]; activity: Activity[]; questions?: Question[]; inbox?: InboxItem[]; cursor: number }>('sync.snapshot', {});
     const d = env.data;
     return {
       clients: d.clients.map(normClient),
@@ -74,6 +74,7 @@ export class LiveApi implements CabinetApi {
       tasks: d.tasks,
       activity: d.activity,
       questions: d.questions ?? [],
+      inbox: d.inbox ?? [],
       cursor: d.cursor ?? env.cursor,
     };
   }
@@ -144,6 +145,16 @@ export class LiveApi implements CabinetApi {
           const env = await this.rpc<{ deadline: Deadline }>('deadlines.update', { id: op.id, baseVersion: op.baseVersion, patch: op.patch }, o);
           return { ok: true, changes: [up('deadline', env.data.deadline, env.cursor)], cursor: env.cursor };
         }
+        case 'decideInbox': {
+          // Ответ сервера — само сообщение и то, что из него получилось (платёж или задача); остальное — опросом.
+          const payload: Record<string, unknown> = { id: op.id, action: op.action };
+          if (op.amount !== undefined) payload.amount = op.amount;
+          const env = await this.rpc<{ inbox: InboxItem; payment?: Payment | null; task?: Task | null }>('inbox.decide', payload, o);
+          const changes = [up('inbox', env.data.inbox, env.cursor)];
+          if (env.data.payment) changes.push(up('payment', env.data.payment, env.cursor));
+          if (env.data.task) changes.push(up('task', env.data.task, env.cursor));
+          return { ok: true, changes, cursor: env.cursor };
+        }
         case 'answerQuestion': {
           const env = await this.rpc<{ question: Question }>('questions.answer', { id: op.id, text: op.text }, o);
           return { ok: true, changes: [up('question', env.data.question, env.cursor)], cursor: env.cursor };
@@ -160,7 +171,7 @@ export class LiveApi implements CabinetApi {
       const res: WriteResult = { ok: false, code, message: e.message };
       if (e.retryAt) res.retryAt = e.retryAt;
       if (e.current && typeof e.current === 'object') {
-        res.current = 'kind' in e.current ? normClient(e.current) : e.current as Deadline | Payment | Question;
+        res.current = 'kind' in e.current ? normClient(e.current) : e.current as Deadline | Payment | Question | InboxItem;
       }
       return res;
     }

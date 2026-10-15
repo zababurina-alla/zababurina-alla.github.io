@@ -298,3 +298,60 @@
   margin: 0;
   padding: var(--space-1) var(--space-5) var(--space-3);
 }
+
+/* «Входящие» (техника сайта): сообщения клиентов с кнопками решения. Оформление — за отделом дизайна. */
+.inbox {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--space-5) var(--space-4);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.inbox__item {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--line);
+}
+
+.inbox__item:first-child {
+  border-top: 0;
+}
+
+.inbox__item--accepted,
+.inbox__item--task,
+.inbox__item--rejected {
+  opacity: 0.72;
+}
+
+.inbox__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.inbox__who {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.inbox__snippet {
+  margin: 0;
+}
+
+.inbox__act {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.inbox__done {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+}

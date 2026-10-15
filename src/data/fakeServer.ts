@@ -2,9 +2,9 @@
 // — запись подтверждается с задержкой; — автоцикл создаёт следующий период; — проверка «период закончился»;
 // — версии записей и ошибка CONFLICT; — журнал изменений с курсором; — повтор того же requestId не создаёт дубль.
 // Рычаги отладки (обрыв связи, отказ, правка извне) — для кнопок в режиме отладки.
-import { ACTIVITY, CLIENTS, DEADLINES, PAYMENTS, QUESTIONS, TASKS } from './fake';
+import { ACTIVITY, CLIENTS, DEADLINES, INBOX, PAYMENTS, QUESTIONS, TASKS } from './fake';
 import type { CabinetApi, Change, Entity, Snapshot, WriteOp, WriteResult } from './api';
-import type { Activity, Client, Deadline, Payment, Question, Task } from './types';
+import type { Activity, Client, Deadline, InboxItem, Payment, Question, Task } from './types';
 import { TODAY, addDays, endOfMonth, fmtDate, fmtDue } from '../lib/dates';
 import { formatPayMoney } from '../lib/money';
 
@@ -46,6 +46,7 @@ class FakeServer implements CabinetApi {
   private payments = new Map<string, Payment>(PAYMENTS.map((p) => [p.id, { ...p }]));
   private activity: Activity[] = ACTIVITY.map((a) => ({ ...a }));
   private tasks = new Map<string, Task>(TASKS.map((t) => [t.id, { ...t }]));
+  private inbox = new Map<string, InboxItem>(INBOX.map((i) => [i.id, { ...i }]));
   private questions = new Map<string, Question>(QUESTIONS.map((q) => [q.id, { ...q, options: [...q.options] }]));
   private log: Change[] = [];
   private cursor = 100;
@@ -83,6 +84,7 @@ class FakeServer implements CabinetApi {
       activity: this.activity.map((a) => ({ ...a })),
       tasks: [...this.tasks.values()].map((t) => ({ ...t })),
       questions: [...this.questions.values()].filter((q) => q.answer === null).map((q) => ({ ...q, options: [...q.options] })),
+      inbox: [...this.inbox.values()].map((i) => ({ ...i })),
       cursor: this.cursor,
     };
   }
@@ -186,6 +188,33 @@ class FakeServer implements CabinetApi {
         this.tasks.set(t.id, t);
         return { ok: true, changes: [this.record('task', 'upsert', t.id, o, t)], cursor: this.cursor };
       }
+      case 'decideInbox': {
+        // Как будет на сервере (inbox.decide): принять платёж — запись в «💰 Платежи»; задача — в «🧩 Задачи».
+        const it = this.inbox.get(op.id);
+        if (!it) return { ok: false, code: 'NOT_FOUND', message: 'Этого сообщения уже нет' };
+        if (it.status !== 'new') return { ok: false, code: 'VALIDATION', message: 'Уже решено — в Telegram или на сайте', current: { ...it } };
+        const changes: Change[] = [];
+        let status: InboxItem['status'] = 'rejected';
+        if (op.action === 'accept') {
+          status = 'accepted';
+          if (it.type === 'payment') {
+            const kopecks = op.amount ?? it.amount ?? null;
+            if (!kopecks || !it.clientId) return { ok: false, code: 'VALIDATION', message: 'Нужны сумма и клиент' };
+            const p: Payment = { id: `${o}`, version: this.cursor + 1, clientId: it.clientId, kopecks, period: 'Октябрь 2026', method: 'bank', date: TODAY, source: 'сайт' };
+            this.payments.set(p.id, p);
+            changes.push(this.record('payment', 'upsert', p.id, o, p));
+          }
+        } else if (op.action === 'task') {
+          status = 'task';
+          const t: Task = { id: `${o}`, version: this.cursor + 1, clientId: it.clientId, text: it.snippet.slice(0, 80), due: null, type: 'docs', priority: 'medium', done: false };
+          this.tasks.set(t.id, t);
+          changes.push(this.record('task', 'upsert', t.id, o, t));
+        }
+        const upd: InboxItem = { ...it, status, version: this.cursor + 1 };
+        this.inbox.set(it.id, upd);
+        changes.push(this.record('inbox', 'upsert', it.id, o, upd));
+        return { ok: true, changes, cursor: this.cursor };
+      }
       case 'answerQuestion': {
         // Как сервер (контракт v2.1, у. 6): уже отвечен в Telegram — отказ с текущим ответом; choice — только из вариантов.
         const q = this.questions.get(op.id);
@@ -241,7 +270,13 @@ class FakeServer implements CabinetApi {
   }
 
   // ── Правки «извне» для режима отладки: так выглядят изменения в таблице и через бота ──
-  external(kind: 'payment' | 'key' | 'close' | 'phone'): string {
+  external(kind: 'payment' | 'key' | 'close' | 'phone' | 'inbox'): string {
+    if (kind === 'inbox') {
+      const it: InboxItem = { id: `in-${this.cursor + 1}`, at: `${TODAY}T${new Date().toTimeString().slice(0, 5)}`, clientId: 'c2', clientName: 'Вербицький Андрій', type: 'payment', snippet: 'Сплатив 4 200 грн за III квартал', amount: 420000, status: 'new', version: this.cursor + 1 };
+      this.inbox.set(it.id, it);
+      this.record('inbox', 'upsert', it.id, 'таблица', it);
+      return 'Telegram: Вербицький Андрій — «Сплатив 4 200 грн»';
+    }
     if (kind === 'payment') {
       const p: Payment = { id: `p-bot-${this.cursor + 1}`, version: this.cursor + 1, clientId: 'c5', kopecks: 320000, period: 'III квартал 2026', method: 'bank', date: TODAY, source: 'бот' };
       this.payments.set(p.id, p);
