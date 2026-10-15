@@ -313,32 +313,57 @@
 }
 
 /* Ход первой загрузки из таблицы (LoadProgress): текст, секунды и полоса. Полоса — transform, без перерисовки. */
+/* Ход первой загрузки (LoadProgress.tsx, логика — техники сайта): подпись по этапам, секунды, полоса по ожидаемым 12 с.
+   По полосе бежит блик — видно, что работа идёт, даже когда полоса почти стоит (сервер хода не сообщает). */
 .load-progress {
   display: grid;
-  gap: var(--space-2);
-  max-width: 28rem;
+  gap: var(--space-3);
+  max-width: 32rem;
+  margin: var(--space-2) 0 var(--space-1);
 }
 
 .load-progress__text {
   margin: 0;
-  color: var(--ink-2);
+  color: var(--ink);
+  font-weight: var(--weight-medium);
+}
+
+.load-progress__text .sub {
+  display: inline;
+  margin-left: var(--space-1);
+  font-variant-numeric: tabular-nums;
 }
 
 .load-progress__bar {
-  height: 4px;
-  border-radius: 999px;
-  background: var(--line);
+  position: relative;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunk);
+  box-shadow: inset 0 0 0 1px var(--line);
   overflow: hidden;
 }
 
 .load-progress__bar > span {
+  position: relative;
   display: block;
   height: 100%;
-  background: var(--focus);
+  border-radius: inherit;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 55%, transparent), var(--accent));
   transform-origin: left center;
   transition: transform 500ms linear;
+  overflow: hidden;
+}
+
+.load-progress__bar > span::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.55), transparent);
+  transform: translateX(-100%);
+  animation: shimmer 1.4s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .load-progress__bar > span { transition: none; }
+  .load-progress__bar > span::after { animation: none; display: none; }
 }
