@@ -1,5 +1,6 @@
 // «Добавить клиента» — три коротких шага, на каждом одно главное действие; в конце видно, что создала система.
 import { useEffect, useRef, useState } from 'react';
+import { isLive } from '../config';
 import gsap from 'gsap';
 import { KIND_LABEL } from '../data/fake';
 import { useStore } from '../data/store';
@@ -202,7 +203,10 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
                 ))}
               </ul>
             </div>
-            {kind && (
+            {kind && isLive() && (
+              <p className="sub">Начисления в месяц посчитает таблица по ставкам из «⚙️ Справочники» — они появятся в карточке после добавления.</p>
+            )}
+            {kind && !isLive() && (
               <div className="estimate">
                 <p className="field__label">Начисления в месяц ({KIND_LABEL[kind]})</p>
                 <dl className="charges charges--sm">

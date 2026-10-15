@@ -1,6 +1,6 @@
 // Ключи ЭЦП, Справочник, Задачи и «Ещё» (телефон). Короче основных экранов, но рабочие.
 import { useState } from 'react';
-import { canWrite } from '../config';
+import { canWrite, isLive } from '../config';
 import { useStore } from '../data/store';
 import { TODAY, addDays, daysBetween, daysLabel, fmtDate, plural, statusByDays } from '../lib/dates';
 import { parseQuickTask } from '../lib/quickTask';
@@ -97,6 +97,20 @@ const KVED_RATES: [string, string, string][] = [
 export function Reference() {
   const [q, setQ] = useState('');
   const kv = KVED_RATES.filter(([code, title]) => !q || code.startsWith(q) || fold(title).includes(fold(q)));
+  // На живых данных ставки и КВЕД — только из таблицы (reference.*). Пока сервер их не отдаёт — не показываем цифры
+  // из кода сайта: неверная ставка на экране бухгалтера опаснее, чем её отсутствие (координатор, 15.10.2026).
+  if (isLive()) {
+    return (
+      <div className="page">
+        <header className="page__head"><div><h1 className="page__title">Справочник</h1></div></header>
+        <section className="panel panel--pad">
+          <Empty pic="search" title="Ставки и КВЕД — в таблице, лист «⚙️ Справочники»">
+            Здесь они появятся, когда таблица начнёт отдавать их сайту. До тех пор смотрите в таблице — там всегда актуальные.
+          </Empty>
+        </section>
+      </div>
+    );
+  }
   return (
     <div className="page">
       <header className="page__head"><div><h1 className="page__title">Справочник <em>ставки 2026</em></h1><p className="page__sub">Обновлено в таблице 02.01.2026 (пример).</p></div></header>
