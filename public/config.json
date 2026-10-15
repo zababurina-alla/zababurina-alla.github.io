@@ -4,5 +4,8 @@
     "tasks",
     "deadlines",
     "payments"
+  ],
+  "features": [
+    "inbox"
   ]
 }
