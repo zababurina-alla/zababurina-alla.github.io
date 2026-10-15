@@ -5,7 +5,8 @@
 import { ApiError, call } from './transport';
 
 export interface User { email: string; name: string; role: 'mama' | 'owner' }
-export interface AuthState { status: 'unknown' | 'signedOut' | 'signedIn'; user: User | null; error: string | null }
+/** signingIn — Google ответил, таблица проверяет вход (3+ с): экран входа пишет «Входим…» (п. 41). */
+export interface AuthState { status: 'unknown' | 'signedOut' | 'signingIn' | 'signedIn'; user: User | null; error: string | null }
 
 interface Stored { session: string; expiresAt: string; user: User }
 interface Gis {
@@ -148,6 +149,7 @@ export class Auth {
   private async finish(idToken: string, nonce: string) {
     const waiting = this.pending;
     this.pending = null;
+    if (this.buttonEl) this.set({ status: 'signingIn', user: null, error: null });
     try {
       const env = await call<Stored>({ url: this.url, action: 'auth.login', payload: { idToken, nonce }, fetchImpl: this.fetchImpl });
       this.stored = env.data;

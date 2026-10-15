@@ -26,6 +26,7 @@ export function Login() {
         <h1 id="login-title" className="login__title">Бухгалтерия <em>рабочий кабинет</em></h1>
         <p className="login__text">Войдите через Google — тем аккаунтом, которому Дмитрий открыл доступ. Пароль от Google сайт не видит.</p>
         <div ref={slot} className="login__button" />
+        <p className="login__status sub" role="status">{state.status === 'signingIn' ? 'Входим… Таблица проверяет доступ, это до 5 секунд.' : ''}</p>
         {state.error && <p className="login__error" role="alert">{state.error}</p>}
       </section>
     </main>

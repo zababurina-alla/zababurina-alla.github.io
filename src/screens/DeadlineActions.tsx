@@ -7,7 +7,7 @@ import { useStore } from '../data/store';
 import type { DatedDeadline, DeadlineStatus } from '../data/types';
 import { TODAY, addDays, fmtDate } from '../lib/dates';
 import { Icon } from '../ui/Icon';
-import { roAttrs } from '../ui/readonly';
+import { roMessage } from '../ui/readonly';
 
 export const STATUS_LABEL: Record<DeadlineStatus, string> = {
   new: 'новый', inProgress: 'в работе', waiting: 'ожидание', postponed: 'отложено', done: 'сдано',
@@ -30,7 +30,7 @@ export function DeadlineActions({ d }: { d: DatedDeadline }) {
   if (!open) {
     return (
       <button type="button" className="btn btn--ghost btn--sm dactions__toggle" aria-expanded={false} aria-label={`Другие действия со сроком ${what}`}
-        onClick={() => (can ? setOpen(true) : store.updateDeadline(d.id, {}, `Срок ${what}`))} {...roAttrs('deadlines')}>
+        onClick={() => setOpen(true)}>
         <Icon name="more" size={18} />Действия
       </button>
     );
@@ -38,21 +38,23 @@ export function DeadlineActions({ d }: { d: DatedDeadline }) {
   const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(date) && date !== d.due;
   return (
     <div className="dactions" role="group" aria-label={`Действия со сроком ${what}`}>
+      {/* Только просмотр: меню видно (мама узнаёт, что здесь будет), пункты недоступны и подписаны (п. 8). */}
+      {!can && <p className="sub dactions__ro">{roMessage('deadlines')}</p>}
       {d.status !== 'inProgress' && (
-        <button type="button" className="btn btn--secondary btn--sm" onClick={() => { store.updateDeadline(d.id, { status: 'inProgress' }, `В работе: ${what}`); done(); }}>В работе</button>
+        <button type="button" className="btn btn--secondary btn--sm" disabled={!can} onClick={() => { store.updateDeadline(d.id, { status: 'inProgress' }, `В работе: ${what}`); done(); }}>В работе</button>
       )}
       {d.status !== 'waiting' && (
-        <button type="button" className="btn btn--secondary btn--sm" onClick={() => { store.updateDeadline(d.id, { status: 'waiting' }, `Ожидание: ${what}`); done(); }}>Ожидание</button>
+        <button type="button" className="btn btn--secondary btn--sm" disabled={!can} onClick={() => { store.updateDeadline(d.id, { status: 'waiting' }, `Ожидание: ${what}`); done(); }}>Ожидание</button>
       )}
       <label className="dactions__date">
         <span className="sub">Дата</span>
-        <input type="date" className="input input--sm" value={date} min={TODAY} onChange={(e) => setDate(e.target.value)} />
+        <input type="date" className="input input--sm" value={date} min={TODAY} disabled={!can} onChange={(e) => setDate(e.target.value)} />
       </label>
-      <button type="button" className="btn btn--secondary btn--sm" disabled={!dateOk}
+      <button type="button" className="btn btn--secondary btn--sm" disabled={!can || !dateOk}
         onClick={() => { store.updateDeadline(d.id, { status: 'postponed', due: date }, `Отложить ${what} до ${fmtDate(date)}`); done(); }}>Отложить до этой даты</button>
-      <button type="button" className="btn btn--secondary btn--sm" disabled={!dateOk}
+      <button type="button" className="btn btn--secondary btn--sm" disabled={!can || !dateOk}
         onClick={() => { store.updateDeadline(d.id, { due: date }, `Перенести ${what} на ${fmtDate(date)}`); done(); }}>Перенести срок</button>
-      <button type="button" className="btn btn--ghost btn--sm" onClick={done}>Отмена</button>
+      <button type="button" className="btn btn--ghost btn--sm" onClick={done}>{can ? 'Отмена' : 'Закрыть'}</button>
     </div>
   );
 }

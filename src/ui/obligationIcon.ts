@@ -4,5 +4,5 @@ import type { ObligationKind } from '../lib/obligation';
 import type { IconName } from './Icon';
 
 export const OBLIGATION_ICON: Record<ObligationKind, IconName> = {
-  ep: 'taxEp', esv: 'esv', declaration: 'declaration', report: 'staffReport', other: 'documents',
+  ep: 'taxEp', esv: 'esv', pdfo: 'taxPay', vz: 'vz', vat: 'vat', land: 'land', declaration: 'declaration', report: 'staffReport', other: 'documents',
 };
