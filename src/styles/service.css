@@ -243,8 +243,15 @@
   justify-items: center;
   gap: var(--space-4);
   width: min(100%, 30rem);
+  grid-template-columns: minmax(0, 1fr); /* текст переносится по карточке, а не по ширине кнопки Google */
   padding: var(--space-7) var(--space-6);
   text-align: center;
+}
+
+/* Телефон: кнопка Google 320 px должна уместиться внутри карточки (375 − 2 × 12 − 2 × 12 = 327) */
+@media (max-width: 26rem) {
+  .login { padding: var(--space-3); }
+  .login__card { padding: var(--space-6) var(--space-3); }
 }
 
 .login__mark {
@@ -276,8 +283,11 @@
   max-width: 32ch;
 }
 
+/* color-scheme: light — документ кнопки Google внутри iframe светлый; при тёмной схеме страницы Chrome заливает
+   такой iframe непрозрачным белым (белый прямоугольник вокруг кнопки). Совпадение схем возвращает прозрачность. */
 .login__button {
   min-height: 44px;
+  color-scheme: light;
 }
 
 .login__error {
