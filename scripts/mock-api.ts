@@ -20,6 +20,7 @@ interface FakeLike {
   referenceRates(year?: number): Promise<unknown>;
   clientCard(id: string): Promise<unknown>;
   referenceKved(q: string): Promise<{ items: unknown[]; note: string | null }>;
+  referenceKvedAll(): Promise<unknown>;
   changesSince(c: number): Promise<{ changes: { cursor: number; entity: string; op: string; id: string; origin: string; record?: unknown }[]; cursor: number }>;
   write(op: Record<string, unknown>): Promise<{ ok: true; changes: { entity: string; op: string; id: string; record?: { id: string } }[]; cursor: number; notifyAt?: string | null }
     | { ok: false; code: string; message: string; current?: unknown; retryAt?: string }>;
@@ -87,7 +88,7 @@ async function handle(ctx: Ctx, body: { action: string; payload?: Record<string,
   if (body.action === 'payments.list') return env(await f.listPayments(String(p.month ?? '')), 0);
   if (body.action === 'clients.get') return env(await f.clientCard(String(p.id ?? '')), 0);
   if (body.action === 'reference.rates') return env(await f.referenceRates(typeof p.year === 'number' ? p.year : undefined), 0);
-  if (body.action === 'reference.kved') return env(await f.referenceKved(String(p.q ?? '')), 0);
+  if (body.action === 'reference.kved') return env(p.all ? await f.referenceKvedAll() : await f.referenceKved(String(p.q ?? '')), 0);
   if (body.action === 'questions.list') return env({ questions: await f.listQuestions() }, 0);
   if (body.action === 'clients.revealPassword') return env({ login: 'учебный-логин', password: 'учебный-пароль', ttlSeconds: 30 }, 0);
 

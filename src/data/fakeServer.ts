@@ -3,7 +3,7 @@
 // — версии записей и ошибка CONFLICT; — журнал изменений с курсором; — повтор того же requestId не создаёт дубль.
 // Рычаги отладки (обрыв связи, отказ, правка извне) — для кнопок в режиме отладки.
 import { ACTIVITY, CLIENTS, DEADLINES, INBOX, KVEDS, PAYMENTS, QUESTIONS, RATES, TASKS } from './fake';
-import type { CabinetApi, Change, ClientCard, Entity, KvedFound, Snapshot, WriteOp, WriteResult } from './api';
+import type { CabinetApi, Change, ClientCard, Entity, KvedAll, KvedFound, Snapshot, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Deadline, InboxItem, KvedItem, Payment, Question, Rates, Task } from './types';
 import { fold } from '../lib/search';
 import { TODAY, addDays, endOfMonth, fmtDate, fmtDue } from '../lib/dates';
@@ -327,6 +327,12 @@ class FakeServer implements CabinetApi {
     const items: KvedItem[] = KVEDS.filter((k) => k.code.startsWith(t) || fold(`${k.title} ${k.words}`).includes(fold(t))).slice(0, 20)
       .map(({ code, title, epByGroup, councilDecision }) => ({ code, title, epByGroup: { ...epByGroup }, councilDecision }));
     return { items, note: items.length ? null : 'Ставка для этого КВЕДа не установлена радою' };
+  }
+
+  async referenceKvedAll(): Promise<KvedAll> {
+    await wait(READ_MS);
+    if (!this.online) throw new Error('NETWORK');
+    return { items: KVEDS.map(({ code, title, epByGroup, councilDecision }) => ({ code, title, epByGroup: { ...epByGroup }, councilDecision })), councilDecision: null, updatedAt: '2026-01-02' };
   }
 
   // ── Правки «извне» для режима отладки: так выглядят изменения в таблице и через бота ──

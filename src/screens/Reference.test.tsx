@@ -12,7 +12,9 @@ const RATES: Rates = {
 const KV: KvedItem[] = [{ code: '56.30', title: 'Обслуговування напоями', epByGroup: { '2': '20 % МЗП' }, councilDecision: null }];
 const kved = vi.fn(async () => ({ items: KV, note: null }));
 
-vi.mock('../data/session', () => ({ api: { referenceRates: async () => RATES, referenceKved: kved } }));
+// Весь лист КВЕДов сервер (здесь) не отдал — поиск идёт запросом reference.kved, как до { all:true }.
+const kvedAll = vi.fn(async () => { throw new Error('нет'); });
+vi.mock('../data/session', () => ({ api: { referenceRates: async () => RATES, referenceKved: kved, referenceKvedAll: kvedAll } }));
 vi.mock('../data/store', () => ({ useStore: () => ({}) }));
 
 // jsdom без matchMedia, а модули интерфейса спрашивают его при загрузке.

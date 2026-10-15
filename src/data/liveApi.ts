@@ -2,7 +2,7 @@
 // (docs/api-contract.md v2.1). Экраны и очередь записей не знают, с кем говорят.
 import { ApiError, call } from './transport';
 import type { Envelope } from './transport';
-import type { CabinetApi, Change, ClientCard, Entity, ErrorCode, KvedFound, Snapshot, WriteOp, WriteResult } from './api';
+import type { CabinetApi, Change, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, Snapshot, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Deadline, InboxItem, KvedItem, Payment, Question, RateGroup, Rates, Task } from './types';
 
 /** Откуда брать сеанс и как тихо войти заново (auth.ts). */
@@ -294,6 +294,17 @@ export class LiveApi implements CabinetApi {
   async referenceKved(q: string): Promise<KvedFound> {
     const env = await this.rpc<{ items?: unknown[]; note?: unknown }>('reference.kved', { q });
     return { items: (env.data.items ?? []).map(normKved).filter((k) => k.code), note: text(env.data.note) || null };
+  }
+
+  /** Весь лист КВЕДов: решение горсовета одно на лист — подставляем его в строки, где своего нет. */
+  async referenceKvedAll(): Promise<KvedAll> {
+    const env = await this.rpc<{ items?: unknown[]; councilDecision?: unknown; updatedAt?: unknown }>('reference.kved', { all: true });
+    const council = text(env.data.councilDecision) || null;
+    return {
+      items: (env.data.items ?? []).map(normKved).filter((k) => k.code).map((k) => ({ ...k, councilDecision: k.councilDecision ?? council })),
+      councilDecision: council,
+      updatedAt: text(env.data.updatedAt) || null,
+    };
   }
 
   /** Счётчики сервера за день (только owner, контракт 8.8) — рядом со ступенями сайта. */

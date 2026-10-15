@@ -77,6 +77,9 @@ export interface ClientCard { client: Client; deadlines: Deadline[]; payments: P
 /** Ответ поиска КВЕД. note — пояснение сервера, когда не нашлось («не установлена радою»). */
 export interface KvedFound { items: KvedItem[]; note: string | null }
 
+/** reference.kved { all:true } — весь лист «📑 КВЕДы» (~217 строк): ищем в браузере. */
+export interface KvedAll { items: KvedItem[]; councilDecision: string | null; updatedAt: string | null }
+
 export interface CabinetApi {
   snapshot(): Promise<Snapshot>;
   changesSince(cursor: number): Promise<{ changes: Change[]; cursor: number }>;
@@ -92,6 +95,8 @@ export interface CabinetApi {
   referenceRates(year?: number): Promise<Rates>;
   /** reference.kved — поиск по коду или словам, до 20 строк. */
   referenceKved(q: string): Promise<KvedFound>;
+  /** reference.kved { all:true } — весь лист одним ответом. */
+  referenceKvedAll(): Promise<KvedAll>;
 }
 
 export function newRequestId(): string {

@@ -3,7 +3,8 @@
 // Первое открытие шло 5–10 с (п. 45): ставки — публичные цифры, не данные клиентов, поэтому прошлый ответ лежит в
 // localStorage и показывается сразу, а свежий подтягивается в фоне. Ответы поиска КВЕД помним до закрытия вкладки.
 import { useCallback, useEffect, useState } from 'react';
-import type { CabinetApi, KvedFound } from './api';
+import type { CabinetApi, KvedAll, KvedFound } from './api';
+import { searchKved } from '../lib/kvedLocal';
 import { api } from './session';
 import type { Rates } from './types';
 import { kvedQuery } from '../lib/kvedQuery';
@@ -62,14 +63,51 @@ export function useRates(): Loaded<Rates> & { retry: () => void } {
 
 const found = new Map<string, KvedFound>();
 
+// Весь лист КВЕДов — публичные данные (не клиенты): localStorage на 24 ч, дальше ищем в браузере мгновенно (п. 45).
+const KVED_KEY = 'buh.kved.v1';
+const KVED_TTL_MS = 24 * 3600_000;
+let kvedAll: KvedAll | null = (() => {
+  try {
+    const raw = localStorage.getItem(KVED_KEY);
+    const v = raw ? JSON.parse(raw) as { at?: number; data?: KvedAll } : null;
+    return v?.data && Array.isArray(v.data.items) && typeof v.at === 'number' && Date.now() - v.at < KVED_TTL_MS ? v.data : null;
+  } catch {
+    return null;
+  }
+})();
+let kvedLoading: Promise<KvedAll | null> | null = null;
+
+function loadKvedAll(): Promise<KvedAll | null> {
+  if (kvedAll) return Promise.resolve(kvedAll);
+  kvedLoading ??= api.referenceKvedAll().then((data) => {
+    kvedAll = data;
+    try { localStorage.setItem(KVED_KEY, JSON.stringify({ at: Date.now(), data })); } catch { /* в памяти */ }
+    return data;
+  }, () => null).finally(() => { kvedLoading = null; });
+  return kvedLoading;
+}
+
+/** Весь лист, когда пришёл; null — ещё идёт или сервер его не отдаёт (тогда ищем запросом, как раньше). */
+function useKvedAll(): KvedAll | null {
+  const [all, setAll] = useState<KvedAll | null>(kvedAll);
+  useEffect(() => {
+    if (all) return;
+    let alive = true;
+    void loadKvedAll().then((d) => { if (alive && d) setAll(d); });
+    return () => { alive = false; };
+  }, [all]);
+  return all;
+}
+
 /** Поиск КВЕД на сервере: ждём паузу в наборе 300 мс; меньше двух знаков — не ищем. Запрос приводится к виду листа
  *  («96,02» → «96.02», «парикмахер» → «перукар» — lib/kvedQuery). Ответ помнит, на какой запрос он. */
 export function useKvedSearch(q: string): Loaded<KvedFound> {
   const t = q.trim();
   const sent = kvedQuery(t);
+  const all = useKvedAll();
   const [res, setRes] = useState<{ q: string; st: Loaded<KvedFound> } | null>(null);
   useEffect(() => {
-    if (t.length < 2 || found.has(sent)) return;
+    if (t.length < 2 || found.has(sent) || all) return;
     let alive = true;
     const timer = setTimeout(() => {
       api.referenceKved(sent).then(
@@ -78,8 +116,9 @@ export function useKvedSearch(q: string): Loaded<KvedFound> {
       );
     }, 300);
     return () => { alive = false; clearTimeout(timer); };
-  }, [t, sent]);
+  }, [t, sent, all]);
   if (t.length < 2) return { state: 'idle' };
+  if (all) return { state: 'ok', data: searchKved(all.items, t) };
   const known = found.get(sent);
   if (known) return { state: 'ok', data: known };
   return res && res.q === sent ? res.st : { state: 'loading' };
