@@ -15,7 +15,7 @@ import type { IconName } from '../ui/Icon';
 import type { RouteName } from '../router';
 import { navigate, toHash } from '../router';
 import { useUi } from './ui-context';
-import { WRITE_AREAS, readOnlyAreas } from '../config';
+import { readOnlyAreas, visibleAreas } from '../config';
 import '../ui/fx';
 
 const NAV: { id: RouteName; label: string; icon: IconName; group: 'work' | 'ref' }[] = [
@@ -116,7 +116,8 @@ function SyncStatus() {
   const waitReason = online ? pending.find((p) => p.state === 'queued' && p.error)?.error : undefined;
   // Пока снимок не пришёл — не «всё сохранено», а «связываемся»; когда запись выключена во всех разделах — честно
   // «только просмотр» (находка «Пользователя» № 10). Очередь и ошибки важнее — их показываем как раньше.
-  const readOnly = readOnlyAreas().length === WRITE_AREAS.length;
+  // С видимыми разделами, а не со всеми: «Входящие» за флагом на живом сайте не видны (иначе 5 ≠ 6 и «всё сохранено»).
+  const readOnly = readOnlyAreas().length === visibleAreas().length;
   if (!pending.length && online && (!loaded || readOnly)) {
     return (
       <p className={`sync ${loaded ? 'is-readonly' : 'is-saving'}`} role="status">
