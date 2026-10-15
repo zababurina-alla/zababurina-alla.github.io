@@ -365,6 +365,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setPayments((xs) => upsert(xs, cur));
       }
       if (op.kind === 'addPayment') setPayments((xs) => xs.map((p) => (p.id === op.payment.id ? { ...p, save: 'failed' } : p)));
+      // Задачу таблица не приняла окончательно (VALIDATION: «Выберите клиента», клиента нет) — убрать её с экрана, иначе
+      // она стоит в списке как записанная при «Всё сохранено» (вечерняя проверка 15.10, тестовый клиент удалён).
+      if (op.kind === 'createTask' && final) setTasks((xs) => xs.filter((t) => t.id !== op.task.id));
+      // «Сделано» не принято — галочка возвращается.
+      if (op.kind === 'completeTask' && final) setTasks((xs) => xs.map((t) => (t.id === op.id ? { ...t, done: !op.done } : t)));
       // Ответ не записался: вопрос возвращается, если он всё ещё открыт (уже отвечен в Telegram — не возвращаем).
       if (op.kind === 'answerQuestion' && final) {
         const q = answering.current.get(op.requestId);
