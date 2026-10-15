@@ -4,11 +4,14 @@
 // Пустой адрес — сайт на выдуманном сервере (src/data/fakeServer.ts).
 
 /** Разделы, запись в которых можно включать по одному (сервер готовит их по очереди). */
-export type WriteArea = 'payments' | 'tasks' | 'questions' | 'deadlines' | 'clients' | 'inbox';
-export const WRITE_AREAS: readonly WriteArea[] = ['payments', 'tasks', 'questions', 'deadlines', 'clients', 'inbox'];
+// remind — напоминания клиентам (clients.remind): отдельно от сроков, включается своим «да» (координатор 15.10).
+export type WriteArea = 'payments' | 'tasks' | 'questions' | 'deadlines' | 'clients' | 'inbox' | 'remind';
+export const WRITE_AREAS: readonly WriteArea[] = ['payments', 'tasks', 'questions', 'deadlines', 'clients', 'inbox', 'remind'];
 
 /** Возможности, которые включаются, когда их готов отдавать сервер. На выдуманных данных — все. */
-export type Feature = 'inbox';
+/** remindPreview — сервер умеет clients.remind { preview:true } (пробный, без отправки). Без флага не зовём:
+ *  старый сервер флаг не знает и отправил бы настоящее сообщение. */
+export type Feature = 'inbox' | 'remindPreview';
 
 /** OAuth client ID проекта Google Cloud «zababurina-alla» (…apps.googleusercontent.com). */
 export const GOOGLE_CLIENT_ID = '1078049272948-bnvonl9qah7npdq63gktbio1rm2lbgvb.apps.googleusercontent.com';
@@ -32,7 +35,7 @@ export async function loadRuntimeConfig(fetchImpl: typeof fetch = fetch): Promis
     runtime = {
       apiUrl: typeof j.apiUrl === 'string' ? j.apiUrl.trim() : '',
       writes: Array.isArray(j.writes) ? j.writes.filter(isArea) : [...WRITE_AREAS],
-      features: Array.isArray(j.features) ? j.features.filter((f): f is Feature => f === 'inbox') : [],
+      features: Array.isArray(j.features) ? j.features.filter((f): f is Feature => f === 'inbox' || f === 'remindPreview') : [],
     };
   } catch {
     // нет связи или файл битый — остаёмся на выдуманных данных
@@ -75,5 +78,5 @@ export function readOnlyAreas(): WriteArea[] {
 }
 
 export const AREA_LABEL: Record<WriteArea, string> = {
-  payments: 'платежи', tasks: 'задачи', questions: 'ответы на вопросы', deadlines: 'сроки', clients: 'клиенты', inbox: 'входящие',
+  payments: 'платежи', tasks: 'задачи', questions: 'ответы на вопросы', deadlines: 'сроки', clients: 'клиенты', inbox: 'входящие', remind: 'напоминания клиентам',
 };

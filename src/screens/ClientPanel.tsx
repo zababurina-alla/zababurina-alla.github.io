@@ -243,7 +243,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                   <div><h3 className="cp__h">Ключ ЭЦП</h3>{keyDays === null ? <p className="cp__key"><Icon name="inactive" size={18} className="urgency--grey" /><span className="nil">ключа нет в таблице</span></p>
                     : <p className="cp__key"><Icon name={URGENCY_ICON[statusByDays(keyDays)]} size={18} className={`urgency--${statusByDays(keyDays)}`} /><span className="num">до {fmtDate(c.keyUntil ?? '')}</span><span className={`due--${statusByDays(keyDays)}`}>{daysLabel(keyDays)}</span></p>}{c.keyFrom && <p className="sub">выпущен {fmtDate(c.keyFrom)}</p>}<KeyRenew c={c} />
                     {keyDays !== null && keyDays <= 30 && (
-                      <button type="button" className="btn btn--secondary btn--sm cp__remind" onClick={() => setRemindKey(true)} {...roAttrs('deadlines')}>Напомнить про ключ</button>
+                      <button type="button" className="btn btn--secondary btn--sm cp__remind" onClick={() => setRemindKey(true)} {...roAttrs('remind')}>Напомнить про ключ</button>
                     )}
                     {remindKey && <RemindDialog open onClose={() => setRemindKey(false)} client={c} keyReminder />}</div>
                   <div><h3 className="cp__h">Ключ выпущен</h3><p>{c.keyIssuer ? <TableText text={c.keyIssuer} tidy /> : <span className="nil">не указано</span>}</p></div>

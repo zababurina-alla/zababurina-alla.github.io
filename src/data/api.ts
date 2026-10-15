@@ -98,6 +98,8 @@ export interface CabinetApi {
   listQuestions(): Promise<Question[]>;
   /** clients.remind — мимо очереди: результат нужен сразу, повтор не должен отправить сообщение дважды (requestId). */
   remindClient(req: RemindRequest, requestId: string): Promise<RemindResult>;
+  /** clients.remind { preview:true } — текст сообщения на языке клиента, без отправки и без расхода лимита. */
+  remindPreview(req: Omit<RemindRequest, 'text'>): Promise<{ preview: string; lang: string | null }>;
   /** clients.get — карточка целиком (п. 3) и история изменений клиента (п. 9). */
   clientCard(id: string): Promise<ClientCard>;
   /** reference.rates — ставки года из «⚙️ Справочники». Цифр ставок в коде сайта нет. */

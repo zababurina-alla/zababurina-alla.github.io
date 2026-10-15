@@ -8,7 +8,7 @@ import type { ReactNode } from 'react';
 import { fakeServer } from './fakeServer';
 import { api, liveApi } from './session';
 import { ApiError } from './transport';
-import { canWrite, isLive } from '../config';
+import { canWrite, hasFeature, isLive } from '../config';
 import { roMessage } from '../ui/readonly';
 import type { WriteArea } from '../config';
 import { kvAll, kvDelete, kvSet } from './idb';
@@ -98,6 +98,8 @@ interface Store {
   decideInbox: (id: string, action: 'accept' | 'task' | 'reject', amount?: number) => void;
   /** clients.remind — напомнить клиенту в Telegram (под writes.deadlines). Ответ — сразу, мимо очереди. */
   remindClient: (req: RemindRequest) => Promise<RemindResult>;
+  /** Черновик напоминания от сервера (пробный запуск) — только если сервер это умеет (features: remindPreview). */
+  remindPreview: (req: Omit<RemindRequest, 'text'>) => Promise<string | null>;
   /** clients.get: карточка целиком — строка клиента, его платежи и задачи дополняют общие списки; история — в ответе. */
   loadClientCard: (id: string) => Promise<Activity[]>;
   /** Поправить задачу (tasks.update): текст, срок, приоритет, тип, клиент; null очищает срок/клиента. */
@@ -653,6 +655,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return r;
   }, [syncNow]);
 
+  const remindPreview = useCallback(async (req: Omit<RemindRequest, 'text'>) => {
+    if (!hasFeature('remindPreview')) return null;
+    try { return (await api.remindPreview(req)).preview || null; } catch { return null; }
+  }, []);
+
   const loadClientCard = useCallback(async (id: string) => {
     const card = await api.clientCard(id);
     const add = <T extends { id: string }>(xs: T[], more: T[]) => [...xs, ...more.filter((m) => !xs.some((x) => x.id === m.id))];
@@ -695,10 +702,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<Store>(() => ({
     loaded, online, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance,
   }), [loaded, online, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

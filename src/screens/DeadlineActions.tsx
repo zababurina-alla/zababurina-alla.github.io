@@ -60,7 +60,8 @@ export function DeadlineActions({ d }: { d: DatedDeadline }) {
         onClick={() => { store.updateDeadline(d.id, { status: 'postponed', due: date }, `Отложить ${what} до ${fmtDate(date)}`); done(); }}>Отложить до этой даты</button>
       <button type="button" className="btn btn--secondary btn--sm" disabled={!can || !dateOk}
         onClick={() => { store.updateDeadline(d.id, { due: date }, `Перенести ${what} на ${fmtDate(date)}`); done(); }}>Перенести срок</button>
-      {client && <button type="button" className="btn btn--secondary btn--sm" disabled={!can} onClick={() => { setRemindOpen(true); done(); }}>Напомнить клиенту</button>}
+      {client && <button type="button" className="btn btn--secondary btn--sm" disabled={!canWrite('remind')} title={canWrite('remind') ? undefined : roMessage('remind')}
+        onClick={() => { setRemindOpen(true); done(); }}>Напомнить клиенту</button>}
       <button type="button" className="btn btn--ghost btn--sm" onClick={done}>{can ? 'Отмена' : 'Закрыть'}</button>
       {remind}
     </div>
