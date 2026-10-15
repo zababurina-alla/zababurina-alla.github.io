@@ -191,7 +191,7 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
               </div>
               {kved && <p className="field__hint">Выбран: <span className="num">{kved}</span> {kvedTitle}</p>}
               <div aria-live="polite">
-                {found.state === 'idle' && !kved && <p className="field__hint">Наберите хотя бы два знака — поиск по листу «📑 КВЕДы».</p>}
+                {found.state === 'idle' && !kved && <p className="field__hint">Наберите хотя бы два знака — поиск по листу «КВЕДы».</p>}
                 {found.state === 'loading' && <p className="field__hint">Ищу в таблице…</p>}
                 {found.state === 'error' && <p className="field__hint">{found.message}</p>}
                 {found.state === 'ok' && !found.data.items.length && <p className="field__hint">«{kq.trim()}» в таблице не нашёлся — {found.data.note ?? 'попробуйте код или другое слово'}.</p>}
@@ -209,7 +209,7 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
               )}
             </div>
             {kind && isLive() && (
-              <p className="sub">Начисления в месяц посчитает таблица по ставкам из «⚙️ Справочники» — они появятся в карточке после добавления.</p>
+              <p className="sub">Начисления в месяц посчитает таблица по ставкам из «Справочники» — они появятся в карточке после добавления.</p>
             )}
             {kind && !isLive() && (
               <div className="estimate">

@@ -14,6 +14,7 @@ import { formatPayMoney } from '../lib/money';
 import { obligationKind } from '../lib/obligation';
 import { OBLIGATION_ICON } from '../ui/obligationIcon';
 import { shortName } from '../ui/names';
+import { splitEmoji } from '../ui/TableText';
 
 
 interface Item { id: string; group: string; label: string; hint?: string | undefined; icon: IconName; run: () => void }
@@ -59,12 +60,12 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const deadlines: Item[] = deep
     ? search(store.deadlines.map((d) => ({ ...d, name: `${who(d.clientId)} ${d.what}` })), q)
       .sort((a, b) => a.due.localeCompare(b.due)).slice(0, 5)
-      .map((d) => ({ id: `d-${d.id}`, group: 'Сроки', label: `${shortName(who(d.clientId)) || 'Клиент не указан'} — ${d.what}`,
+      .map((d) => ({ id: `d-${d.id}`, group: 'Сроки', label: `${shortName(who(d.clientId)) || 'Клиент не указан'} — ${splitEmoji(d.what).rest}`,
         hint: daysLabel(daysBetween(TODAY, d.due)), icon: OBLIGATION_ICON[obligationKind(d.what)], run: () => ui.openClient(d.clientId) }))
     : [];
   const tasks: Item[] = deep
     ? search(store.tasks.filter((t) => !t.done).map((t) => ({ ...t, name: `${who(t.clientId)} ${t.text}` })), q).slice(0, 4)
-      .map((t) => ({ id: `t-${t.id}`, group: 'Задачи', label: t.text, hint: t.clientId ? shortName(who(t.clientId)) : undefined,
+      .map((t) => ({ id: `t-${t.id}`, group: 'Задачи', label: splitEmoji(t.text).rest, hint: t.clientId ? shortName(who(t.clientId)) : undefined,
         icon: 'tasks' as IconName, run: () => (t.clientId ? ui.openClient(t.clientId) : navigate('#/tasks')) }))
     : [];
   const payments: Item[] = deep
