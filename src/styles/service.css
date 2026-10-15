@@ -311,3 +311,34 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Ход первой загрузки из таблицы (LoadProgress): текст, секунды и полоса. Полоса — transform, без перерисовки. */
+.load-progress {
+  display: grid;
+  gap: var(--space-2);
+  max-width: 28rem;
+}
+
+.load-progress__text {
+  margin: 0;
+  color: var(--ink-2);
+}
+
+.load-progress__bar {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.load-progress__bar > span {
+  display: block;
+  height: 100%;
+  background: var(--focus);
+  transform-origin: left center;
+  transition: transform 500ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .load-progress__bar > span { transition: none; }
+}
