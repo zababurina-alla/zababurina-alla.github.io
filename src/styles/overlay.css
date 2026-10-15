@@ -105,6 +105,22 @@
     padding: 0;
   }
 
+  /* Шторка не шире экрана: подвал с двумя кнопками («Отмена» + «Отправить в Telegram») раньше распирал её на 5 px
+     сверх 360 (Windows-полоса прокрутки съедает 15 px) — внизу появлялась горизонтальная прокрутка */
+  .modal--dialog .modal__box {
+    min-width: 0;
+  }
+
+  .modal--dialog .modal__foot {
+    flex-wrap: wrap;
+    padding-inline: var(--space-4);
+  }
+
+  /* Не влезли в строку — каждая кнопка на всю ширину; главная остаётся последней, под большим пальцем */
+  .modal--dialog .modal__foot > .btn {
+    flex: 1 1 auto;
+  }
+
   .modal--dialog .modal__box {
     width: 100%;
     max-height: 94dvh;
@@ -240,6 +256,21 @@
     right: var(--space-6);
     bottom: var(--space-6);
     justify-items: end;
+  }
+}
+
+/* Телефон, открыта шторка снизу: уведомления — сверху, на её заголовке, а не на поле и кнопках
+   (ответ «не знаю, ушло ли» оставляет окно открытым — красная строка закрывала текст и «Отправить») */
+@media (max-width: 699px) {
+  .modal--dialog > .toasts {
+    top: calc(var(--space-3) + env(safe-area-inset-top));
+    bottom: auto;
+    align-items: start;
+  }
+
+  .modal--dialog > .toasts > .toast {
+    transform: translateY(calc(var(--i) * 10px)) scale(calc(1 - var(--i) * 0.05));
+    transform-origin: 50% 100%;
   }
 }
 
