@@ -17,6 +17,7 @@ import { navigate, toHash } from '../router';
 import { useUi } from './ui-context';
 import { readOnlyAreas, visibleAreas } from '../config';
 import '../ui/fx';
+import { BrandMark } from '../ui/BrandMark';
 
 const NAV: { id: RouteName; label: string; icon: IconName; group: 'work' | 'ref' }[] = [
   { id: 'today', label: 'Сегодня', icon: 'today', group: 'work' },
@@ -226,7 +227,7 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
       <button type="button" className="skip" onClick={() => document.getElementById('main')?.focus()}>К содержимому</button>
       <aside className="rail" aria-label="Меню">
         <a href="#/today" className="brand" aria-label="Бухгалтерия — на главную">
-          <span className="brand__mark" aria-hidden="true">Б</span>
+          <BrandMark />
           <span className="brand__name">Бухгалтерия</span>
         </a>
         <SyncStatus />
@@ -255,7 +256,7 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
       </aside>
 
       <header className="topbar">
-        <a href="#/today" className="brand" aria-label="Бухгалтерия — на главную"><span className="brand__mark" aria-hidden="true">Б</span><span className="brand__name">Бухгалтерия</span></a>
+        <a href="#/today" className="brand" aria-label="Бухгалтерия — на главную"><BrandMark /><span className="brand__name">Бухгалтерия</span></a>
         <div className="topbar__tools">
           <SyncStatus />
           <ClosedCounter compact />
