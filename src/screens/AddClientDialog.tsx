@@ -194,11 +194,11 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
                 {found.state === 'idle' && !kved && <p className="field__hint">Наберите хотя бы два знака — поиск по листу «📑 КВЕДы».</p>}
                 {found.state === 'loading' && <p className="field__hint">Ищу в таблице…</p>}
                 {found.state === 'error' && <p className="field__hint">{found.message}</p>}
-                {found.state === 'ok' && !found.data.length && <p className="field__hint">«{kq.trim()}» в таблице не нашёлся — попробуйте код или другое слово.</p>}
+                {found.state === 'ok' && !found.data.items.length && <p className="field__hint">«{kq.trim()}» в таблице не нашёлся — {found.data.note ?? 'попробуйте код или другое слово'}.</p>}
               </div>
-              {found.state === 'ok' && found.data.length > 0 && (
+              {found.state === 'ok' && found.data.items.length > 0 && (
                 <ul className="kved-list" aria-label="КВЕД">
-                  {found.data.map((k) => (
+                  {found.data.items.map((k) => (
                     <li key={k.code}>
                       <button type="button" className="kved-opt" aria-pressed={kved === k.code} onClick={() => { setKved(k.code); setKvedTitle(k.title); }}>
                         <span className="num kved__code">{k.code}</span><span>{k.title}</span>{kved === k.code && <Icon name="check" />}

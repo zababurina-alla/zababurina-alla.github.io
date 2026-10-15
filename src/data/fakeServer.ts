@@ -3,7 +3,7 @@
 // — версии записей и ошибка CONFLICT; — журнал изменений с курсором; — повтор того же requestId не создаёт дубль.
 // Рычаги отладки (обрыв связи, отказ, правка извне) — для кнопок в режиме отладки.
 import { ACTIVITY, CLIENTS, DEADLINES, INBOX, KVEDS, PAYMENTS, QUESTIONS, RATES, TASKS } from './fake';
-import type { CabinetApi, Change, Entity, Snapshot, WriteOp, WriteResult } from './api';
+import type { CabinetApi, Change, Entity, KvedFound, Snapshot, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Deadline, InboxItem, KvedItem, Payment, Question, Rates, Task } from './types';
 import { fold } from '../lib/search';
 import { TODAY, addDays, endOfMonth, fmtDate, fmtDue } from '../lib/dates';
@@ -276,12 +276,13 @@ class FakeServer implements CabinetApi {
     return { ...RATES, year: year ?? RATES.year, groups: RATES.groups.map((g) => ({ ...g })) };
   }
 
-  async referenceKved(q: string): Promise<KvedItem[]> {
+  async referenceKved(q: string): Promise<KvedFound> {
     await wait(READ_MS);
     if (!this.online) throw new Error('NETWORK');
     const t = q.trim();
-    return KVEDS.filter((k) => k.code.startsWith(t) || fold(`${k.title} ${k.words}`).includes(fold(t))).slice(0, 20)
+    const items: KvedItem[] = KVEDS.filter((k) => k.code.startsWith(t) || fold(`${k.title} ${k.words}`).includes(fold(t))).slice(0, 20)
       .map(({ code, title, epByGroup, councilDecision }) => ({ code, title, epByGroup: { ...epByGroup }, councilDecision }));
+    return { items, note: items.length ? null : 'Ставка для этого КВЕДа не установлена радою' };
   }
 
   // ── Правки «извне» для режима отладки: так выглядят изменения в таблице и через бота ──

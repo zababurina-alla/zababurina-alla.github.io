@@ -250,6 +250,11 @@ describe('живой адаптер: чтение', () => {
     const s = server(ok({ items: [{ code: '56.30', title: 'Обслуговування напоями', epByGroup: { 2: '20 % МЗП', 3: null }, councilDecision: '' }, { title: 'без кода' }] }));
     const r = await new LiveApi(URL_, auth(), s.fetchImpl).referenceKved('56.3');
     expect(s.sent[0]?.payload).toEqual({ q: '56.3' });
-    expect(r).toEqual([{ code: '56.30', title: 'Обслуговування напоями', epByGroup: { '2': '20 % МЗП' }, councilDecision: null }]);
+    expect(r).toEqual({ items: [{ code: '56.30', title: 'Обслуговування напоями', epByGroup: { '2': '20 % МЗП' }, councilDecision: null }], note: null });
+  });
+
+  it('справочник: не нашлось — items пуст и пояснение сервера (note)', async () => {
+    const s = server(ok({ items: [], note: 'не установлена радою', matchedBy: null }));
+    expect(await new LiveApi(URL_, auth(), s.fetchImpl).referenceKved('99.99')).toEqual({ items: [], note: 'не установлена радою' });
   });
 });

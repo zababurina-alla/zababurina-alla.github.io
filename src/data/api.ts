@@ -62,6 +62,9 @@ export type WriteResult =
 
 export interface DeadlinePatch { due?: string; status?: Exclude<DeadlineStatus, 'done'>; note?: string }
 
+/** Ответ поиска КВЕД. note — пояснение сервера, когда не нашлось («не установлена радою»). */
+export interface KvedFound { items: KvedItem[]; note: string | null }
+
 export interface CabinetApi {
   snapshot(): Promise<Snapshot>;
   changesSince(cursor: number): Promise<{ changes: Change[]; cursor: number }>;
@@ -74,7 +77,7 @@ export interface CabinetApi {
   /** reference.rates — ставки года из «⚙️ Справочники». Цифр ставок в коде сайта нет. */
   referenceRates(year?: number): Promise<Rates>;
   /** reference.kved — поиск по коду или словам, до 20 строк. */
-  referenceKved(q: string): Promise<KvedItem[]>;
+  referenceKved(q: string): Promise<KvedFound>;
 }
 
 export function newRequestId(): string {

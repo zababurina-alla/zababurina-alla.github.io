@@ -2,7 +2,7 @@
 // (docs/api-contract.md v2.1). Экраны и очередь записей не знают, с кем говорят.
 import { ApiError, call } from './transport';
 import type { Envelope } from './transport';
-import type { CabinetApi, Change, Entity, ErrorCode, Snapshot, WriteOp, WriteResult } from './api';
+import type { CabinetApi, Change, Entity, ErrorCode, KvedFound, Snapshot, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Deadline, InboxItem, KvedItem, Payment, Question, RateGroup, Rates, Task } from './types';
 
 /** Откуда брать сеанс и как тихо войти заново (auth.ts). */
@@ -241,9 +241,10 @@ export class LiveApi implements CabinetApi {
     return normRates(env.data);
   }
 
-  async referenceKved(q: string): Promise<KvedItem[]> {
-    const env = await this.rpc<{ items?: unknown[] }>('reference.kved', { q });
-    return (env.data.items ?? []).map(normKved).filter((k) => k.code);
+  /** Сервер ищет и по укороченному коду («56.30» → «56.3» → «56»); не нашлось — items пуст и note. */
+  async referenceKved(q: string): Promise<KvedFound> {
+    const env = await this.rpc<{ items?: unknown[]; note?: unknown }>('reference.kved', { q });
+    return { items: (env.data.items ?? []).map(normKved).filter((k) => k.code), note: text(env.data.note) || null };
   }
 
   /** Счётчики сервера за день (только owner, контракт 8.8) — рядом со ступенями сайта. */

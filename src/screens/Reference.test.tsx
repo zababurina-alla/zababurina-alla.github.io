@@ -10,7 +10,7 @@ const RATES: Rates = {
   updatedAt: '2026-01-02', source: 'fallback', limitsSource: 'code',
 };
 const KV: KvedItem[] = [{ code: '56.30', title: 'Обслуговування напоями', epByGroup: { '2': '20 % МЗП' }, councilDecision: null }];
-const kved = vi.fn(async () => KV);
+const kved = vi.fn(async () => ({ items: KV, note: null }));
 
 vi.mock('../data/session', () => ({ api: { referenceRates: async () => RATES, referenceKved: kved } }));
 vi.mock('../data/store', () => ({ useStore: () => ({}) }));

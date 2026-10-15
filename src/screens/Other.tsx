@@ -125,15 +125,15 @@ function KvedSearch() {
         {found.state === 'idle' && <p className="sub panel__note">Наберите хотя бы два знака — поиск идёт по листу «📑 КВЕДы».</p>}
         {found.state === 'loading' && <p className="sub panel__note">Ищу в таблице…</p>}
         {found.state === 'error' && <p className="sub panel__note">{found.message}</p>}
-        {found.state === 'ok' && (found.data.length ? (
-          <ul className="kved kved--table">{found.data.map((k) => (
+        {found.state === 'ok' && (found.data.items.length ? (
+          <ul className="kved kved--table">{found.data.items.map((k) => (
             <li key={k.code}>
               <span className="num kved__code">{k.code}</span>
               <span>{k.title}{k.councilDecision && <span className="sub kved__council">{k.councilDecision}</span>}</span>
               <span className="kved__rates">{Object.entries(k.epByGroup).map(([g, rule]) => <span key={g} className="tag">{g} гр. — {rule}</span>)}</span>
             </li>
           ))}</ul>
-        ) : <Empty pic="search" title={`КВЕД «${q.trim()}» в таблице не нашёлся`}>Попробуйте код целиком или другое слово.</Empty>)}
+        ) : <Empty pic="search" title={`КВЕД «${q.trim()}» в таблице не нашёлся`}>{found.data.note ?? 'Попробуйте код целиком или другое слово.'}</Empty>)}
       </div>
     </section>
   );
