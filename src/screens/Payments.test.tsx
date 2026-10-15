@@ -18,12 +18,14 @@ vi.mock('../data/store', () => ({
   }),
 }));
 
+// jsdom без matchMedia, а модули интерфейса спрашивают его при загрузке.
+window.matchMedia ??= ((q: string) => ({ matches: q.includes('reduce'), media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
+
 const { Payments } = await import('./Payments');
 const { ScreenBoundary } = await import('../app/ScreenBoundary');
 
 beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  window.matchMedia ??= ((q: string) => ({ matches: q.includes('reduce'), media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
 });
 
 let host: HTMLDivElement;

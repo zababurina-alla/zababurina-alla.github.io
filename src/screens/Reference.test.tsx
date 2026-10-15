@@ -15,6 +15,9 @@ const kved = vi.fn(async () => KV);
 vi.mock('../data/session', () => ({ api: { referenceRates: async () => RATES, referenceKved: kved } }));
 vi.mock('../data/store', () => ({ useStore: () => ({}) }));
 
+// jsdom без matchMedia, а модули интерфейса спрашивают его при загрузке.
+window.matchMedia ??= ((q: string) => ({ matches: q.includes('reduce'), media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
+
 const { Reference } = await import('./Other');
 
 beforeAll(() => { (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true; });
