@@ -1,12 +1,13 @@
 // Ключи ЭЦП, Справочник, Задачи и «Ещё» (телефон). Короче основных экранов, но рабочие.
 import { useState } from 'react';
-import { canWrite, isLive } from '../config';
+import type { ReactNode } from 'react';
+import { canWrite } from '../config';
 import { useStore } from '../data/store';
 import { TODAY, addDays, daysBetween, daysLabel, fmtDate, plural, statusByDays } from '../lib/dates';
 import { parseQuickTask } from '../lib/quickTask';
-import type { Client, Priority, Status, Task } from '../data/types';
+import type { Client, Priority, Rates, Status, Task } from '../data/types';
+import { useKvedSearch, useRates } from '../data/reference';
 import { formatMoney } from '../lib/money';
-import { fold } from '../lib/search';
 import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
 import { Avatar, Money, SaveBadge } from '../ui/kit';
@@ -77,62 +78,82 @@ export function Keys() {
   );
 }
 
-// Ставки 2026 — из брифа (МЗП 8 647, ПМ 3 328, ЄСВ 1 902,34). На живых данных — из справочника API, не из кода.
-const RATES: [string, number, string, IconName][] = [
-  ['Минимальная зарплата (МЗП)', 864700, 'с 1 января 2026', 'salary'],
-  ['Прожиточный минимум (ПМ)', 332800, 'для трудоспособных', 'person'],
-  ['ЄСВ в месяц', 190234, '22 % МЗП', 'esv'],
-  ['ЄП 1 группа в месяц', 33280, 'до 10 % ПМ', 'taxEp'],
-  ['ЄП 2 группа в месяц', 172940, 'до 20 % МЗП', 'taxEp'],
-];
+// Ставки и КВЕД — только с сервера (reference.rates / reference.kved, лист «⚙️ Справочники»). В коде сайта цифр нет:
+// неверная ставка на экране бухгалтера опаснее, чем её отсутствие (координатор, 15.10.2026).
+const money = (k: number | null) => (k === null ? '—' : formatMoney(k));
 
-const KVED_RATES: [string, string, string][] = [
-  ['96.02', 'Перукарні та салони краси', '2 гр. — 20 % МЗП'],
-  ['47.91', 'Торгівля через інтернет', '2 гр. — 20 % МЗП'],
-  ['47.81', 'Торгівля з лотків продуктами', '1 гр. — 10 % ПМ'],
-  ['56.10', 'Ресторани', '2 гр. — 20 % МЗП'],
-  ['45.20', 'Ремонт автомобілів', '2 гр. — 20 % МЗП'],
-];
+function RateCards({ r }: { r: Rates }) {
+  const cards: [string, ReactNode, string, IconName][] = [
+    ['Минимальная зарплата (МЗП)', <Money text={money(r.mzpKopecks)} />, `с 1 января ${r.year}`, 'salary'],
+    ['Прожиточный минимум (ПМ)', <Money text={money(r.pmKopecks)} />, 'для трудоспособных', 'person'],
+    ['ЄСВ в месяц', <Money text={money(r.esvMonthlyKopecks)} />, r.esvRatePct !== null ? `${r.esvRatePct} % МЗП` : 'минимальный взнос', 'esv'],
+    ...r.groups.map((g): [string, ReactNode, string, IconName] => [
+      `ЄП ${g.group} группа`, g.epRule || '—',
+      g.limitKopecks !== null ? `доход до ${formatMoney(g.limitKopecks)}${g.limitMzp !== null ? ` (${g.limitMzp} МЗП)` : ''}` : 'предел дохода не указан',
+      'taxEp',
+    ]),
+  ];
+  return (
+    <section className="rates" aria-label="Ставки">
+      {cards.map(([name, value, note, icon]) => (
+        <div key={name} className="rate">
+          <Icon name={icon} size={22} className="rate__icon" />
+          <p className="rate__name">{name}</p>
+          <p className="rate__value display">{value}</p>
+          <p className="sub">{note}</p>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function KvedSearch() {
+  const [q, setQ] = useState('');
+  const found = useKvedSearch(q);
+  return (
+    <section className="panel" aria-labelledby="kv-title">
+      <header className="panel__head"><h2 id="kv-title" className="panel__title">КВЕД и ставка ЄП</h2></header>
+      <div className="toolbar"><label className="search-input"><Icon name="search" /><span className="visually-hidden">Поиск КВЕД</span>
+        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Код или слово: «47.91», «перукар»" autoComplete="off" spellCheck={false} /></label></div>
+      <div aria-live="polite">
+        {found.state === 'idle' && <p className="sub panel__note">Наберите хотя бы два знака — поиск идёт по листу «📑 КВЕДы».</p>}
+        {found.state === 'loading' && <p className="sub panel__note">Ищу в таблице…</p>}
+        {found.state === 'error' && <p className="sub panel__note">{found.message}</p>}
+        {found.state === 'ok' && (found.data.length ? (
+          <ul className="kved kved--table">{found.data.map((k) => (
+            <li key={k.code}>
+              <span className="num kved__code">{k.code}</span>
+              <span>{k.title}{k.councilDecision && <span className="sub kved__council">{k.councilDecision}</span>}</span>
+              <span className="kved__rates">{Object.entries(k.epByGroup).map(([g, rule]) => <span key={g} className="tag">{g} гр. — {rule}</span>)}</span>
+            </li>
+          ))}</ul>
+        ) : <Empty pic="search" title={`КВЕД «${q.trim()}» в таблице не нашёлся`}>Попробуйте код целиком или другое слово.</Empty>)}
+      </div>
+    </section>
+  );
+}
 
 export function Reference() {
-  const [q, setQ] = useState('');
-  const kv = KVED_RATES.filter(([code, title]) => !q || code.startsWith(q) || fold(title).includes(fold(q)));
-  // На живых данных ставки и КВЕД — только из таблицы (reference.*). Пока сервер их не отдаёт — не показываем цифры
-  // из кода сайта: неверная ставка на экране бухгалтера опаснее, чем её отсутствие (координатор, 15.10.2026).
-  if (isLive()) {
-    return (
-      <div className="page">
-        <header className="page__head"><div><h1 className="page__title">Справочник</h1></div></header>
-        <section className="panel panel--pad">
-          <Empty pic="search" title="Ставки и КВЕД — в таблице, лист «⚙️ Справочники»">
-            Здесь они появятся, когда таблица начнёт отдавать их сайту. До тех пор смотрите в таблице — там всегда актуальные.
-          </Empty>
-        </section>
-      </div>
-    );
-  }
+  const rates = useRates();
+  const r = rates.state === 'ok' ? rates.data : null;
   return (
     <div className="page">
-      <header className="page__head"><div><h1 className="page__title">Справочник <em>ставки 2026</em></h1><p className="page__sub">Обновлено в таблице 02.01.2026 (пример).</p></div></header>
-      <section className="rates" aria-label="Ставки">
-        {RATES.map(([name, k, note, icon]) => (
-          <div key={name} className="rate">
-            <Icon name={icon} size={22} className="rate__icon" />
-            <p className="rate__name">{name}</p>
-            <p className="rate__value display"><Money text={formatMoney(k)} /></p>
-            <p className="sub">{note}</p>
-          </div>
-        ))}
-      </section>
-      <section className="panel" aria-labelledby="kv-title">
-        <header className="panel__head"><h2 id="kv-title" className="panel__title">КВЕД и ставка ЄП</h2></header>
-        <div className="toolbar"><label className="search-input"><Icon name="search" /><span className="visually-hidden">Поиск КВЕД</span>
-          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Код или слово" autoComplete="off" spellCheck={false} /></label></div>
-        {kv.length ? (
-          <ul className="kved kved--table">{kv.map(([code, title, rate]) => <li key={code}><span className="num kved__code">{code}</span><span>{title}</span><span className="tag">{rate}</span></li>)}</ul>
-        ) : <Empty pic="search" title={`КВЕД «${q}» в примерах нет`}>Полный список придёт из таблицы.</Empty>}
-        <p className="sub panel__note">Ставки по рішенню Миколаївської міськради придут из таблицы через API — здесь примеры.</p>
-      </section>
+      <header className="page__head"><div>
+        <h1 className="page__title">Справочник{r && r.year ? <> <em>ставки {r.year}</em></> : null}</h1>
+        {r && <p className="page__sub">{r.updatedAt ? `Обновлено в таблице ${fmtDate(r.updatedAt.slice(0, 10))}` : 'Из листа «⚙️ Справочники»'}</p>}
+      </div></header>
+      {r?.source === 'fallback' && (
+        <div className="offline" role="status"><Icon name="warning" /><span><strong>Не из таблицы.</strong> Лист «⚙️ Справочники» сейчас не читается — это запасные цифры сервера. Сверьте с листом.</span></div>
+      )}
+      {rates.state === 'loading' && <p className="sub" aria-live="polite">Загружаю ставки из таблицы…</p>}
+      {rates.state === 'error' && (
+        <section className="panel panel--pad">
+          <Empty pic="search" title="Ставки не загрузились" action={<button type="button" className="btn btn--secondary" onClick={rates.retry}>Ещё раз</button>}>{rates.message}</Empty>
+        </section>
+      )}
+      {r && <RateCards r={r} />}
+      {r?.limitsSource === 'code' && <p className="sub rates__note">Пределы групп — по закону {r.year || ''}, не из таблицы.</p>}
+      <KvedSearch />
     </div>
   );
 }

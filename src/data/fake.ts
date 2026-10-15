@@ -1,7 +1,7 @@
 // Выдуманные данные прототипа. Ни один клиент не взят из таблицы; совпадения фамилий случайны.
 // Начисления посчитаны по ставкам 2026 из брифа (МЗП 8 647, ПМ 3 328, ЄСВ 22 % МЗП = 1 902,34) — только для вида;
 // на живых данных их считает сервер.
-import type { Activity, Client, Deadline, InboxItem, Payment, Question, Task } from './types';
+import type { Activity, Client, Deadline, InboxItem, KvedItem, Payment, Question, Rates, Task } from './types';
 
 const ESV = { name: 'ЄСВ', kopecks: 190234, note: '22 % МЗП' };
 const EP1 = { name: 'ЄП', kopecks: 33280, note: '10 % ПМ' };
@@ -108,3 +108,30 @@ export const KIND_LABEL: Record<NonNullable<Client['kind']>, string> = {
   fop1: 'ФОП, 1 группа', fop2: 'ФОП, 2 группа', fop3: 'ФОП, 3 группа', fopGeneral: 'ФОП, общая система',
   tov3: 'ТОВ, 3 группа', tovGeneral: 'ТОВ, общая система', person: 'Физическое лицо', nonresident: 'Нерезидент',
 };
+
+// Справочник выдуманного сервера: ставки 2026 из брифа. На живых данных — reference.rates / reference.kved.
+export const RATES: Rates = {
+  year: 2026, mzpKopecks: 864700, pmKopecks: 332800, esvMonthlyKopecks: 190234, esvRatePct: 22,
+  groups: [
+    { group: 1, limitKopecks: 144404900, limitMzp: 167, epRule: '10 % ПМ' },
+    { group: 2, limitKopecks: 721159800, limitMzp: 834, epRule: '20 % МЗП' },
+    { group: 3, limitKopecks: 1009104900, limitMzp: 1167, epRule: '5 % дохода' },
+  ],
+  updatedAt: '2026-01-02', source: 'sheet', limitsSource: 'code',
+};
+
+const G2 = { '2': '20 % МЗП', '3': '5 % дохода' };
+const G12 = { '1': '10 % ПМ', ...G2 };
+const G3 = { '3': '5 % дохода' };
+/** words — слова, по которым мама ищет («перукар», «інтернет»). */
+export const KVEDS: (KvedItem & { words: string })[] = [
+  { code: '96.02', title: 'Надання послуг перукарнями та салонами краси', words: 'перукар салон краси', epByGroup: G12, councilDecision: null },
+  { code: '47.91', title: 'Роздрібна торгівля через інтернет', words: 'інтернет магазин торгівля онлайн', epByGroup: G2, councilDecision: null },
+  { code: '62.01', title: "Комп'ютерне програмування", words: 'програміст айті програмування', epByGroup: G3, councilDecision: null },
+  { code: '56.10', title: 'Діяльність ресторанів', words: 'кафе ресторан їжа', epByGroup: G2, councilDecision: null },
+  { code: '47.81', title: 'Роздрібна торгівля з лотків харчовими продуктами', words: 'ринок продукти лоток', epByGroup: G12, councilDecision: null },
+  { code: '45.20', title: 'Технічне обслуговування автотранспортних засобів', words: 'сто авто ремонт машин', epByGroup: G2, councilDecision: null },
+  { code: '85.59', title: 'Інші види освіти', words: 'репетитор курси навчання', epByGroup: G2, councilDecision: null },
+  { code: '74.10', title: 'Спеціалізована діяльність із дизайну', words: 'дизайн дизайнер', epByGroup: G3, councilDecision: null },
+  { code: '69.20', title: 'Діяльність у сфері бухгалтерського обліку', words: 'бухгалтер облік', epByGroup: G2, councilDecision: null },
+];

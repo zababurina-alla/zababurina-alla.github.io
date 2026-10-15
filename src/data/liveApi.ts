@@ -3,7 +3,7 @@
 import { ApiError, call } from './transport';
 import type { Envelope } from './transport';
 import type { CabinetApi, Change, Entity, ErrorCode, Snapshot, WriteOp, WriteResult } from './api';
-import type { Activity, Client, Deadline, InboxItem, Payment, Question, Task } from './types';
+import type { Activity, Client, Deadline, InboxItem, KvedItem, Payment, Question, RateGroup, Rates, Task } from './types';
 
 /** Откуда брать сеанс и как тихо войти заново (auth.ts). */
 export interface SessionProvider {
@@ -46,6 +46,34 @@ export function normPayment(raw: unknown): Payment {
     period: typeof p.period === 'string' ? p.period : '',
     method: typeof p.method === 'string' && METHODS.has(p.method) ? p.method as Payment['method'] : 'other',
   };
+}
+
+// Справочник: пустая клетка листа приходит null или строкой — на экране «—», а не NaN и не выдуманная цифра.
+const num = (x: unknown): number | null => (typeof x === 'number' && Number.isFinite(x) ? x : null);
+const text = (x: unknown): string => (typeof x === 'string' ? x : typeof x === 'number' ? String(x) : '');
+
+export function normRates(raw: unknown): Rates {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const groups = Array.isArray(r.groups) ? r.groups : [];
+  return {
+    year: num(r.year) ?? 0,
+    mzpKopecks: num(r.mzpKopecks), pmKopecks: num(r.pmKopecks), esvMonthlyKopecks: num(r.esvMonthlyKopecks), esvRatePct: num(r.esvRatePct),
+    groups: groups.map((g): RateGroup => {
+      const o = (g ?? {}) as Record<string, unknown>;
+      return { group: num(o.group) ?? (typeof o.group === 'string' && o.group.trim() ? Number(o.group) : NaN), limitKopecks: num(o.limitKopecks), limitMzp: num(o.limitMzp), epRule: text(o.epRule) };
+    }).filter((g) => Number.isFinite(g.group)),
+    updatedAt: typeof r.updatedAt === 'string' && r.updatedAt ? r.updatedAt : null,
+    source: text(r.source), limitsSource: text(r.limitsSource),
+  };
+}
+
+export function normKved(raw: unknown): KvedItem {
+  const k = (raw ?? {}) as Record<string, unknown>;
+  const ep: Record<string, string> = {};
+  if (k.epByGroup && typeof k.epByGroup === 'object') {
+    for (const [g, v] of Object.entries(k.epByGroup as Record<string, unknown>)) if (text(v)) ep[g] = text(v);
+  }
+  return { code: text(k.code), title: text(k.title), epByGroup: ep, councilDecision: text(k.councilDecision) || null };
 }
 
 function normRecord(entity: Entity, raw: unknown): NonNullable<Change['record']> {
@@ -205,6 +233,17 @@ export class LiveApi implements CabinetApi {
   async listQuestions(): Promise<Question[]> {
     const env = await this.rpc<{ questions: Question[] }>('questions.list', {});
     return env.data.questions;
+  }
+
+  /** Справочник читается без requestId и мимо очереди: это чтение. */
+  async referenceRates(year?: number): Promise<Rates> {
+    const env = await this.rpc<unknown>('reference.rates', year ? { year } : {});
+    return normRates(env.data);
+  }
+
+  async referenceKved(q: string): Promise<KvedItem[]> {
+    const env = await this.rpc<{ items?: unknown[] }>('reference.kved', { q });
+    return (env.data.items ?? []).map(normKved).filter((k) => k.code);
   }
 
   /** Счётчики сервера за день (только owner, контракт 8.8) — рядом со ступенями сайта. */

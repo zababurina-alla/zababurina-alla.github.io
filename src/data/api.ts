@@ -1,6 +1,6 @@
 // Интерфейс данных кабинета — тот же, что будет у JSON-API в Apps Script (контракт: docs/api-contract.md, этап 3).
 // Сейчас его реализует fakeServer.ts (выдуманная «таблица»); на этапе 4 — живой адаптер. Экраны знают только это.
-import type { Activity, Client, Deadline, DeadlineStatus, InboxItem, Payment, Question, Task } from './types';
+import type { Activity, Client, Deadline, DeadlineStatus, InboxItem, KvedItem, Payment, Question, Rates, Task } from './types';
 
 /** Снимок данных при открытии кабинета. cursor — номер последнего изменения в таблице (выдаёт сервер, не часы браузера). */
 export interface Snapshot {
@@ -71,6 +71,10 @@ export interface CabinetApi {
   listPayments(month: string): Promise<{ payments: Payment[]; totalKopecks: number }>;
   /** questions.list — открытые вопросы без перезагрузки снимка. */
   listQuestions(): Promise<Question[]>;
+  /** reference.rates — ставки года из «⚙️ Справочники». Цифр ставок в коде сайта нет. */
+  referenceRates(year?: number): Promise<Rates>;
+  /** reference.kved — поиск по коду или словам, до 20 строк. */
+  referenceKved(q: string): Promise<KvedItem[]>;
 }
 
 export function newRequestId(): string {

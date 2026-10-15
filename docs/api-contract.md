@@ -338,8 +338,11 @@ notifyAt: datetime|null }`. Статус — «✅ Сдано + 💰 Оплач�
 ### 8.6. Справочник
 
 **`reference.rates`** (mama) — `{ year?: 2026 }` →
-`{ year, mzpKopecks: 864700, pmKopecks: 332800, esvMonthlyKopecks: 190234, groups: [{ group, limitKopecks, epRule }],
-updatedAt }`. Числа — из «⚙️ Справочники», не из кода сайта.
+`{ year, mzpKopecks: 864700, pmKopecks: 332800, esvMonthlyKopecks: 190234, esvRatePct: 22,
+groups: [{ group, limitKopecks, limitMzp, epRule }], updatedAt, source, limitsSource }`. Числа — из «⚙️ Справочники», не из
+кода сайта (сервер v5.63, кэш 10 мин). `source: 'fallback'` — лист не прочитался, сайт подписывает «Не из таблицы»;
+`limitsSource: 'code'` — пределы групп из кода сервера, сайт пишет мелко «Пределы групп — по закону {year}».
+Пустая клетка — `null`, на экране «—». Сумму ЄП из `epRule` сайт не вычисляет — показывает текст ставки.
 
 **`reference.kved`** (mama) — `{ q }` → `{ items: [{ code, title, epByGroup: { "2": "20 % МЗП" },
 councilDecision: "рішення Миколаївської міськради №…" | null }] }` (до 20 штук; `null`, если номера решения в листе нет [п. 36]).
