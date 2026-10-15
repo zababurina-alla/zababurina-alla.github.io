@@ -16,7 +16,7 @@ import { readSnap, saveSnap } from './snapCache';
 import { Outbox } from './outbox';
 import type { Counters, OutboxEvent, OutboxItem } from './outbox';
 import { newRequestId } from './api';
-import type { Change, DeadlinePatch, Snapshot, TaskPatch, WriteOp, WriteResult } from './api';
+import type { Change, DeadlinePatch, RemindRequest, RemindResult, Snapshot, TaskPatch, WriteOp, WriteResult } from './api';
 import type { Activity, Client, DatedDeadline, Deadline, InboxItem, Payment, Question, SaveState, Task } from './types';
 import { isDated } from './types';
 import { TODAY, addDays, fmtDate, plural } from '../lib/dates';
@@ -96,6 +96,8 @@ interface Store {
   refreshQuestions: () => Promise<void>;
   /** Решение по сообщению из «Входящих» (inbox.decide). amount — копейки, если мама поправила сумму. */
   decideInbox: (id: string, action: 'accept' | 'task' | 'reject', amount?: number) => void;
+  /** clients.remind — напомнить клиенту в Telegram (под writes.deadlines). Ответ — сразу, мимо очереди. */
+  remindClient: (req: RemindRequest) => Promise<RemindResult>;
   /** clients.get: карточка целиком — строка клиента, его платежи и задачи дополняют общие списки; история — в ответе. */
   loadClientCard: (id: string) => Promise<Activity[]>;
   /** Поправить задачу (tasks.update): текст, срок, приоритет, тип, клиент; null очищает срок/клиента. */
@@ -644,6 +646,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     send({ kind: 'updateClient', requestId: newRequestId(), id: clientId, baseVersion: c.version, patch }, `Ключ ЭЦП: ${c.name}`);
   }, [clients, send]);
 
+  // Один requestId на одно нажатие «Отправить»: повтор того же запроса сервер второй раз не отправит.
+  const remindClient = useCallback(async (req: RemindRequest) => {
+    const r = await api.remindClient(req, newRequestId());
+    if (r.sent) void syncNow(); // в ленте «Что изменилось» появится запись сервера
+    return r;
+  }, [syncNow]);
+
   const loadClientCard = useCallback(async (id: string) => {
     const card = await api.clientCard(id);
     const add = <T extends { id: string }>(xs: T[], more: T[]) => [...xs, ...more.filter((m) => !xs.some((x) => x.id === m.id))];
@@ -686,10 +695,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<Store>(() => ({
     loaded, online, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance,
   }), [loaded, online, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

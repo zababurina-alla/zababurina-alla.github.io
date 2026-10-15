@@ -3,7 +3,7 @@
 // — версии записей и ошибка CONFLICT; — журнал изменений с курсором; — повтор того же requestId не создаёт дубль.
 // Рычаги отладки (обрыв связи, отказ, правка извне) — для кнопок в режиме отладки.
 import { ACTIVITY, CLIENTS, DEADLINES, INBOX, KVEDS, PAYMENTS, QUESTIONS, RATES, TASKS } from './fake';
-import type { CabinetApi, Change, ClientCard, Entity, KvedAll, KvedFound, Snapshot, WriteOp, WriteResult } from './api';
+import type { CabinetApi, Change, ClientCard, Entity, KvedAll, KvedFound, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Deadline, InboxItem, KvedItem, Payment, Question, Rates, Task } from './types';
 import { fold } from '../lib/search';
 import { TODAY, addDays, endOfMonth, fmtDate, fmtDue } from '../lib/dates';
@@ -296,6 +296,25 @@ class FakeServer implements CabinetApi {
     await wait(READ_MS);
     if (!this.online) throw new Error('NETWORK');
     return [...this.questions.values()].filter((q) => q.answer === null).map((q) => ({ ...q, options: [...q.options] }));
+  }
+
+  private reminded = new Map<string, number>();
+  async remindClient(req: RemindRequest, requestId: string): Promise<RemindResult> {
+    await wait(READ_MS * 4);
+    if (!this.online) throw new Error('NETWORK');
+    void requestId;
+    const c = this.clients.get(req.clientId);
+    if (!c) throw new Error('NOT_FOUND');
+    // Как на сервере: у части клиентов бота нет; одно напоминание на клиента и повод за 12 ч.
+    if (c.botConnected === false) return { sent: false, reason: 'noBot', message: 'У клиента нет бота в Telegram — позвоните или напишите сами' };
+    const key = `${req.clientId}|${req.kind}|${req.deadlineId ?? ''}`;
+    const last = this.reminded.get(key);
+    if (last && Date.now() - last < 12 * 3600_000) {
+      return { sent: false, reason: 'rateLimit', message: 'Этому клиенту уже напоминали об этом сегодня', retryAt: new Date(last + 12 * 3600_000).toISOString() };
+    }
+    this.reminded.set(key, Date.now());
+    this.act(`Напоминание отправлено: ${short(c.name)}`, requestId, 'сайт');
+    return { sent: true, sentAt: new Date().toISOString(), preview: req.text };
   }
 
   async clientCard(id: string): Promise<ClientCard> {

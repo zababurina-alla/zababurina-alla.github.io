@@ -19,6 +19,7 @@ interface FakeLike {
   listQuestions(): Promise<unknown[]>;
   referenceRates(year?: number): Promise<unknown>;
   clientCard(id: string): Promise<unknown>;
+  remindClient(req: Record<string, unknown>, requestId: string): Promise<{ sent: boolean; reason?: string; message?: string; retryAt?: string }>;
   referenceKved(q: string): Promise<{ items: unknown[]; note: string | null }>;
   referenceKvedAll(): Promise<unknown>;
   changesSince(c: number): Promise<{ changes: { cursor: number; entity: string; op: string; id: string; origin: string; record?: unknown }[]; cursor: number }>;
@@ -86,6 +87,11 @@ async function handle(ctx: Ctx, body: { action: string; payload?: Record<string,
   }
   if (body.action === 'diag.counters') return env({ received: ctx.counters.received, applied: ctx.counters.applied, rejectedByCode: ctx.counters.rejectedByCode, repeats: ctx.counters.repeats }, 0);
   if (body.action === 'payments.list') return env(await f.listPayments(String(p.month ?? '')), 0);
+  if (body.action === 'clients.remind') {
+    const r = await f.remindClient(p, body.requestId ?? randomUUID());
+    if (!r.sent && r.reason === 'rateLimit') return fail('RATE_LIMIT', r.message ?? 'Рано', { retryable: true, retryAt: r.retryAt });
+    return env(r, 0);
+  }
   if (body.action === 'clients.get') return env(await f.clientCard(String(p.id ?? '')), 0);
   if (body.action === 'reference.rates') return env(await f.referenceRates(typeof p.year === 'number' ? p.year : undefined), 0);
   if (body.action === 'reference.kved') return env(p.all ? await f.referenceKvedAll() : await f.referenceKved(String(p.q ?? '')), 0);
