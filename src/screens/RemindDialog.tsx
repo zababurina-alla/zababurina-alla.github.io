@@ -7,6 +7,7 @@ import { useStore } from '../data/store';
 import type { RemindRequest, RemindResult } from '../data/api';
 import type { Client, DatedDeadline } from '../data/types';
 import { fmtDate } from '../lib/dates';
+import { Icon } from '../ui/Icon';
 import { Modal } from '../ui/Modal';
 import { roMessage } from '../ui/readonly';
 import { useToast } from '../ui/toast';
@@ -89,10 +90,10 @@ export function RemindDialog({ open, onClose, client, deadline, keyReminder = fa
           {sending ? 'Отправляю…' : 'Отправить в Telegram'}</button>
       </>
     }>
+      {blocked && <p className="remind__blocked" role="status"><Icon name="info" size={18} /><span>{blocked}</span></p>}
       <div className="field remind">
         <label className="field__label" htmlFor="remind-text">Сообщение клиенту — уйдёт ровно так</label>
         <textarea id="remind-text" className="input remind__text" rows={5} value={text} onChange={(e) => { setEdited(true); setText(e.target.value); }} />
-        {blocked && <p className="remind__blocked" role="status">{blocked}</p>}
         <p className="field__hint">Напоминание об одном и том же — не чаще раза в 12 часов. {can ? '' : roMessage('remind')}</p>
       </div>
     </Modal>
