@@ -493,3 +493,14 @@
   display: grid;
   gap: 2px;
 }
+
+/* «Что у меня сегодня» — временно, оформление за отделом дизайна */
+.voice__text p {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-lg);
+  line-height: 1.45;
+}
+
+.voice__btn {
+  justify-self: start;
+}

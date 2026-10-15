@@ -15,6 +15,7 @@ import { Empty } from '../ui/Empty';
 import { shortName } from '../ui/names';
 import { useUi } from '../app/ui-context';
 import { TableText } from '../ui/TableText';
+import { useInstall } from '../lib/install';
 import { TaskEdit } from './TaskEdit';
 import { useToast } from '../ui/toast';
 import { roAttrs, roMessage } from '../ui/readonly';
@@ -282,6 +283,25 @@ const MORE: [string, IconName, string, string][] = [
   ['#/reference', 'book', 'Справочник', 'ставки, КВЕД'],
 ];
 
+/** «Установить на экран»: Android/Chrome — кнопкой, iPhone — подсказкой; установлено — строки нет. */
+function InstallItem() {
+  const { state, install } = useInstall();
+  const [iosOpen, setIosOpen] = useState(false);
+  if (state === 'installed' || state === 'none') return null;
+  return (
+    <div className="more__item more__install">
+      <Icon name="share" tile="accent" />
+      <span className="more__text"><strong>Приложение на экране</strong>
+        <span className="sub">{state === 'ios' && iosOpen
+          ? 'В Safari нажмите «Поделиться» (квадрат со стрелкой) → «На экран „Домой“» → «Добавить».'
+          : 'Открывается одним нажатием, как обычное приложение'}</span></span>
+      {state === 'prompt'
+        ? <button type="button" className="btn btn--primary btn--sm" onClick={() => void install()}>Установить</button>
+        : <button type="button" className="btn btn--secondary btn--sm" aria-expanded={iosOpen} onClick={() => setIosOpen((o) => !o)}>{iosOpen ? 'Понятно' : 'Как добавить'}</button>}
+    </div>
+  );
+}
+
 export function More() {
   const [theme, toggleTheme] = useTheme();
   return (
@@ -309,6 +329,7 @@ export function More() {
           <SoundSettings />
         </div>
         <div className="more__item"><Me /></div>
+        <InstallItem />
       </section>
     </div>
   );

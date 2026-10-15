@@ -24,6 +24,7 @@ import { auth, useAuth } from './data/session';
 import { ServerDown, ReadOnlyBanner } from './app/SyncUi';
 import { canWrite, hasFeature } from './config';
 import { Inbox } from './screens/Inbox';
+import { TodayVoice } from './screens/TodayVoice';
 import { roMessage } from './ui/readonly';
 import { useToast } from './ui/toast';
 
@@ -74,6 +75,7 @@ function Screens() {
         {route.name === 'reference' && <Reference />}
         {route.name === 'more' && <More />}
         {route.name === 'icons' && <IconGallery />}
+        {route.name === 'today-voice' && <TodayVoice />}
         {route.name === 'inbox' && (hasFeature('inbox') ? <Inbox /> : <Today />)}
         </ScreenBoundary>}
       </Shell>
