@@ -3,7 +3,7 @@
 // — версии записей и ошибка CONFLICT; — журнал изменений с курсором; — повтор того же requestId не создаёт дубль.
 // Рычаги отладки (обрыв связи, отказ, правка извне) — для кнопок в режиме отладки.
 import { ACTIVITY, CLIENTS, DEADLINES, INBOX, KVEDS, PAYMENTS, QUESTIONS, RATES, TASKS } from './fake';
-import type { CabinetApi, Change, ClientCard, Entity, KvedFound, Snapshot, WriteOp, WriteResult } from './api';
+import type { CabinetApi, Change, ClientCard, Entity, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Deadline, InboxItem, KvedItem, Payment, Question, Rates, Task } from './types';
 import { fold } from '../lib/search';
 import { TODAY, addDays, endOfMonth, fmtDate, fmtDue } from '../lib/dates';
@@ -246,6 +246,22 @@ class FakeServer implements CabinetApi {
         this.tasks.set(t.id, upd);
         return { ok: true, changes: [this.record('task', 'upsert', t.id, o, upd)], cursor: this.cursor };
       }
+      case 'updateTask': {
+        const t = this.tasks.get(op.id);
+        if (!t) return { ok: false, code: 'NOT_FOUND', message: 'Этой задачи уже нет' };
+        if (t.version !== op.baseVersion) return { ok: false, code: 'CONFLICT', message: 'Задача изменилась в таблице', current: { ...t } };
+        if (t.done) return { ok: false, code: 'VALIDATION', message: 'Сделанную задачу править нельзя — сначала верните её в работу' };
+        const upd: Task = { ...t, ...op.patch, version: this.cursor + 1 };
+        this.tasks.set(t.id, upd);
+        return { ok: true, changes: [this.record('task', 'upsert', t.id, o, upd)], cursor: this.cursor };
+      }
+      case 'deleteTask': {
+        const t = this.tasks.get(op.id);
+        if (!t) return { ok: false, code: 'NOT_FOUND', message: 'Этой задачи уже нет' };
+        if (t.version !== op.baseVersion) return { ok: false, code: 'CONFLICT', message: 'Задача изменилась в таблице', current: { ...t } };
+        this.tasks.delete(t.id);
+        return { ok: true, changes: [this.record('task', 'delete', t.id, o)], cursor: this.cursor };
+      }
       case 'updateDeadline': {
         const d = this.deadlines.get(op.id);
         if (!d) return { ok: false, code: 'NOT_FOUND', message: 'Этого срока уже нет' };
@@ -282,6 +298,34 @@ class FakeServer implements CabinetApi {
     return [...this.questions.values()].filter((q) => q.answer === null).map((q) => ({ ...q, options: [...q.options] }));
   }
 
+  async remindPreview(req: Omit<RemindRequest, 'text'>): Promise<RemindPreview> {
+    await wait(READ_MS);
+    const c = this.clients.get(req.clientId);
+    if (c?.botConnected === false) return { preview: null, lang: 'uk', reason: 'noBot', message: 'У клиента нет бота в Telegram — позвоните или напишите сами' };
+    const d = req.deadlineId ? this.deadlines.get(req.deadlineId) : undefined;
+    const hi = `Добрий день${c ? `, ${c.name.split(' ')[1] ?? ''}` : ''}!`;
+    return { preview: d ? `${hi} 📅 Нагадую: ${d.what} — до ${fmtDate(d.due ?? TODAY)}.` : `${hi} 🔐 Ключ ЕЦП діє до ${fmtDate(c?.keyUntil ?? TODAY)} — час продовжити.`, lang: 'uk', reason: null, message: null };
+  }
+
+  private reminded = new Map<string, number>();
+  async remindClient(req: RemindRequest, requestId: string): Promise<RemindResult> {
+    await wait(READ_MS * 4);
+    if (!this.online) throw new Error('NETWORK');
+    void requestId;
+    const c = this.clients.get(req.clientId);
+    if (!c) throw new Error('NOT_FOUND');
+    // Как на сервере: у части клиентов бота нет; одно напоминание на клиента и повод за 12 ч.
+    if (c.botConnected === false) return { sent: false, reason: 'noBot', message: 'У клиента нет бота в Telegram — позвоните или напишите сами' };
+    const key = `${req.clientId}|${req.kind}|${req.deadlineId ?? ''}`;
+    const last = this.reminded.get(key);
+    if (last && Date.now() - last < 12 * 3600_000) {
+      return { sent: false, reason: 'rateLimit', message: 'Этому клиенту уже напоминали об этом сегодня', retryAt: new Date(last + 12 * 3600_000).toISOString() };
+    }
+    this.reminded.set(key, Date.now());
+    this.act(`Напоминание отправлено: ${short(c.name)}`, requestId, 'сайт');
+    return { sent: true, sentAt: new Date().toISOString(), preview: req.text };
+  }
+
   async clientCard(id: string): Promise<ClientCard> {
     await wait(READ_MS);
     if (!this.online) throw new Error('NETWORK');
@@ -311,6 +355,12 @@ class FakeServer implements CabinetApi {
     const items: KvedItem[] = KVEDS.filter((k) => k.code.startsWith(t) || fold(`${k.title} ${k.words}`).includes(fold(t))).slice(0, 20)
       .map(({ code, title, epByGroup, councilDecision }) => ({ code, title, epByGroup: { ...epByGroup }, councilDecision }));
     return { items, note: items.length ? null : 'Ставка для этого КВЕДа не установлена радою' };
+  }
+
+  async referenceKvedAll(): Promise<KvedAll> {
+    await wait(READ_MS);
+    if (!this.online) throw new Error('NETWORK');
+    return { items: KVEDS.map(({ code, title, epByGroup, councilDecision }) => ({ code, title, epByGroup: { ...epByGroup }, councilDecision })), councilDecision: null, updatedAt: '2026-01-02' };
   }
 
   // ── Правки «извне» для режима отладки: так выглядят изменения в таблице и через бота ──

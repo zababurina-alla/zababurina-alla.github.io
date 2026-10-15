@@ -285,4 +285,42 @@ describe('живой адаптер: чтение', () => {
     expect(r.ok && r.changes.map((c) => c.id)).toEqual(['D-1', 'D-9']);
     expect(r.ok && r.failed?.map((f) => [f.id, f.code, f.current?.version ?? null])).toEqual([['D-2', 'PERIOD_OPEN', null], ['D-3', 'CONFLICT', 8], ['D-4', 'SERVER', null]]);
   });
+
+  it('задачи: tasks.update { id, baseVersion, patch } → upsert; tasks.delete → delete', async () => {
+    const s = server(ok({ task: { id: 'T-1', text: 'Позвонить', due: null, version: 6 } }, 50), ok({ deleted: 'T-2' }, 51));
+    const api = new LiveApi(URL_, auth(), s.fetchImpl);
+    const r1 = await api.write({ kind: 'updateTask', requestId: 'R1', id: 'T-1', baseVersion: 5, patch: { text: 'Позвонить', due: null } });
+    expect(s.sent[0]).toMatchObject({ action: 'tasks.update', requestId: 'R1', payload: { id: 'T-1', baseVersion: 5, patch: { text: 'Позвонить', due: null } } });
+    expect(r1.ok && r1.changes[0]).toMatchObject({ entity: 'task', op: 'upsert', id: 'T-1' });
+    const r2 = await api.write({ kind: 'deleteTask', requestId: 'R2', id: 'T-2', baseVersion: 3 });
+    expect(s.sent[1]).toMatchObject({ action: 'tasks.delete', payload: { id: 'T-2', baseVersion: 3 } });
+    expect(r2.ok && r2.changes[0]).toMatchObject({ entity: 'task', op: 'delete', id: 'T-2' });
+  });
+
+  it('напомнить: clients.remind с requestId — ушло / нет бота / RATE_LIMIT с retryAt', async () => {
+    const s = server(
+      ok({ sent: true, sentAt: '2026-10-15T19:00:00+03:00', preview: 'Добрий день!' }),
+      ok({ sent: false, reason: 'noBot', message: 'У клієнта немає бота' }),
+      fail('RATE_LIMIT', 'Вже нагадували', { retryable: true, retryAt: '2026-10-16T07:00:00+03:00' }),
+    );
+    const api = new LiveApi(URL_, auth(), s.fetchImpl);
+    const req = { clientId: 'C-1', kind: 'deadline' as const, deadlineId: 'D-1', text: 'Добрий день!' };
+    expect(await api.remindClient(req, 'R1')).toEqual({ sent: true, sentAt: '2026-10-15T19:00:00+03:00', preview: 'Добрий день!' });
+    expect(s.sent[0]).toMatchObject({ action: 'clients.remind', requestId: 'R1', payload: { clientId: 'C-1', kind: 'deadline', deadlineId: 'D-1', text: 'Добрий день!' } });
+    expect(await api.remindClient(req, 'R2')).toEqual({ sent: false, reason: 'noBot', message: 'У клієнта немає бота' });
+    expect(await api.remindClient(req, 'R3')).toEqual({ sent: false, reason: 'rateLimit', message: 'Вже нагадували', retryAt: '2026-10-16T07:00:00+03:00' });
+  });
+
+  it('пробный запуск напоминания: clients.remind { preview:true } без requestId — текст и язык', async () => {
+    const s = server(ok({ preview: 'Добрий день! 📅 Нагадую…', lang: 'uk' }));
+    const r = await new LiveApi(URL_, auth(), s.fetchImpl).remindPreview({ clientId: 'C-1', kind: 'deadline', deadlineId: 'D-1' });
+    expect(s.sent[0]).toEqual({ v: 1, action: 'clients.remind', payload: { clientId: 'C-1', kind: 'deadline', preview: true, deadlineId: 'D-1' }, session: 'S1' });
+    expect(r).toEqual({ preview: 'Добрий день! 📅 Нагадую…', lang: 'uk', reason: null, message: null });
+  });
+
+  it('пробный прогон: нет бота — preview null и причина (окно скажет сразу)', async () => {
+    const s = server(ok({ preview: null, lang: 'uk', reason: 'noBot', message: 'У клієнта немає бота' }));
+    expect(await new LiveApi(URL_, auth(), s.fetchImpl).remindPreview({ clientId: 'C-1', kind: 'key' }))
+      .toEqual({ preview: null, lang: 'uk', reason: 'noBot', message: 'У клієнта немає бота' });
+  });
 });

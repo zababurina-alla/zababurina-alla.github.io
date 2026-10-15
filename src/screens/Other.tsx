@@ -15,6 +15,10 @@ import { Empty } from '../ui/Empty';
 import { shortName } from '../ui/names';
 import { useUi } from '../app/ui-context';
 import { TableText } from '../ui/TableText';
+import { useInstall } from '../lib/install';
+import { TaskEdit } from './TaskEdit';
+import { useToast } from '../ui/toast';
+import { roAttrs, roMessage } from '../ui/readonly';
 import { URGENCY_ICON } from './DeadlineTable';
 import { Me, SoundSettings, useTheme } from '../app/Shell';
 
@@ -51,14 +55,15 @@ export function Keys() {
   // Закончились и заканчиваются — разные вещи (п. 4): «7 заканчиваются», когда 4 уже закончились, вводило в заблуждение.
   const gone = withKey.filter((c) => daysBetween(TODAY, c.keyUntil ?? TODAY) < 0).length;
   const soon = withKey.filter((c) => { const d = daysBetween(TODAY, c.keyUntil ?? TODAY); return d >= 0 && d <= 14; }).length;
-  const title = [gone ? `${gone} ${plural(gone, 'закончился', 'закончились', 'закончились')}` : '', soon ? `${soon} продлить в ближайшие 14 дней` : '']
+  // Заголовок — коротко, одной-двумя строками на телефоне (п. 58); что значит «скоро» — в подписи под ним.
+  const title = [gone ? `${gone} ${plural(gone, 'закончился', 'закончились', 'закончились')}` : '', soon ? `${soon} скоро` : '']
     .filter(Boolean).join(', ') || 'продлевать пока нечего';
   return (
     <div className="page">
       <header className="page__head">
         <div>
           <h1 className="page__title">Ключи ЭЦП <em>{title}</em></h1>
-          <p className="page__sub">По дате окончания. Продлить лучше за 14 дней — бот напомнит.</p>
+          <p className="page__sub">«Скоро» — кончаются в ближайшие 14 дней. Продлить лучше заранее — бот напомнит.</p>
         </div>
       </header>
       <section className="panel" aria-label="Ключи">
@@ -177,6 +182,13 @@ export function Tasks() {
   const client = parsed?.clientId ? store.client(parsed.clientId) : undefined;
 
   const open = store.tasks.filter((t) => !t.done);
+  const [editing, setEditing] = useState<string | null>(null);
+  const toast = useToast();
+  const edit = (t: Task) => {
+    if (!canWrite('tasks')) { toast({ text: roMessage('tasks'), tone: 'info' }); return; }
+    if (t.done) { toast({ text: 'Сделанную задачу править нельзя — сначала верните её в работу (снимите галочку)', tone: 'info' }); return; }
+    setEditing(t.id);
+  };
   const [showDone, setShowDone] = useState(false); // «Сделано» свёрнуто: их десятки (находка «Пользователя» № 29)
   // В снимке — все задачи листа: сделанных бывают сотни, на экране — 20 последних, остальное в таблице.
   const done = store.tasks.filter((t) => t.done);
@@ -248,6 +260,11 @@ export function Tasks() {
                     </span>
                     {saving ? <SaveBadge state="saving" offline={!store.online} />
                       : t.due && !t.done && st && <span className={`tasks__when due--${st}`}><Icon name={URGENCY_ICON[st]} size={16} className={`urgency--${st}`} />{daysLabel(daysBetween(TODAY, t.due))}</span>}
+                    {editing !== t.id && (
+                      <button type="button" className="icon-btn tasks__edit" aria-label={`Изменить задачу: ${t.text}`} title="Изменить или удалить"
+                        onClick={() => edit(t)} {...roAttrs('tasks')}><Icon name="edited" size={16} /></button>
+                    )}
+                    {editing === t.id && <TaskEdit t={t} onDone={() => setEditing(null)} />}
                   </li>
                 );
               })}
@@ -266,6 +283,25 @@ const MORE: [string, IconName, string, string][] = [
   ['#/keys', 'key', 'Ключи ЭЦП', 'у кого заканчиваются'],
   ['#/reference', 'book', 'Справочник', 'ставки, КВЕД'],
 ];
+
+/** «Установить на экран»: Android/Chrome — кнопкой, iPhone — подсказкой; установлено — строки нет. */
+function InstallItem() {
+  const { state, install } = useInstall();
+  const [iosOpen, setIosOpen] = useState(false);
+  if (state === 'installed' || state === 'none') return null;
+  return (
+    <div className="more__item more__install">
+      <Icon name="share" tile="accent" />
+      <span className="more__text"><strong>Приложение на экране</strong>
+        <span className="sub">{state === 'ios' && iosOpen
+          ? 'В Safari нажмите «Поделиться» (квадрат со стрелкой) → «На экран „Домой“» → «Добавить».'
+          : 'Открывается одним нажатием, как обычное приложение'}</span></span>
+      {state === 'prompt'
+        ? <button type="button" className="btn btn--primary btn--sm" onClick={() => void install()}>Установить</button>
+        : <button type="button" className="btn btn--secondary btn--sm" aria-expanded={iosOpen} onClick={() => setIosOpen((o) => !o)}>{iosOpen ? 'Понятно' : 'Как добавить'}</button>}
+    </div>
+  );
+}
 
 export function More() {
   const [theme, toggleTheme] = useTheme();
@@ -294,6 +330,7 @@ export function More() {
           <SoundSettings />
         </div>
         <div className="more__item"><Me /></div>
+        <InstallItem />
       </section>
     </div>
   );

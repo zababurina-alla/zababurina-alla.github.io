@@ -8,6 +8,7 @@ import type { DatedDeadline, DeadlineStatus } from '../data/types';
 import { TODAY, addDays, fmtDate } from '../lib/dates';
 import { Icon } from '../ui/Icon';
 import { roMessage } from '../ui/readonly';
+import { RemindDialog } from './RemindDialog';
 
 export const STATUS_LABEL: Record<DeadlineStatus, string> = {
   new: 'новый', inProgress: 'в работе', waiting: 'ожидание', postponed: 'отложено', done: 'сдано',
@@ -27,13 +28,18 @@ export function DeadlineActions({ d }: { d: DatedDeadline }) {
   const who = store.client(d.clientId)?.name.split(' ').slice(0, 2).join(' ');
   const what = `«${d.what}»${who ? `, ${who}` : ''}`;
   const done = () => setOpen(false);
+  // «Напомнить клиенту» (clients.remind): окно живёт отдельно от меню — меню закрывается, окно остаётся.
+  const [remindOpen, setRemindOpen] = useState(false);
+  const client = store.client(d.clientId);
+  const remind = client && remindOpen ? <RemindDialog open onClose={() => setRemindOpen(false)} client={client} deadline={d} /> : null;
   if (!open) {
-    return (
+    return (<>
       <button type="button" className="btn btn--ghost btn--sm dactions__toggle" aria-expanded={false} aria-label={`Другие действия со сроком ${what}`}
         onClick={() => setOpen(true)}>
         <Icon name="more" size={18} />Действия
       </button>
-    );
+      {remind}
+    </>);
   }
   const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(date) && date !== d.due;
   return (
@@ -54,7 +60,10 @@ export function DeadlineActions({ d }: { d: DatedDeadline }) {
         onClick={() => { store.updateDeadline(d.id, { status: 'postponed', due: date }, `Отложить ${what} до ${fmtDate(date)}`); done(); }}>Отложить до этой даты</button>
       <button type="button" className="btn btn--secondary btn--sm" disabled={!can || !dateOk}
         onClick={() => { store.updateDeadline(d.id, { due: date }, `Перенести ${what} на ${fmtDate(date)}`); done(); }}>Перенести срок</button>
+      {client && <button type="button" className="btn btn--secondary btn--sm" disabled={!canWrite('remind')} title={canWrite('remind') ? undefined : roMessage('remind')}
+        onClick={() => { setRemindOpen(true); done(); }}>Напомнить клиенту</button>}
       <button type="button" className="btn btn--ghost btn--sm" onClick={done}>{can ? 'Отмена' : 'Закрыть'}</button>
+      {remind}
     </div>
   );
 }

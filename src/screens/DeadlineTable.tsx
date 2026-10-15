@@ -90,8 +90,8 @@ export function DeadlineTable({ items, showClient = true, empty = 'Сроков 
               <span className="dtable__line"><TableText text={d.what} fallback={OBLIGATION_ICON[obligationKind(d.what)]} prefer="fallback" /> <StatusTag status={d.status} />
               <span className="dtable__tools">
                 {/* Одно нажатие к нужному: позвонить клиенту, записать его платёж; «…» — статус и дата (техника сайта) */}
-                {c?.phone && <a className="icon-btn dtable__tool" href={`tel:${c.phone.replace(/[^d+]/g, '')}`} aria-label={`Позвонить: ${name}`} title={`Позвонить ${c.phone}`}><Icon name="call" size={18} /></a>}
-                {c && <button type="button" className="icon-btn dtable__tool" aria-label={`Записать платёж: ${name}`} title="Записать платёж" onClick={() => ui.openPayment(c.id)} {...roAttrs('payments')}><Icon name="payments" size={18} /></button>}
+                {c?.phone && <a className="icon-btn dtable__tool" href={`tel:${c.phone.replace(/[^\d+]/g, '')}`} aria-label={`Позвонить: ${name}`} title={`Позвонить ${c.phone}`}><Icon name="call" size={18} /><span className="dtable__tool-text" aria-hidden="true">Позвонить</span></a>}
+                {c && <button type="button" className="icon-btn dtable__tool" aria-label={`Записать платёж: ${name}`} title="Записать платёж" onClick={() => ui.openPayment(c.id)} {...roAttrs('payments')}><Icon name="payments" size={18} /><span className="dtable__tool-text" aria-hidden="true">Платёж</span></button>}
                 <DeadlineActions d={d} />
               </span></span>
               {warn[d.id] && <span className="inline-warn" role="status"><Icon name="clock" size={16} />{warn[d.id]}</span>}

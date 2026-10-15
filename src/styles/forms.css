@@ -369,3 +369,50 @@
     transform: translateY(10px);
   }
 }
+
+/* ═════════ «Напомнить клиенту» (RemindDialog) ═════════ */
+/* Сообщение клиенту — как письмо: крупный текст с межстрочным, видно ровно то, что уйдёт. Высота — 5 строк,
+   длиннее — растёт рукой (resize) и прокручивается внутри поля, окно не распирает. */
+.remind__text {
+  display: block;
+  min-height: calc(5 * 1.5em + 2 * var(--space-3));
+  max-height: 50vh;
+  padding: var(--space-3) var(--space-4);
+  font: inherit;
+  font-size: var(--text-md);
+  line-height: 1.5;
+  resize: vertical;
+  overflow-wrap: anywhere;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink-2) 45%, transparent) transparent;
+}
+
+.remind .field__hint {
+  margin-top: var(--space-1);
+}
+
+/* Сервер заранее сказал «у клиента нет бота» / «тестовый клиент»: спокойная пшеничная плашка, как в меню «Действия»
+   в режиме просмотра (.dactions__ro) — не ошибка, а объяснение, почему «Отправить» неактивна */
+.remind__blocked {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--wheat-soft);
+  color: var(--wheat-ink);
+  line-height: 1.45;
+  text-wrap: pretty; /* без одного слова на второй строке */
+}
+
+.remind__blocked > .icon {
+  flex: none;
+  margin-top: 1px;
+}
+
+/* Карточка клиента, блок ключа: «Напомнить про ключ» под продлением, по левому краю */
+.cp__remind {
+  justify-self: start;
+  margin-top: var(--space-1);
+}

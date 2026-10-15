@@ -1,7 +1,7 @@
 // Тема — одно место на всё приложение: меню, командная строка и <meta name="theme-color"> видят одно и то же.
 // Выбор запоминается в этом браузере (localStorage); без выбора — по настройке системы (index.html).
 const listeners = new Set<() => void>();
-const META_COLOR = { light: '#F6F7F9', dark: '#0B0D12' } as const; // = --canvas из tokens.css
+const META_COLOR = { light: '#ECEEF1', dark: '#07090C' } as const; // = --canvas из tokens.css (v2)
 
 export function getTheme(): 'light' | 'dark' {
   return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';

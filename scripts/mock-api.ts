@@ -19,7 +19,10 @@ interface FakeLike {
   listQuestions(): Promise<unknown[]>;
   referenceRates(year?: number): Promise<unknown>;
   clientCard(id: string): Promise<unknown>;
+  remindPreview(req: Record<string, unknown>): Promise<unknown>;
+  remindClient(req: Record<string, unknown>, requestId: string): Promise<{ sent: boolean; reason?: string; message?: string; retryAt?: string }>;
   referenceKved(q: string): Promise<{ items: unknown[]; note: string | null }>;
+  referenceKvedAll(): Promise<unknown>;
   changesSince(c: number): Promise<{ changes: { cursor: number; entity: string; op: string; id: string; origin: string; record?: unknown }[]; cursor: number }>;
   write(op: Record<string, unknown>): Promise<{ ok: true; changes: { entity: string; op: string; id: string; record?: { id: string } }[]; cursor: number; notifyAt?: string | null }
     | { ok: false; code: string; message: string; current?: unknown; retryAt?: string }>;
@@ -85,9 +88,15 @@ async function handle(ctx: Ctx, body: { action: string; payload?: Record<string,
   }
   if (body.action === 'diag.counters') return env({ received: ctx.counters.received, applied: ctx.counters.applied, rejectedByCode: ctx.counters.rejectedByCode, repeats: ctx.counters.repeats }, 0);
   if (body.action === 'payments.list') return env(await f.listPayments(String(p.month ?? '')), 0);
+  if (body.action === 'clients.remind' && p.preview === true) return env(await f.remindPreview(p), 0);
+  if (body.action === 'clients.remind') {
+    const r = await f.remindClient(p, body.requestId ?? randomUUID());
+    if (!r.sent && r.reason === 'rateLimit') return fail('RATE_LIMIT', r.message ?? 'Рано', { retryable: true, retryAt: r.retryAt });
+    return env(r, 0);
+  }
   if (body.action === 'clients.get') return env(await f.clientCard(String(p.id ?? '')), 0);
   if (body.action === 'reference.rates') return env(await f.referenceRates(typeof p.year === 'number' ? p.year : undefined), 0);
-  if (body.action === 'reference.kved') return env(await f.referenceKved(String(p.q ?? '')), 0);
+  if (body.action === 'reference.kved') return env(p.all ? await f.referenceKvedAll() : await f.referenceKved(String(p.q ?? '')), 0);
   if (body.action === 'questions.list') return env({ questions: await f.listQuestions() }, 0);
   if (body.action === 'clients.revealPassword') return env({ login: 'учебный-логин', password: 'учебный-пароль', ttlSeconds: 30 }, 0);
 
@@ -106,6 +115,8 @@ async function handle(ctx: Ctx, body: { action: string; payload?: Record<string,
     'deadlines.update': () => ({ kind: 'updateDeadline', id: p.id, baseVersion: p.baseVersion, patch: p.patch }),
     'tasks.create': () => ({ kind: 'createTask', task: { ...(p.task as object), version: 1, done: false } }),
     'tasks.complete': () => ({ kind: 'completeTask', id: p.id, done: p.done }),
+    'tasks.update': () => ({ kind: 'updateTask', id: p.id, baseVersion: p.baseVersion, patch: p.patch }),
+    'tasks.delete': () => ({ kind: 'deleteTask', id: p.id, baseVersion: p.baseVersion }),
     'questions.answer': () => ({ kind: 'answerQuestion', id: p.id, text: p.text }),
     'inbox.decide': () => ({ kind: 'decideInbox', id: p.id, action: p.action, ...(p.amount !== undefined ? { amount: p.amount } : {}) }),
   };
@@ -139,6 +150,8 @@ async function handle(ctx: Ctx, body: { action: string; payload?: Record<string,
     }
     case 'payments.create': return env({ payment: recs('payment')[0] }, r.cursor);
     case 'payments.cancel': return env({ cancelled: p.id }, r.cursor);
+    case 'tasks.update': return env({ task: recs('task')[0] }, r.cursor);
+    case 'tasks.delete': return env({ deleted: p.id }, r.cursor);
     case 'questions.answer': return env({ question: recs('question')[0] }, r.cursor);
     case 'deadlines.update': return env({ deadline: recs('deadline')[0] }, r.cursor);
     case 'inbox.decide': return env({ inbox: recs('inbox')[0], payment: recs('payment')[0] ?? null, task: recs('task')[0] ?? null }, r.cursor);

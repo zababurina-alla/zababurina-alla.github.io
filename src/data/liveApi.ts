@@ -2,7 +2,7 @@
 // (docs/api-contract.md v2.1). Экраны и очередь записей не знают, с кем говорят.
 import { ApiError, call } from './transport';
 import type { Envelope } from './transport';
-import type { CabinetApi, Change, ClientCard, Entity, ErrorCode, KvedFound, Snapshot, WriteOp, WriteResult } from './api';
+import type { CabinetApi, Change, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Deadline, InboxItem, KvedItem, Payment, Question, RateGroup, Rates, Task } from './types';
 
 /** Откуда брать сеанс и как тихо войти заново (auth.ts). */
@@ -179,6 +179,14 @@ export class LiveApi implements CabinetApi {
           for (const it of op.items) if (!seen.has(it.id)) failed.push({ id: it.id, code: 'SERVER', message: 'Таблица не ответила по этому сроку' });
           return { ok: true, changes, cursor: env.cursor, failed };
         }
+        case 'updateTask': {
+          const env = await this.rpc<{ task: Task }>('tasks.update', { id: op.id, baseVersion: op.baseVersion, patch: op.patch }, o);
+          return { ok: true, changes: [up('task', env.data.task, env.cursor)], cursor: env.cursor };
+        }
+        case 'deleteTask': {
+          const env = await this.rpc<{ deleted: string }>('tasks.delete', { id: op.id, baseVersion: op.baseVersion }, o);
+          return { ok: true, changes: [{ cursor: env.cursor, entity: 'task', op: 'delete', id: env.data.deleted, origin: o }], cursor: env.cursor };
+        }
         case 'reopenDeadline': {
           const env = await this.rpc<{ reopened: Deadline }>('deadlines.reopen', { id: op.id, undoOf: op.undoOf }, o);
           return { ok: true, changes: [up('deadline', env.data.reopened, env.cursor)], cursor: env.cursor };
@@ -247,7 +255,7 @@ export class LiveApi implements CabinetApi {
       const res: WriteResult = { ok: false, code, message: e.message };
       if (e.retryAt) res.retryAt = e.retryAt;
       if (e.current && typeof e.current === 'object') {
-        res.current = 'kind' in e.current ? normClient(e.current) : e.current as Deadline | Payment | Question | InboxItem;
+        res.current = 'kind' in e.current ? normClient(e.current) : e.current as Deadline | Payment | Question | InboxItem | Task;
       }
       return res;
     }
@@ -261,6 +269,37 @@ export class LiveApi implements CabinetApi {
   async listQuestions(): Promise<Question[]> {
     const env = await this.rpc<{ questions: Question[] }>('questions.list', {});
     return env.data.questions;
+  }
+
+  /** Напоминание клиенту: запись с requestId (сервер не отправит дважды), но мимо очереди — ответ показываем сразу. */
+  async remindClient(req: RemindRequest, requestId: string): Promise<RemindResult> {
+    const payload: Record<string, unknown> = { clientId: req.clientId, kind: req.kind, text: req.text };
+    if (req.deadlineId) payload.deadlineId = req.deadlineId;
+    if (req.period) payload.period = req.period;
+    try {
+      const env = await this.rpc<{ sent?: unknown; sentAt?: unknown; preview?: unknown; reason?: unknown; message?: unknown }>('clients.remind', payload, requestId);
+      const d = env.data;
+      if (d.sent === true) return { sent: true, sentAt: text(d.sentAt) || null, preview: text(d.preview) || null };
+      const reason = d.reason === 'noBot' || d.reason === 'test' ? d.reason : 'unknown';
+      return { sent: false, reason, message: text(d.message) || (reason === 'noBot' ? 'У клиента нет бота в Telegram' : reason === 'test' ? 'Тестовый режим — сообщение не ушло' : 'Не знаю, ушло ли — проверьте в Telegram') };
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'RATE_LIMIT') {
+        const r: RemindResult = { sent: false, reason: 'rateLimit', message: e.message || 'Этому клиенту уже напоминали недавно' };
+        if (e.retryAt) r.retryAt = e.retryAt;
+        return r;
+      }
+      throw e;
+    }
+  }
+
+  /** Пробный запуск напоминания: сервер собирает текст на языке клиента и ничего не отправляет. */
+  async remindPreview(req: Omit<RemindRequest, 'text'>): Promise<RemindPreview> {
+    const payload: Record<string, unknown> = { clientId: req.clientId, kind: req.kind, preview: true };
+    if (req.deadlineId) payload.deadlineId = req.deadlineId;
+    if (req.period) payload.period = req.period;
+    const env = await this.rpc<{ preview?: unknown; lang?: unknown; reason?: unknown; message?: unknown }>('clients.remind', payload);
+    const d = env.data;
+    return { preview: text(d.preview) || null, lang: text(d.lang) || null, reason: d.reason === 'noBot' || d.reason === 'test' ? d.reason : null, message: text(d.message) || null };
   }
 
   /** Карточка целиком: чтение, без requestId. Пустые клетки нормализуются, как в снимке. */
@@ -286,6 +325,17 @@ export class LiveApi implements CabinetApi {
   async referenceKved(q: string): Promise<KvedFound> {
     const env = await this.rpc<{ items?: unknown[]; note?: unknown }>('reference.kved', { q });
     return { items: (env.data.items ?? []).map(normKved).filter((k) => k.code), note: text(env.data.note) || null };
+  }
+
+  /** Весь лист КВЕДов: решение горсовета одно на лист — подставляем его в строки, где своего нет. */
+  async referenceKvedAll(): Promise<KvedAll> {
+    const env = await this.rpc<{ items?: unknown[]; councilDecision?: unknown; updatedAt?: unknown }>('reference.kved', { all: true });
+    const council = text(env.data.councilDecision) || null;
+    return {
+      items: (env.data.items ?? []).map(normKved).filter((k) => k.code).map((k) => ({ ...k, councilDecision: k.councilDecision ?? council })),
+      councilDecision: council,
+      updatedAt: text(env.data.updatedAt) || null,
+    };
   }
 
   /** Счётчики сервера за день (только owner, контракт 8.8) — рядом со ступенями сайта. */

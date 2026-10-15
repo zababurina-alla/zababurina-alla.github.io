@@ -6,6 +6,7 @@
 // Справка GIS: https://developers.google.com/identity/gsi/web/reference/js-reference
 import { ApiError, call } from './transport';
 import { clearSnap } from './snapCache';
+import { getTheme } from '../lib/theme';
 
 export interface User { email: string; name: string; role: 'mama' | 'owner' }
 /** signingIn — Google ответил, таблица проверяет вход (3+ с): экран входа пишет «Входим…» (п. 41). */
@@ -80,7 +81,10 @@ export class Auth {
   private listeners = new Set<() => void>();
   private pending: { resolve: (s: string) => void; reject: (e: unknown) => void } | null = null;
 
-  constructor(private readonly url: string, private readonly clientId: string, private readonly fetchImpl: typeof fetch = (...a) => fetch(...a)) {}
+  constructor(private readonly url: string, private readonly clientId: string, private readonly fetchImpl: typeof fetch = (...a) => fetch(...a)) {
+    // Сеанса нет (истёк, вышла, перенос сеанса из старых сборок) — снимок с данными клиентов не держим на экране входа.
+    if (!this.stored) clearSnap();
+  }
 
   getState = (): AuthState => this.state;
   subscribe = (fn: () => void): (() => void) => { this.listeners.add(fn); return () => this.listeners.delete(fn); };
@@ -159,7 +163,8 @@ export class Auth {
         const g = await this.arm();
         if (this.buttonEl) {
           this.buttonEl.replaceChildren();
-          g.renderButton(this.buttonEl, { type: 'standard', theme: 'filled_blue', size: 'large', text: 'signin_with', shape: 'pill', locale: 'ru', width: '320' });
+          // Тёмная тема — тёмная кнопка Google: синяя в белой рамке iframe выглядела белым пятном (отдел «Качество»).
+          g.renderButton(this.buttonEl, { type: 'standard', theme: getTheme() === 'dark' ? 'filled_black' : 'filled_blue', size: 'large', text: 'signin_with', shape: 'pill', locale: 'ru', width: String(Math.min(320, this.buttonEl.clientWidth || 320)) }); // на 360 px не шире карточки
         }
         if (prompt) g.prompt();
       } catch (e) {

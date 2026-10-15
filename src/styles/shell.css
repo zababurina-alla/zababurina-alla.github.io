@@ -191,19 +191,56 @@
   text-decoration: none;
 }
 
-/* Знак — буква «Б» с засечками на чернильной плашке, как печать в углу бланка */
+/* Знак — эмблема «Гроссбух» на плашке цвета чернил, как иконка приложения: мягкий свет «море» из угла */
 .brand__mark {
   display: grid;
   place-items: center;
+  flex: none;
   width: 2.25rem;
   height: 2.25rem;
   border-radius: var(--radius-md);
-  background: var(--btn);
+  background:
+    radial-gradient(120% 120% at 0 0, color-mix(in srgb, var(--mark-sea) 22%, transparent), transparent 70%),
+    var(--btn);
   color: var(--on-btn);
-  font-family: var(--display);
-  font-size: 1.25rem;
-  font-weight: var(--weight-bold);
   box-shadow: var(--shadow-1);
+}
+
+.brand__mark svg {
+  width: 100%;
+  height: 100%;
+}
+
+.brand__tone { fill: var(--mark-sea); fill-opacity: .16; }
+.brand__tone--right { fill-opacity: .26; }
+.brand__ribbon { fill: var(--mark-wheat); }
+
+.brand__line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.brand__rules { stroke-width: 2.2; stroke-opacity: .55; }
+
+.brand__check {
+  fill: none;
+  stroke: var(--mark-sea);
+  stroke-width: 4.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Наведение на название — галочка в книге ставится заново */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .brand:hover .brand__check { animation: brand-tick 520ms var(--spring-soft, ease-out) both; }
+}
+
+@keyframes brand-tick {
+  from { stroke-dasharray: 1; stroke-dashoffset: 1; }
+  to { stroke-dasharray: 1; stroke-dashoffset: 0; }
 }
 
 .brand__name {
@@ -217,7 +254,7 @@
 .rail > .sync {
   margin: -6px 0 var(--space-1);
   gap: var(--space-3);
-  padding: 0 var(--space-2) 0 calc(var(--space-2) + 1.125rem - 4px); /* точка — под серединой знака «Б» */
+  padding: 0 var(--space-2) 0 calc(var(--space-2) + 1.125rem - 4px); /* точка — под серединой знака */
 }
 
 .sync {

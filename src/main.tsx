@@ -3,6 +3,10 @@ import { createRoot } from 'react-dom/client';
 import './styles/base.css';
 import './styles/app.css';
 import { loadRuntimeConfig } from './config';
+import { initInstall } from './lib/install';
+
+// «Установить на экран» и сервис-воркер оболочки — до приложения: событие установки приходит рано.
+initInstall();
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Нет элемента #root в index.html');

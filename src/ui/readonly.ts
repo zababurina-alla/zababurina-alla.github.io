@@ -15,8 +15,10 @@ const DO_IT: Record<WriteArea, string> = {
   deadlines: 'Сроки пока закрывайте и меняйте в таблице',
   clients: 'Клиентов пока добавляйте и правьте в таблице',
   inbox: 'Сообщения клиентов пока решайте в Telegram',
+  remind: 'Напоминания клиентам пока пишите сами в Telegram',
 };
 
 export function roMessage(area: WriteArea): string {
-  return `${DO_IT[area]} — на сайте появится само`;
+  // Напоминание, отправленное самой в Telegram, на сайте не появится — без этого хвоста.
+  return area === 'remind' ? DO_IT[area] : `${DO_IT[area]} — на сайте появится само`;
 }
