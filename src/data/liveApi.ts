@@ -84,7 +84,11 @@ function normRecord(entity: Entity, raw: unknown): NonNullable<Change['record']>
   // Строки, которые экраны режут и сравнивают (when.slice, at.localeCompare): пустая клетка → '' вместо null.
   if (entity === 'activity') { const a = raw as Activity; return { ...a, when: a.when ?? '', text: a.text ?? '' }; }
   if (entity === 'task') { const t = raw as Task; return { ...t, text: t.text ?? '' }; }
-  if (entity === 'inbox') { const i = raw as InboxItem; return { ...i, at: i.at ?? '', snippet: i.snippet ?? '', clientName: i.clientName ?? '' }; }
+  if (entity === 'inbox') {
+    const i = raw as InboxItem & { file?: unknown; taxKopecks?: unknown; amount?: unknown };
+    return { ...i, at: i.at ?? '', snippet: i.snippet ?? '', clientName: i.clientName ?? '', file: i.file === true,
+      amount: num(i.amount), taxKopecks: num(i.taxKopecks) };
+  }
   return raw as Deadline | Payment | Activity | Task | Question | InboxItem;
 }
 

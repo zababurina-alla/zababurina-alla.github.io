@@ -47,7 +47,7 @@ export type WriteOp =
   | { kind: 'completeTask'; requestId: string; id: string; done: boolean }
   | { kind: 'answerQuestion'; requestId: string; id: string; text: string }
   /** inbox.decide: принять (платёж — записать с суммой), сделать задачей, отклонить. */
-  | { kind: 'decideInbox'; requestId: string; id: string; action: 'accept' | 'task' | 'reject'; amount?: number };
+  | { kind: 'decideInbox'; requestId: string; id: string; action: InboxAction; amount?: number };
 
 export type ErrorCode = 'NETWORK' | 'CONFLICT' | 'PERIOD_OPEN' | 'NOT_FOUND' | 'SERVER' | 'VALIDATION' | 'UNDO_TOO_LATE'
   | 'DUPLICATE' | 'BUSY' | 'MAINTENANCE' | 'QUOTA' | 'RATE_LIMIT' | 'AUTH_EXPIRED' | 'AUTH_REQUIRED' | 'FORBIDDEN';
@@ -85,6 +85,9 @@ export type RemindResult =
 export interface RemindPreview { preview: string | null; lang: string | null; reason: 'noBot' | 'test' | null; message: string | null }
 
 /** Ответ поиска КВЕД. note — пояснение сервера, когда не нашлось («не установлена радою»). */
+/** inbox.decide: записать (платёж — с суммой), задача, отклонить, задача по налогу (статус сообщения не меняется). */
+export type InboxAction = 'accept' | 'task' | 'reject' | 'taxTask';
+
 export interface KvedFound { items: KvedItem[]; note: string | null }
 
 /** reference.kved { all:true } — весь лист «📑 КВЕДы» (~217 строк): ищем в браузере. */

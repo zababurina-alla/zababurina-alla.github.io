@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { canWrite } from '../config';
 import { useStore } from '../data/store';
 import type { InboxItem, InboxStatus, InboxType } from '../data/types';
+import type { InboxAction } from '../data/api';
 import { TODAY, addDays, fmtDayMonth } from '../lib/dates';
 import { formatMoney, parseMoney } from '../lib/money';
 import { Icon } from '../ui/Icon';
@@ -19,11 +20,11 @@ export const INBOX_TYPE: Record<InboxType, { label: string; icon: IconName }> = 
   document: { label: 'Документ', icon: 'documents' },
   question: { label: 'Вопрос', icon: 'questions' },
   file: { label: 'Файл', icon: 'documents' },
-  who: { label: 'Кто это?', icon: 'clients' },
 };
 
 const DONE_LABEL: Record<Exclude<InboxStatus, 'new'>, string> = { accepted: 'принято', task: 'задача создана', rejected: 'отклонено' };
 const DONE_SHOWN = 20;
+const MIN_KOPECKS = 5000; // сервер (v5.72): сумма платежа не меньше 50 ₴
 
 function when(at: string): string {
   const day = at.slice(0, 10);
@@ -41,7 +42,8 @@ export function InboxCard({ it, compact = false }: { it: InboxItem; compact?: bo
   const can = canWrite('inbox');
   const saving = store.pending.some((p) => p.op.kind === 'decideInbox' && p.op.id === it.id);
   const parsed = parseMoney(sum);
-  const decide = (action: 'accept' | 'task' | 'reject', amount?: number) => { store.decideInbox(it.id, action, amount); setEditing(false); };
+  const tooSmall = parsed.ok && parsed.kopecks < MIN_KOPECKS;
+  const decide = (action: InboxAction, amount?: number) => { store.decideInbox(it.id, action, amount); setEditing(false); };
   return (
     <li className={`inbox__item inbox__item--${it.status}${compact ? ' inbox__item--compact' : ''}`}>
       <div className="inbox__head">
@@ -50,18 +52,21 @@ export function InboxCard({ it, compact = false }: { it: InboxItem; compact?: bo
           : <span className="inbox__who"><Avatar name={it.clientName} /><strong>{it.clientName}</strong></span>}
         <span className="tag"><Icon name={t.icon} size={14} />{t.label}</span>
         <span className="sub num">{when(it.at)}</span>
+        {it.file && <span className="tag inbox__file" title="К сообщению приложен файл — он в Telegram">📎 файл</span>}
       </div>
       <p className="inbox__snippet">«{it.snippet}»</p>
+      {it.taxKopecks ? <p className="sub inbox__tax">В сообщении и налог: {formatMoney(it.taxKopecks)}</p> : null}
       {it.status !== 'new' ? (
         <p className="sub inbox__done"><Icon name="check" size={14} />{DONE_LABEL[it.status]}</p>
       ) : saving ? (
         <p className="sub">сохраняется…</p>
       ) : editing ? (
-        <form className="inbox__act" onSubmit={(e) => { e.preventDefault(); if (parsed.ok) decide('accept', parsed.kopecks); }}>
+        <form className="inbox__act" onSubmit={(e) => { e.preventDefault(); if (parsed.ok && !tooSmall) decide('accept', parsed.kopecks); }}>
           <input className="input input--sm num" value={sum} onChange={(e) => setSum(e.target.value)} inputMode="decimal" aria-label="Сумма, ₴" autoFocus />
-          <button type="submit" className="btn btn--primary btn--sm" disabled={!parsed.ok}>Записать {parsed.ok ? formatMoney(parsed.kopecks) : ''}</button>
+          <button type="submit" className="btn btn--primary btn--sm" disabled={!parsed.ok || tooSmall}>Записать {parsed.ok ? formatMoney(parsed.kopecks) : ''}</button>
           <button type="button" className="btn btn--ghost btn--sm" onClick={() => setEditing(false)}>Отмена</button>
           {!parsed.ok && sum.trim() && <span className="field__error">{parsed.error}</span>}
+          {tooSmall && <span className="field__error">Сумма меньше 50 ₴ — проверьте</span>}
         </form>
       ) : (
         <div className="inbox__act">
@@ -72,9 +77,10 @@ export function InboxCard({ it, compact = false }: { it: InboxItem; compact?: bo
                 : null}
               <button type="button" className="btn btn--secondary btn--sm" onClick={() => (can ? setEditing(true) : decide('accept'))} {...roAttrs('inbox')}>{it.amount ? 'Изменить сумму' : 'Указать сумму'}</button>
             </>
-          ) : it.type !== 'who' && (
+          ) : it.clientId && (
             <button type="button" className="btn btn--primary btn--sm" onClick={() => decide('accept')} {...roAttrs('inbox')}>Принято</button>
           )}
+          {it.taxKopecks ? <button type="button" className="btn btn--secondary btn--sm" onClick={() => decide('taxTask')} {...roAttrs('inbox')}>Задача по налогу</button> : null}
           <button type="button" className="btn btn--secondary btn--sm" onClick={() => decide('task')} {...roAttrs('inbox')}>Задача</button>
           <button type="button" className="btn btn--ghost btn--sm" onClick={() => decide('reject')} {...roAttrs('inbox')}>Нет</button>
         </div>

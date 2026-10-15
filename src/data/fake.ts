@@ -89,12 +89,12 @@ export const TASKS: Task[] = [
 
 export const INBOX: InboxItem[] = [
   { id: 'in1', at: '2026-10-14T08:52', clientId: 'c3', clientName: 'Калиновська Ірина', type: 'payment',
-    snippet: 'Добрий день! Оплатила ЄП за жовтень, 1 200 грн, квитанцію надішлю', amount: 120000, status: 'new' },
+    snippet: 'Добрий день! Оплатила ЄП за жовтень, 1 200 грн, квитанцію надішлю', amount: 120000, status: 'new', taxKopecks: 120000 },
   { id: 'in2', at: '2026-10-14T08:30', clientId: 'c12', clientName: 'Мирошниченко Ольга', type: 'document',
-    snippet: 'Надсилаю виписку з банку за вересень', amount: null, status: 'new' },
+    snippet: 'Надсилаю виписку з банку за вересень', amount: null, status: 'new', file: true },
   { id: 'in3', at: '2026-10-13T19:05', clientId: 'c5', clientName: 'Ясенко Микола', type: 'question',
     snippet: 'Чи треба мені подавати щось через новий КВЕД?', amount: null, status: 'new' },
-  { id: 'in4', at: '2026-10-13T12:10', clientId: null, clientName: 'Невідомий номер +380…', type: 'who',
+  { id: 'in4', at: '2026-10-13T12:10', clientId: null, clientName: 'Невідомий номер +380…', type: 'question',
     snippet: 'Добрий день, мені порадили вас як бухгалтера', amount: null, status: 'new' },
 ];
 

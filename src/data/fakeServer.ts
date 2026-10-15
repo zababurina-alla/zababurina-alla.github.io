@@ -205,7 +205,14 @@ class FakeServer implements CabinetApi {
         // Как будет на сервере (inbox.decide): принять платёж — запись в «💰 Платежи»; задача — в «🧩 Задачи».
         const it = this.inbox.get(op.id);
         if (!it) return { ok: false, code: 'NOT_FOUND', message: 'Этого сообщения уже нет' };
-        if (it.status !== 'new') return { ok: false, code: 'VALIDATION', message: 'Уже решено — в Telegram или на сайте', current: { ...it } };
+        if (it.status !== 'new') return { ok: false, code: 'CONFLICT', message: 'Уже решено — в Telegram или на сайте', current: { ...it } };
+        if (op.action === 'taxTask') {
+          // Задача по налогу смешанного сообщения — статус сообщения не меняется (v5.72).
+          const t: Task = { id: `${o}`, version: this.cursor + 1, clientId: it.clientId, text: `Налог: ${formatPayMoney(it.taxKopecks ?? null)} — ${it.clientName}`, due: null, type: 'taxes', priority: 'high', done: false };
+          this.tasks.set(t.id, t);
+          return { ok: true, changes: [this.record('task', 'upsert', t.id, o, t)], cursor: this.cursor };
+        }
+        if (op.action === 'accept' && op.amount !== undefined && op.amount < 5000) return { ok: false, code: 'VALIDATION', message: 'Сумма меньше 50 ₴ — проверьте' };
         const changes: Change[] = [];
         let status: InboxItem['status'] = 'rejected';
         if (op.action === 'accept') {

@@ -16,7 +16,7 @@ import { readSnap, saveSnap } from './snapCache';
 import { Outbox } from './outbox';
 import type { Counters, OutboxEvent, OutboxItem } from './outbox';
 import { newRequestId } from './api';
-import type { Change, DeadlinePatch, RemindPreview, RemindRequest, RemindResult, Snapshot, TaskPatch, WriteOp, WriteResult } from './api';
+import type { Change, DeadlinePatch, InboxAction, RemindPreview, RemindRequest, RemindResult, Snapshot, TaskPatch, WriteOp, WriteResult } from './api';
 import type { Activity, Client, DatedDeadline, Deadline, InboxItem, Payment, Question, SaveState, Task } from './types';
 import { isDated } from './types';
 import { TODAY, addDays, fmtDate, plural } from '../lib/dates';
@@ -32,7 +32,7 @@ export type ExternalKind = 'payment' | 'key' | 'close' | 'phone' | 'inbox';
 
 /** Окончательный отказ таблицы (повтор не поможет): маме — что случилось, её словами. */
 /** info — подсказка (раздел пока только для просмотра): спокойная, уходит сама, одна на раздел. */
-export interface Notice { id: string; text: string; info?: boolean; key?: string }
+export interface Notice { id: string; text: string; info?: boolean; key?: string; /** «Открыть» в уведомлении — куда перейти. */ href?: string }
 
 export interface Conflict {
   requestId: string;
@@ -95,7 +95,7 @@ interface Store {
   /** Открытые вопросы заново (questions.list) — без перезагрузки снимка. */
   refreshQuestions: () => Promise<void>;
   /** Решение по сообщению из «Входящих» (inbox.decide). amount — копейки, если мама поправила сумму. */
-  decideInbox: (id: string, action: 'accept' | 'task' | 'reject', amount?: number) => void;
+  decideInbox: (id: string, action: InboxAction, amount?: number) => void;
   /** clients.remind — напомнить клиенту в Telegram (под writes.deadlines). Ответ — сразу, мимо очереди. */
   remindClient: (req: RemindRequest) => Promise<RemindResult>;
   /** Черновик напоминания от сервера (пробный запуск) — только если сервер это умеет (features: remindPreview). */
@@ -235,7 +235,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       } else if (ch.entity === 'inbox') {
         // Решено здесь или в Telegram — приходит upsert со статусом; удалено — delete.
         if (ch.op === 'delete') setInbox((xs) => xs.filter((x) => x.id !== ch.id));
-        else setInbox((xs) => upsert(xs, ch.record as InboxItem));
+        else {
+          const rec = ch.record as InboxItem;
+          // Новое сообщение клиента (не наше, раньше не было) — заметное уведомление, а не только цифра в меню.
+          if (!own && rec.status === 'new' && hasFeature('inbox')) {
+            setInbox((xs) => {
+              if (!xs.some((x) => x.id === rec.id)) setNotices((ns) => [...ns, { id: `in-${rec.id}`, text: `Новое сообщение: ${rec.clientName} — «${rec.snippet.slice(0, 60)}${rec.snippet.length > 60 ? '…' : ''}»`, info: true, key: `inbox-new-${rec.id}`, href: '#/inbox' }]);
+              return upsert(xs, rec);
+            });
+          } else setInbox((xs) => upsert(xs, rec));
+        }
       } else if (ch.entity === 'question') {
         // На сайте — только открытые: отвеченный (здесь или в Telegram) уходит из списка.
         const rec = ch.record as Question | undefined;
@@ -287,8 +296,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     } else if (op.kind === 'completeTask') {
       setTasks((xs) => xs.map((t) => (t.id === op.id ? { ...t, done: op.done } : t)));
     } else if (op.kind === 'decideInbox') {
-      const status = op.action === 'accept' ? 'accepted' : op.action === 'task' ? 'task' : 'rejected';
-      setInbox((xs) => xs.map((x) => (x.id === op.id ? { ...x, status } : x)));
+      // «Задача по налогу» статус сообщения не меняет (v5.72) — само сообщение ещё ждёт решения.
+      if (op.action !== 'taxTask') {
+        const status = op.action === 'accept' ? 'accepted' : op.action === 'task' ? 'task' : 'rejected';
+        setInbox((xs) => xs.map((x) => (x.id === op.id ? { ...x, status } : x)));
+      }
     } else if (op.kind === 'answerQuestion') {
       setQuestions((xs) => {
         const q = xs.find((x) => x.id === op.id);
@@ -376,6 +388,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const answered = e.result.current && 'options' in e.result.current && e.result.current.answer !== null;
         if (q && !answered) setQuestions((xs) => upsert(xs, q));
         answering.current.delete(op.requestId);
+      }
+      // Уже решено в Telegram или в другой вкладке (CONFLICT с current) — это не ошибка: сообщаем спокойно, чем решено.
+      const decided = op.kind === 'decideInbox' && e.result.code === 'CONFLICT' && e.result.current && 'snippet' in e.result.current ? e.result.current : null;
+      if (final && decided) {
+        void outboxRef.current?.discard(op.requestId);
+        const how = decided.status === 'accepted' ? 'записано' : decided.status === 'task' ? 'задача создана' : decided.status === 'rejected' ? 'отклонено' : 'ещё ждёт решения';
+        setNotices((ns) => [...ns, { id: op.requestId, text: `Уже решено: ${how} — ${decided.clientName}`, info: true, key: `inbox-${decided.id}` }]);
+        return;
       }
       if (final) {
         void outboxRef.current?.discard(op.requestId);
@@ -703,9 +723,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     try { setQuestions(await api.listQuestions()); } catch { /* вопросы останутся из снимка */ }
   }, []);
 
-  const decideInbox = useCallback((id: string, action: 'accept' | 'task' | 'reject', amount?: number) => {
+  const decideInbox = useCallback((id: string, action: InboxAction, amount?: number) => {
     const it = inbox.find((x) => x.id === id);
-    const label = action === 'accept' ? `Принять: ${it?.clientName ?? 'сообщение'}` : action === 'task' ? `Задача из сообщения: ${it?.clientName ?? ''}` : `Отклонить: ${it?.clientName ?? 'сообщение'}`;
+    const label = action === 'accept' ? `Принять: ${it?.clientName ?? 'сообщение'}` : action === 'task' ? `Задача из сообщения: ${it?.clientName ?? ''}`
+      : action === 'taxTask' ? `Задача по налогу: ${it?.clientName ?? ''}` : `Отклонить: ${it?.clientName ?? 'сообщение'}`;
     send({ kind: 'decideInbox', requestId: newRequestId(), id, action, ...(amount !== undefined ? { amount } : {}) }, label);
   }, [inbox, send]);
 

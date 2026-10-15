@@ -323,4 +323,21 @@ describe('живой адаптер: чтение', () => {
     expect(await new LiveApi(URL_, auth(), s.fetchImpl).remindPreview({ clientId: 'C-1', kind: 'key' }))
       .toEqual({ preview: null, lang: 'uk', reason: 'noBot', message: 'У клієнта немає бота' });
   });
+
+  it('входящие v5.72: file и taxKopecks из снимка; taxTask уходит действием; «уже решено» — CONFLICT с current', async () => {
+    const item = { id: 'I-1', version: 2, at: '2026-10-15T21:00:00+03:00', clientId: 'C-1', clientName: 'К', type: 'payment', snippet: 'Сплатила 1200 і податок', amount: 120000, status: 'new', file: true, taxKopecks: 34500 };
+    const s = server(
+      ok({ clients: [], deadlines: [], payments: [], tasks: [], activity: [], inbox: [item, { ...item, id: 'I-2', file: 'так', taxKopecks: '' }], cursor: 1 }),
+      ok({ inbox: item, payment: null, task: { id: 'T-9', text: 'Налог' } }, 5),
+      fail('CONFLICT', 'Уже решено', {}, { ...item, status: 'accepted' }),
+    );
+    const api = new LiveApi(URL_, auth(), s.fetchImpl);
+    const snap = await api.snapshot();
+    expect(snap.inbox.map((x) => [x.file, x.taxKopecks])).toEqual([[true, 34500], [false, null]]);
+    const r = await api.write({ kind: 'decideInbox', requestId: 'R1', id: 'I-1', action: 'taxTask' });
+    expect(s.sent[1]).toMatchObject({ action: 'inbox.decide', requestId: 'R1', payload: { id: 'I-1', action: 'taxTask' } });
+    expect(r.ok && r.changes.map((c) => c.entity)).toEqual(['inbox', 'task']);
+    const c = await api.write({ kind: 'decideInbox', requestId: 'R2', id: 'I-1', action: 'accept' });
+    expect(!c.ok && [c.code, c.current && 'status' in c.current ? c.current.status : null]).toEqual(['CONFLICT', 'accepted']);
+  });
 });

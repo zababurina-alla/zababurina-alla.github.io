@@ -30,7 +30,9 @@ export function FailureWatcher() {
   useEffect(() => {
     for (const n of notices) {
       // Отказ записи — ошибка, висит до закрытия; «пока в таблице» — подсказка на 7 с, одна на раздел (п. 7).
-      toast(n.info ? { key: n.key ?? `notice-${n.id}`, text: n.text, tone: 'info', timeout: 7000 } : { key: `notice-${n.id}`, text: n.text, tone: 'error' });
+      const go = n.href;
+      toast(n.info ? { key: n.key ?? `notice-${n.id}`, text: n.text, tone: 'info', timeout: go ? 12_000 : 7000, ...(go ? { action: { label: 'Открыть', run: () => { location.hash = go; } } } : {}) }
+        : { key: `notice-${n.id}`, text: n.text, tone: 'error' });
       dismissNotice(n.id);
     }
   }, [notices, dismissNotice, toast]);

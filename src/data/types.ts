@@ -113,7 +113,8 @@ export interface Question {
 }
 
 /** «Входящие»: сообщение клиента маме из Telegram (бизнес-бот), превращённое в предложение. */
-export type InboxType = 'payment' | 'document' | 'question' | 'file' | 'who';
+/** Формат сервера v5.72: «кто это» сервер строкой не отдаёт (это вопросы бота маме). */
+export type InboxType = 'payment' | 'document' | 'question' | 'file';
 export type InboxStatus = 'new' | 'accepted' | 'task' | 'rejected';
 
 export interface InboxItem {
@@ -127,6 +128,10 @@ export interface InboxItem {
   /** Сумма из сообщения, копейки (для type: payment). */
   amount?: number | null;
   status: InboxStatus;
+  /** К сообщению приложен файл (📎). */
+  file?: boolean;
+  /** Смешанное сообщение: сумма налога, копейки — для «Задача по налогу» (taxTask). */
+  taxKopecks?: number | null;
 }
 
 export interface Activity {
