@@ -345,6 +345,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const cur = e.result.current && 'snippet' in e.result.current ? e.result.current : null;
         setInbox((xs) => xs.map((x) => (x.id === op.id ? (cur ?? { ...x, status: 'new' }) : x)));
       }
+      // Карточку не поправили (VALIDATION телефона/почты, NOT_FOUND…) — строка клиента такая, какая в таблице или была.
+      if (op.kind === 'updateClient' && final && e.type !== 'conflict') {
+        const cur = e.result.current && 'kind' in e.result.current ? e.result.current : clientsBefore.current.get(op.requestId);
+        if (cur) setClients((xs) => xs.map((c) => (c.id === cur.id ? cur : c)));
+        clientsBefore.current.delete(op.requestId);
+      }
       // Задачу не поправили / не удалили — она возвращается такой, какая она в таблице (или какой была).
       if ((op.kind === 'updateTask' || op.kind === 'deleteTask') && final) {
         const cur = e.result.current && 'priority' in e.result.current ? e.result.current : tasksBefore.current.get(op.requestId);
@@ -565,13 +571,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return temp;
   }, [send]);
 
+  // Строка клиента до правки — вернуть её, если сервер откажет (v2.2: VALIDATION phone/email).
+  const clientsBefore = useRef(new Map<string, Client>());
+  const updateContact = useCallback((clientId: string, patch: { phone?: string; email?: string }, baseVersion: number, label: string) => {
+    const before = clients.find((c) => c.id === clientId);
+    const requestId = newRequestId();
+    if (before) clientsBefore.current.set(requestId, before);
+    send({ kind: 'updateClient', requestId, id: clientId, baseVersion, patch }, label, () => clientsBefore.current.delete(requestId));
+  }, [clients, send]);
   const updatePhone = useCallback((clientId: string, phone: string, baseVersion: number) => {
-    send({ kind: 'updateClient', requestId: newRequestId(), id: clientId, baseVersion, patch: { phone } }, 'Телефон клиента');
-  }, [send]);
+    updateContact(clientId, { phone }, baseVersion, 'Телефон клиента');
+  }, [updateContact]);
 
   const updateEmail = useCallback((clientId: string, email: string, baseVersion: number) => {
-    send({ kind: 'updateClient', requestId: newRequestId(), id: clientId, baseVersion, patch: { email } }, 'Почта клиента');
-  }, [send]);
+    updateContact(clientId, { email }, baseVersion, 'Почта клиента');
+  }, [updateContact]);
 
   const addTask = useCallback((t: Omit<Task, 'id' | 'version' | 'done'>) => {
     const requestId = newRequestId();

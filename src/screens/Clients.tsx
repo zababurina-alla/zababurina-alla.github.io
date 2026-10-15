@@ -27,6 +27,9 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
   const input = useRef<HTMLInputElement>(null);
   const [q, setQ] = useState('');
   const [kind, setKind] = useState<KindFilter>('all');
+  // «Без телефона»: бот узнаёт клиента в Telegram по телефону — у кого его нет, тому бот не пишет (просьба «Связи»).
+  const [noPhone, setNoPhone] = useState(false);
+  const phoneless = store.clients.filter((c) => !c.phone.trim()).length;
 
   useEffect(() => { if (focusSearch) input.current?.focus(); }, [focusSearch]);
 
@@ -50,7 +53,7 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
   const isOther = (k: ClientKind | null) => !['fop1', 'fop2', 'fop3'].includes(k ?? '');
   const byKind = (k: ClientKind | null, f: KindFilter) => f === 'all' || k === f || (f === 'other' && isOther(k));
   const found = search(
-    store.clients.filter((c) => byKind(c.kind, kind)).map((c) => ({ ...c, extra: [...c.kved.map((k) => k.code), c.phone],
+    store.clients.filter((c) => byKind(c.kind, kind) && (!noPhone || !c.phone.trim())).map((c) => ({ ...c, extra: [...c.kved.map((k) => k.code), c.phone],
       words: [...c.kved.map((k) => k.title), c.keyIssuer, ...store.deadlines.filter((d) => d.clientId === c.id).map((d) => d.what)] })),
     q,
   );
@@ -82,6 +85,11 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
             { id: 'fop3', label: '3 гр.', count: count('fop3') },
             { id: 'other', label: 'ТОВ, общая и др.', count: count('other') },
           ]} />
+          {phoneless > 0 && (
+            <button type="button" className="chip clients__nophone" aria-pressed={noPhone} onClick={() => { setNoPhone((v) => !v); play('tick'); }}>
+              <Icon name="call" size={16} />Без телефона<span className="chip__n num">{phoneless}</span>
+            </button>
+          )}
         </div>
 
         <div className="ctable" role="table" aria-label="Клиенты">

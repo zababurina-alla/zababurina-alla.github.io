@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { RemindDialog } from './RemindDialog';
 import { roAttrs } from '../ui/readonly';
+import { emailProblem, normEmail, phoneProblem } from '../lib/contact';
 import { KeyRenew } from './KeyRenew';
 import { canWrite } from '../config';
 import gsap from 'gsap';
@@ -89,6 +90,8 @@ function PasswordReveal({ clientId }: { clientId: string }) {
 }
 
 /** Поле карточки с правкой на месте: телефон, почта. Версия — та, что мама видела, начиная правку (конфликт). */
+// Телефон и почта (clients.update v2.2): проверка до отправки — те же правила, что у сервера (lib/contact).
+// Пустое поле — очистить (сервер запишет null). Почта уходит нижним регистром.
 function EditableField({ clientId, value, version, label, inputMode, empty, onSave }: {
   clientId: string; value: string; version: number; label: string; inputMode: 'tel' | 'email';
   empty: string; onSave: (v: string, base: number) => void;
@@ -96,6 +99,8 @@ function EditableField({ clientId, value, version, label, inputMode, empty, onSa
   const store = useStore();
   const [edit, setEdit] = useState<string | null>(null);
   const [base, setBase] = useState(version);
+  const problem = edit === null ? null : inputMode === 'tel' ? phoneProblem(edit) : emailProblem(edit);
+  const next = edit === null ? '' : inputMode === 'email' ? normEmail(edit) : edit.trim();
   const saving = store.pending.some((p) => p.op.kind === 'updateClient' && p.op.id === clientId);
   if (edit === null) {
     return (
@@ -106,10 +111,12 @@ function EditableField({ clientId, value, version, label, inputMode, empty, onSa
     );
   }
   return (
-    <form className="inline-edit" onSubmit={(e) => { e.preventDefault(); if (edit.trim() && edit.trim() !== value) onSave(edit.trim(), base); setEdit(null); }}>
-      <input className="input num" value={edit} onChange={(e) => setEdit(e.target.value)} inputMode={inputMode} type={inputMode === 'email' ? 'email' : 'text'} autoFocus aria-label={label} />
-      <button type="submit" className="btn btn--primary btn--sm">Сохранить</button>
+    <form className="inline-edit" onSubmit={(e) => { e.preventDefault(); if (problem) return; if (next !== value) onSave(next, base); setEdit(null); }}>
+      <input className="input num" value={edit} onChange={(e) => setEdit(e.target.value)} inputMode={inputMode} type={inputMode === 'email' ? 'email' : 'text'} autoFocus
+        aria-label={label} aria-invalid={problem !== null} aria-describedby={problem ? `${clientId}-${inputMode}-err` : undefined} />
+      <button type="submit" className="btn btn--primary btn--sm" disabled={problem !== null}>{next || !value ? 'Сохранить' : 'Очистить'}</button>
       <button type="button" className="btn btn--ghost btn--sm" onClick={() => setEdit(null)}>Отмена</button>
+      {problem && <span id={`${clientId}-${inputMode}-err`} className="field__error" role="alert">{problem}</span>}
     </form>
   );
 }
