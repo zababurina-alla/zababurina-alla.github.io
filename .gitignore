@@ -16,3 +16,7 @@ docs/mockups/
 .playwright-mcp/
 .mock-allowed
 public/config.local.json
+
+# визуальные снимки: отчёт и черновики прогона (эталоны __screenshots__ — в git)
+tests/visual/.out/
+tests/visual/.report/
