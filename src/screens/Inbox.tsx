@@ -55,7 +55,7 @@ export function InboxCard({ it, compact = false }: { it: InboxItem; compact?: bo
     setEditing(false);
     // «Нет» — 10 с на «Отменить», клиенту при этом ничего не уходит (находка «Пользователя» № 15).
     if (action === 'reject' && can) {
-      toast({ text: `Скрыто: ${it.clientName}. Клиенту ничего не отправим`, tone: 'info', timeout: HOLD_MS, action: { label: 'Отменить', run: () => {
+      toast({ text: `Скрыто: ${it.clientName} — клиенту ничего не отправим`, tone: 'info', timeout: HOLD_MS, action: { label: 'Отменить', run: () => {
         void store.undoHeld(rid).then((ok) => { if (!ok) toast({ text: 'Уже записано в таблицу — сообщение остаётся в «Решено»', tone: 'info' }); });
       } } });
     }
