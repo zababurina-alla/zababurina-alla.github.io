@@ -3,7 +3,7 @@
 // Решено в Telegram — здесь сразу «решено» (сервер присылает upsert).
 // Экран — как Telegram (владелец, 16.10): слева чаты по клиенту, справа диалог с пузырями; решения и «вы ответили» —
 // служебными строками в ленте. На узком экране список и диалог — два экрана (#/inbox и #/inbox/<чат>).
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { canWrite } from '../config';
 import { useStore } from '../data/store';
@@ -11,6 +11,9 @@ import type { InboxItem, InboxStatus, InboxType } from '../data/types';
 import type { InboxAction } from '../data/api';
 import { TODAY, addDays, fmtDayMonth } from '../lib/dates';
 import { useRoute } from '../router';
+import { groupThreads } from '../lib/inboxThreads';
+import type { Thread } from '../lib/inboxThreads';
+import { markRead, useReadAt } from '../data/inboxRead';
 import { formatMoney, parseMoney } from '../lib/money';
 import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
@@ -35,9 +38,6 @@ function when(at: string): string {
   const prefix = day === TODAY ? 'сегодня' : day === addDays(TODAY, -1) ? 'вчера' : fmtDayMonth(day);
   return `${prefix}, ${at.slice(11, 16)}`;
 }
-
-/** Поля техники, запрошены 16.10: когда решено и когда мама ответила в Telegram. Нет поля — строки без времени / нет. */
-type Item = InboxItem & { decidedAt?: string | null; repliedAt?: string | null };
 
 const hhmm = (at: string) => at.slice(11, 16);
 
@@ -107,21 +107,6 @@ export function InboxCard({ it, compact = false }: { it: InboxItem; compact?: bo
 
 // ═════════ Чаты ═════════
 
-interface Chat { key: string; clientId: string | null; name: string; items: Item[]; last: Item; unread: number }
-
-/** Чат — по клиенту; неизвестный номер (клиента нет) — свой чат по имени. */
-export const chatKey = (it: InboxItem) => it.clientId ?? `n:${it.clientName}`;
-
-function groupChats(items: Item[]): Chat[] {
-  const by = new Map<string, Item[]>();
-  for (const it of items) by.set(chatKey(it), [...(by.get(chatKey(it)) ?? []), it]);
-  return [...by.entries()].map(([key, xs]) => {
-    const sorted = [...xs].sort((a, b) => a.at.localeCompare(b.at));
-    const last = sorted[sorted.length - 1] as Item;
-    return { key, clientId: last.clientId, name: last.clientName, items: sorted, last, unread: sorted.filter((x) => x.status === 'new').length };
-  }).sort((a, b) => b.last.at.localeCompare(a.last.at));
-}
-
 /** Время в списке чатов — как в Telegram: сегодня — часы, вчера — «вчера», раньше — дата. */
 function listTime(at: string): string {
   const day = at.slice(0, 10);
@@ -131,14 +116,14 @@ function listTime(at: string): string {
 const dayTitle = (day: string) => (day === TODAY ? 'Сегодня' : day === addDays(TODAY, -1) ? 'Вчера' : fmtDayMonth(day));
 
 /** Служебная строка решения в ленте: «Записано в платежи · 1 200,00 ₴ · 09:14». */
-function doneText(it: Item): string {
+function doneText(it: InboxItem): string {
   const what = it.status === 'accepted'
     ? (it.type === 'payment' ? `Записано в платежи${it.amount ? ` · ${formatMoney(it.amount)}` : ''}` : 'Принято')
     : it.status === 'task' ? 'Задача создана' : 'Отклонено';
   return it.decidedAt ? `${what} · ${hhmm(it.decidedAt)}` : what;
 }
 
-function Bubble({ it, i }: { it: Item; i: number }) {
+function Bubble({ it, i }: { it: InboxItem; i: number }) {
   const t = INBOX_TYPE[it.type];
   return (
     <li className={`bubble${it.status === 'new' ? ' is-new' : ''}`} style={{ '--i': i } as CSSProperties}>
@@ -154,19 +139,23 @@ function Bubble({ it, i }: { it: Item; i: number }) {
   );
 }
 
-function Dialog({ chat }: { chat: Chat }) {
+function Dialog({ chat, visible }: { chat: Thread; visible: boolean }) {
   const ui = useUi();
   const feed = useRef<HTMLOListElement>(null);
+  // Открыт и виден — прочитан до последнего сообщения (счётчик в списке гаснет), как в Telegram.
+  useEffect(() => { if (visible) markRead(chat.key, chat.last.at); }, [visible, chat.key, chat.last.at]);
   // Открыли чат — лента внизу, у последнего сообщения (как в Telegram), если у неё своя прокрутка.
   useLayoutEffect(() => { const el = feed.current; if (el) el.scrollTop = el.scrollHeight; }, [chat.key]);
-  const rows: ReactNode[] = [];
-  let day = '';
+  // По дням: у каждого дня своя группа — плашка даты прилипает сверху только в пределах своего дня, следующий день
+  // её выталкивает (как в Telegram), а не ложится поверх.
+  const days: { day: string; rows: ReactNode[] }[] = [];
   chat.items.forEach((it, i) => {
     const d = it.at.slice(0, 10);
-    if (d !== day) { day = d; rows.push(<li key={`d-${d}`} className="feed__day"><span>{dayTitle(d)}</span></li>); }
-    rows.push(<Bubble key={it.id} it={it} i={i} />);
-    if (it.status !== 'new') rows.push(<li key={`s-${it.id}`} className="feed__service"><Icon name="check" size={14} />{doneText(it)}</li>);
-    if (it.repliedAt) rows.push(<li key={`r-${it.id}`} className="feed__service"><Icon name="message" size={14} />Вы ответили в Telegram · {hhmm(it.repliedAt)}</li>);
+    let g = days[days.length - 1];
+    if (!g || g.day !== d) { g = { day: d, rows: [] }; days.push(g); }
+    g.rows.push(<Bubble key={it.id} it={it} i={i} />);
+    if (it.status !== 'new') g.rows.push(<li key={`s-${it.id}`} className="feed__service"><Icon name="check" size={14} />{doneText(it)}</li>);
+    if (it.repliedAt) g.rows.push(<li key={`r-${it.id}`} className="feed__service"><Icon name="message" size={14} />Вы ответили в Telegram · {hhmm(it.repliedAt)}</li>);
   });
   return (
     <section className="dialog" aria-label={`Переписка: ${chat.name}`}>
@@ -177,18 +166,41 @@ function Dialog({ chat }: { chat: Chat }) {
           {chat.clientId
             ? <button type="button" className="linklike dialog__name" onClick={() => ui.openClient(chat.clientId ?? '')} title="Открыть карточку клиента">{chat.name}</button>
             : <strong className="dialog__name">{chat.name}</strong>}
-          <span className="sub">{chat.unread ? `ждут решения: ${chat.unread}` : 'всё решено'}{chat.clientId ? '' : ' · номера нет в таблице'}</span>
+          <span className="sub">{chat.open ? `ждут решения: ${chat.open}` : 'всё решено'}{chat.clientId ? '' : ' · номера нет в таблице'}</span>
         </div>
       </header>
-      <ol ref={feed} className="feed" key={chat.key}>{rows}</ol>
+      <ol ref={feed} className="feed" key={chat.key}>
+        {days.map((g) => (
+          <li key={g.day} className="feed__group">
+            <p className="feed__day"><span>{dayTitle(g.day)}</span></p>
+            <ol className="feed__items">{g.rows}</ol>
+          </li>
+        ))}
+      </ol>
     </section>
   );
+}
+
+/** Две колонки (≥ 900px, как в CSS): справа диалог виден и без адреса. */
+function useWide(): boolean {
+  const q = '(min-width: 900px)';
+  const [wide, setWide] = useState(() => window.matchMedia?.(q).matches ?? true);
+  useEffect(() => {
+    const m = window.matchMedia?.(q);
+    if (!m) return;
+    const on = () => setWide(m.matches);
+    m.addEventListener('change', on);
+    return () => m.removeEventListener('change', on);
+  }, []);
+  return wide;
 }
 
 export function Inbox() {
   const store = useStore();
   const route = useRoute();
-  const chats = groupChats(store.inbox as Item[]);
+  const readAt = useReadAt();
+  const chats = groupThreads(store.inbox, readAt);
+  const wide = useWide();
   const fresh = store.inbox.filter((i) => i.status === 'new').length;
   const want = route.params[0];
   // Открытый чат — из адреса; на широком экране без адреса показан первый (на узком тогда виден только список).
@@ -220,7 +232,7 @@ export function Inbox() {
               ))}
             </ul>
           </nav>
-          {shown && <Dialog chat={shown} />}
+          {shown && <Dialog chat={shown} visible={wide || open !== null} />}
         </div>
       ) : (
         <section className="panel"><Empty pic="calm" title="Сообщений пока нет">Когда клиент напишет в Telegram, переписка появится здесь.</Empty></section>

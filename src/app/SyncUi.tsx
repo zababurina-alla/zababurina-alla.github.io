@@ -6,7 +6,7 @@ import { Icon } from '../ui/Icon';
 import { Modal } from '../ui/Modal';
 import { useToast } from '../ui/toast';
 import { playAmbient } from '../lib/sound';
-import { chatKey } from '../screens/Inbox';
+import { threadKey } from '../lib/inboxThreads';
 
 /** Полоса сверху, пока нет связи: сколько записей ждут — и что ничего не потеряется. */
 export function OfflineBanner() {
@@ -34,7 +34,7 @@ export function FailureWatcher() {
       // Новое сообщение клиента — как в Telegram: аватар, имя, время, отрывок; нажатие — сразу в этот чат; тихий звук.
       const msg = n.id.startsWith('in-') ? inbox.find((i) => i.id === n.id.slice(3)) : undefined;
       if (msg) {
-        const open = `#/inbox/${encodeURIComponent(chatKey(msg))}`;
+        const open = `#/inbox/${encodeURIComponent(threadKey(msg))}`;
         toast({ key: n.key ?? `notice-${n.id}`, text: msg.snippet, tone: 'info', timeout: 12_000, from: { name: msg.clientName, at: msg.at },
           action: { label: 'Открыть', run: () => { location.hash = open; } } });
         playAmbient('message');
