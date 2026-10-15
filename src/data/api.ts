@@ -62,6 +62,9 @@ export type WriteResult =
 
 export interface DeadlinePatch { due?: string; status?: Exclude<DeadlineStatus, 'done'>; note?: string }
 
+/** clients.get — всё о клиенте: строка целиком, его сроки, платежи (не только 90 дней), задачи и история изменений. */
+export interface ClientCard { client: Client; deadlines: Deadline[]; payments: Payment[]; tasks: Task[]; history: Activity[] }
+
 /** Ответ поиска КВЕД. note — пояснение сервера, когда не нашлось («не установлена радою»). */
 export interface KvedFound { items: KvedItem[]; note: string | null }
 
@@ -74,6 +77,8 @@ export interface CabinetApi {
   listPayments(month: string): Promise<{ payments: Payment[]; totalKopecks: number }>;
   /** questions.list — открытые вопросы без перезагрузки снимка. */
   listQuestions(): Promise<Question[]>;
+  /** clients.get — карточка целиком (п. 3) и история изменений клиента (п. 9). */
+  clientCard(id: string): Promise<ClientCard>;
   /** reference.rates — ставки года из «⚙️ Справочники». Цифр ставок в коде сайта нет. */
   referenceRates(year?: number): Promise<Rates>;
   /** reference.kved — поиск по коду или словам, до 20 строк. */

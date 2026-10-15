@@ -3,7 +3,7 @@
 // — версии записей и ошибка CONFLICT; — журнал изменений с курсором; — повтор того же requestId не создаёт дубль.
 // Рычаги отладки (обрыв связи, отказ, правка извне) — для кнопок в режиме отладки.
 import { ACTIVITY, CLIENTS, DEADLINES, INBOX, KVEDS, PAYMENTS, QUESTIONS, RATES, TASKS } from './fake';
-import type { CabinetApi, Change, Entity, KvedFound, Snapshot, WriteOp, WriteResult } from './api';
+import type { CabinetApi, Change, ClientCard, Entity, KvedFound, Snapshot, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Deadline, InboxItem, KvedItem, Payment, Question, Rates, Task } from './types';
 import { fold } from '../lib/search';
 import { TODAY, addDays, endOfMonth, fmtDate, fmtDue } from '../lib/dates';
@@ -268,6 +268,22 @@ class FakeServer implements CabinetApi {
     await wait(READ_MS);
     if (!this.online) throw new Error('NETWORK');
     return [...this.questions.values()].filter((q) => q.answer === null).map((q) => ({ ...q, options: [...q.options] }));
+  }
+
+  async clientCard(id: string): Promise<ClientCard> {
+    await wait(READ_MS);
+    if (!this.online) throw new Error('NETWORK');
+    const c = this.clients.get(id);
+    if (!c) throw new Error('NOT_FOUND');
+    const surname = c.name.split(' ')[0] ?? '#';
+    return {
+      client: { ...c },
+      deadlines: [...this.deadlines.values()].filter((d) => d.clientId === id).map((d) => ({ ...d })),
+      payments: [...this.payments.values()].filter((p) => p.clientId === id).map((p) => ({ ...p })),
+      tasks: [...this.tasks.values()].filter((t) => t.clientId === id).map((t) => ({ ...t })),
+      // На сервере история — строки журнала с clientId; здесь — по фамилии в ленте выдуманных событий.
+      history: this.activity.filter((a) => a.text.includes(surname)).map((a) => ({ ...a })),
+    };
   }
 
   async referenceRates(year?: number): Promise<Rates> {

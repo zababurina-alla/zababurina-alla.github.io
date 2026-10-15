@@ -12,6 +12,7 @@ import { canWrite, isLive } from '../config';
 import { roMessage } from '../ui/readonly';
 import type { WriteArea } from '../config';
 import { kvAll, kvDelete, kvSet } from './idb';
+import { readSnap, saveSnap } from './snapCache';
 import { Outbox } from './outbox';
 import type { Counters, OutboxEvent, OutboxItem } from './outbox';
 import { newRequestId } from './api';
@@ -59,6 +60,8 @@ interface Store {
   notices: Notice[];
   /** Таблица не отдала данные при открытии (живой режим): текст для мамы; null — всё в порядке. */
   loadError: string | null;
+  /** Экраны показывают снимок из прошлой загрузки вкладки (sessionStorage), свежий ещё идёт. */
+  stale: boolean;
   reload: () => void;
   closed: ClosedEntry[];
   fresh: string[];
@@ -88,6 +91,8 @@ interface Store {
   refreshQuestions: () => Promise<void>;
   /** Решение по сообщению из «Входящих» (inbox.decide). amount — копейки, если мама поправила сумму. */
   decideInbox: (id: string, action: 'accept' | 'task' | 'reject', amount?: number) => void;
+  /** clients.get: карточка целиком — строка клиента, его платежи и задачи дополняют общие списки; история — в ответе. */
+  loadClientCard: (id: string) => Promise<Activity[]>;
   /** Ответ на вопрос маме (questions.answer). */
   answerQuestion: (id: string, text: string, onSaved?: () => void) => void;
   dismissNotice: (id: string) => void;
@@ -143,6 +148,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [inbox, setInbox] = useState<InboxItem[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  /** На экране снимок из прошлой загрузки этой вкладки, свежий ещё не пришёл. */
+  const [stale, setStale] = useState(false);
   const [attempt, setAttempt] = useState(0);
   /** Вопросы, убранные с экрана до ответа сервера, — вернуть, если ответ не записался. */
   const answering = useRef(new Map<string, Question>());
@@ -331,7 +338,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [applyChanges, putOpen]);
 
   // Загрузка: снимок таблицы, затем очередь, оставшаяся с прошлого раза (показываем её поверх снимка).
-  const applySnapshot = useCallback((snap: Snapshot) => {
+  // ready = false — снимок из прошлой загрузки этой вкладки: показываем, но изменения от его курсора не тянем.
+  const applySnapshot = useCallback((snap: Snapshot, ready = true) => {
     setClients(snap.clients); setPayments(snap.payments); setActivity(snap.activity); setTasks(snap.tasks); setQuestions(snap.questions); setInbox(snap.inbox);
     const open = snap.deadlines.filter((d) => d.status !== 'done');
     setDeadlines(open.filter(isDated));
@@ -339,7 +347,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setClosed(snap.deadlines.filter((d) => d.status === 'done' && d.closedAt === TODAY)
       .map((d) => ({ deadline: d, next: null, save: 'saved', requestId: `snap-${d.id}`, by: 'бот' })));
     cursorRef.current = snap.cursor; setCursor(snap.cursor);
-    snapReady.current = true;
+    snapReady.current = ready;
   }, []);
 
   useEffect(() => {
@@ -351,15 +359,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }, (e) => handlerRef.current(e));
     outboxRef.current = ob;
     void (async () => {
+      // Обновили вкладку — прошлый снимок этой вкладки сразу, свежий следом (п. 20: первый экран ждал 7–9 с).
+      const cached = isLive() ? readSnap() : null;
+      if (cached) { applySnapshot(cached, false); setStale(true); setLoaded(true); }
       try {
         const snap = await api.snapshot();
         if (!alive) return;
         applySnapshot(snap);
+        if (isLive()) saveSnap(snap);
+        setStale(false);
         setLoadError(null);
       } catch (e) {
         setOnlineState(false);
         // Живой режим без снимка — пустые экраны вводили бы в заблуждение: показать, что случилось.
-        if (alive && isLive()) setLoadError(e instanceof ApiError ? e.message : 'Таблица не ответила');
+        // Прошлый снимок вкладки на экране — оставляем его и честно пишем «не обновилось».
+        if (alive && isLive() && !cached) setLoadError(e instanceof ApiError ? e.message : 'Таблица не ответила');
       }
       const left = await ob.load();
       for (const it of left) { mine.current.add(it.op.requestId); applyOptimistic(it.op); }
@@ -549,6 +563,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     send({ kind: 'updateClient', requestId: newRequestId(), id: clientId, baseVersion: c.version, patch }, `Ключ ЭЦП: ${c.name}`);
   }, [clients, send]);
 
+  const loadClientCard = useCallback(async (id: string) => {
+    const card = await api.clientCard(id);
+    const add = <T extends { id: string }>(xs: T[], more: T[]) => [...xs, ...more.filter((m) => !xs.some((x) => x.id === m.id))];
+    // Строка клиента из clients.get свежее снимка (почта, «ключ с», бот) — заменяем, если версия не старее.
+    setClients((xs) => xs.map((x) => (x.id === id && (card.client.version ?? 0) >= (x.version ?? 0) ? card.client : x)));
+    setPayments((xs) => add(xs, card.payments));
+    setTasks((xs) => add(xs, card.tasks));
+    return card.history;
+  }, []);
+
   const loadPaymentsMonth = useCallback(async (month: string) => {
     const res = await api.listPayments(month);
     setPayments((xs) => res.payments.reduce((acc, p) => (acc.some((x) => x.id === p.id) ? acc : [...acc, p]), xs));
@@ -580,11 +604,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const setMaintenance = useCallback((on: boolean) => { fakeServer.maintenance = on; if (!on) void outboxRef.current?.kick(true); }, []);
 
   const value = useMemo<Store>(() => ({
-    loaded, online, clients, deadlines, undated, payments, activity, tasks, questions, inbox, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox,
+    loaded, online, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
+    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance,
-  }), [loaded, online, clients, deadlines, undated, payments, activity, tasks, questions, inbox, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox,
+  }), [loaded, online, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
+    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

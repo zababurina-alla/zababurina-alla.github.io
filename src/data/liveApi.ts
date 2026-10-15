@@ -2,7 +2,7 @@
 // (docs/api-contract.md v2.1). Экраны и очередь записей не знают, с кем говорят.
 import { ApiError, call } from './transport';
 import type { Envelope } from './transport';
-import type { CabinetApi, Change, Entity, ErrorCode, KvedFound, Snapshot, WriteOp, WriteResult } from './api';
+import type { CabinetApi, Change, ClientCard, Entity, ErrorCode, KvedFound, Snapshot, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Deadline, InboxItem, KvedItem, Payment, Question, RateGroup, Rates, Task } from './types';
 
 /** Откуда брать сеанс и как тихо войти заново (auth.ts). */
@@ -233,6 +233,19 @@ export class LiveApi implements CabinetApi {
   async listQuestions(): Promise<Question[]> {
     const env = await this.rpc<{ questions: Question[] }>('questions.list', {});
     return env.data.questions;
+  }
+
+  /** Карточка целиком: чтение, без requestId. Пустые клетки нормализуются, как в снимке. */
+  async clientCard(id: string): Promise<ClientCard> {
+    const env = await this.rpc<{ client: unknown; deadlines?: unknown[]; payments?: unknown[]; tasks?: unknown[]; history?: unknown[] }>('clients.get', { id });
+    const d = env.data;
+    return {
+      client: normClient(d.client),
+      deadlines: (d.deadlines ?? []).map((x) => normRecord('deadline', x) as Deadline),
+      payments: (d.payments ?? []).map(normPayment),
+      tasks: (d.tasks ?? []).map((x) => normRecord('task', x) as Task),
+      history: (d.history ?? []).map((x) => normRecord('activity', x) as Activity),
+    };
   }
 
   /** Справочник читается без requestId и мимо очереди: это чтение. */
