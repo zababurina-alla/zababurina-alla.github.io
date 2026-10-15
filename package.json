@@ -11,7 +11,10 @@
     "lint": "eslint .",
     "typecheck": "tsc -b",
     "test": "vitest run",
-    "contrast": "node --experimental-strip-types --no-warnings scripts/contrast.ts"
+    "contrast": "node --experimental-strip-types --no-warnings scripts/contrast.ts",
+    "visual": "playwright test",
+    "visual:update": "playwright test --update-snapshots",
+    "visual:selftest": "node tests/visual/selftest.mjs"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",
