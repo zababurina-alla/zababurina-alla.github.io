@@ -27,9 +27,10 @@ export function dismissHint(id: string): void {
   listeners.forEach((l) => l());
 }
 
-export function Hint({ id, children }: { id: string; children: ReactNode }) {
+/** after — id подсказки, после которой показывать эту: на экране одна подсказка за раз (п. 57). */
+export function Hint({ id, after, children }: { id: string; after?: string; children: ReactNode }) {
   const seen = useSyncExternalStore((l) => { listeners.add(l); return () => listeners.delete(l); }, read, () => []);
-  if (seen.includes(id)) return null;
+  if (seen.includes(id) || (after && !seen.includes(after))) return null;
   return (
     <p className="hint" role="note">
       <Icon name="tip" size={18} />

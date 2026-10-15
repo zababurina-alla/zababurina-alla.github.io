@@ -240,9 +240,17 @@
     max-width: 7rem;
   }
 
+  /* «ожидается», «не пришло» — справа под суммой, к ней и относится; без пустой строки с отступом слева (п. 61) */
   .paylist__row > .pill {
-    grid-column: 1 / -1;
-    margin-left: 3.125rem;
+    grid-row: 2;
+    grid-column: 2;
+    justify-self: end;
+    margin-left: 0;
+    padding-left: 11px; /* как у .pill: общее правило :nth-child(3) выше давало пустоту 3,125rem внутри метки */
+  }
+
+  .paylist__row:has(> .pill) > .paylist__how {
+    grid-column: 1;
   }
 }
 

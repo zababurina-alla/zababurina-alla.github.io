@@ -51,14 +51,15 @@ export function Keys() {
   // Закончились и заканчиваются — разные вещи (п. 4): «7 заканчиваются», когда 4 уже закончились, вводило в заблуждение.
   const gone = withKey.filter((c) => daysBetween(TODAY, c.keyUntil ?? TODAY) < 0).length;
   const soon = withKey.filter((c) => { const d = daysBetween(TODAY, c.keyUntil ?? TODAY); return d >= 0 && d <= 14; }).length;
-  const title = [gone ? `${gone} ${plural(gone, 'закончился', 'закончились', 'закончились')}` : '', soon ? `${soon} продлить в ближайшие 14 дней` : '']
+  // Заголовок — коротко, одной-двумя строками на телефоне (п. 58); что значит «скоро» — в подписи под ним.
+  const title = [gone ? `${gone} ${plural(gone, 'закончился', 'закончились', 'закончились')}` : '', soon ? `${soon} скоро` : '']
     .filter(Boolean).join(', ') || 'продлевать пока нечего';
   return (
     <div className="page">
       <header className="page__head">
         <div>
           <h1 className="page__title">Ключи ЭЦП <em>{title}</em></h1>
-          <p className="page__sub">По дате окончания. Продлить лучше за 14 дней — бот напомнит.</p>
+          <p className="page__sub">«Скоро» — кончаются в ближайшие 14 дней. Продлить лучше заранее — бот напомнит.</p>
         </div>
       </header>
       <section className="panel" aria-label="Ключи">

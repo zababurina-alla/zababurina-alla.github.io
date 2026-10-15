@@ -682,6 +682,29 @@
   flex-basis: 100%;
 }
 
+.dtable__tool-text { display: none; }
+
+/* Телефон и узкое окно (п. 56): в строке — только «Действия», без пустого места под невидимые кнопки.
+   «Позвонить» и «Платёж» появляются подписанными кнопками, когда «Действия» открыты. */
+@media (hover: none), (pointer: coarse), (pointer: none), (max-width: 39.99rem) {
+  .dtable__tools > .dtable__tool { display: none; }
+
+  .dtable__tools > .dactions__toggle { opacity: 1; }
+
+  .dtable__tools:has(> .dactions) > .dtable__tool {
+    display: inline-flex;
+    width: auto;
+    gap: 6px;
+    padding: 0 var(--space-3);
+    opacity: 1;
+    color: var(--accent);
+    font-weight: var(--weight-semibold);
+    text-decoration: none;
+  }
+
+  .dtable__tools:has(> .dactions) .dtable__tool-text { display: inline; }
+}
+
 /* «Действия» — явная кнопка со словом, а не бледное «⋯» под текстом (№ 9) */
 .dtable__tools .dactions__toggle {
   width: auto;

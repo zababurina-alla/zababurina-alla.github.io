@@ -402,6 +402,29 @@ p.empty {
   display: block;
 }
 
+/* ═════════ Текст для мыши и для пальца ═════════ */
+/* «Наведите на строку» — только где есть мышь и строке хватает места на кнопки; иначе — «нажмите «Действия»» (п. 55).
+   Порог — тот же, что у кнопок строки срока (deadlines.css). */
+.only-touch { display: none; }
+
+@media (hover: none), (pointer: coarse), (pointer: none), (max-width: 39.99rem) {
+  .only-hover { display: none; }
+  .only-touch { display: inline; }
+}
+
+/* ═════════ Прокрутка внутри листов ═════════ */
+/* Ctrl K, окна, карточка клиента, вопросы, КВЕДы: тонкая полоса цвета подписи вместо системной Windows со стрелками (п. 59).
+   Страница целиком — системная полоса: за неё удобнее браться. */
+.palette__list,
+.modal__body,
+.modal--panel .modal__box,
+.qall,
+.kved-list,
+.rail {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink-2) 45%, transparent) transparent;
+}
+
 /* ═════════ Вкладки со скользящим индикатором (пружина) ═════════ */
 .tabs {
   position: relative;

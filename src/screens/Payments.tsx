@@ -24,7 +24,7 @@ const SOURCE: Record<string, { icon: IconName; text: string }> = {
   'сайт': { icon: 'globe', text: 'с сайта' }, 'бот': { icon: 'bot', text: 'через бота' }, 'таблица': { icon: 'sheet', text: 'в таблице' },
 };
 // Способ оплаты — значок из словаря (Монобанк — это банк, 🏦), название — словом.
-const METHOD_ICON: Record<PayMethod, IconName> = { bank: 'bank', cash: 'cash', mono: 'bank', diia: 'diia', transfer: 'transfer', other: 'other' };
+const METHOD_ICON: Record<PayMethod, IconName> = { bank: 'bank', cash: 'cash', mono: 'bank', diia: 'diia', transfer: 'transfer', other: 'payments' }; // не «три точки»: рядом со словом «другое» читалось «· · · другое» (п. 61)
 
 function dayTitle(iso: string): string {
   if (iso === TODAY) return `Сегодня, ${fmtDayMonth(iso)}`;

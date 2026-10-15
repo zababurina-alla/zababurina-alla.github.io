@@ -534,6 +534,26 @@
   text-underline-offset: 0.2em;
 }
 
+/* Телефон (п. 57): подсказка — абзац во всю ширину, «Понятно» в конце строки, без значка — вдвое ниже */
+@media (max-width: 32rem) {
+  .hint {
+    display: block;
+    margin-inline: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    line-height: 1.45;
+  }
+
+  .hero .hint { margin-inline: 0; }
+
+  .hint > .icon { display: none; }
+
+  .hint__ok {
+    min-height: 0;
+    margin-left: var(--space-2);
+    padding: 6px 0; /* палец: высота строки + поля ≈ 32 px, вся строка подсказки нажимается рядом */
+  }
+}
+
 /* ═════════ Вопросы: «Позже», группы по клиенту, отложенные ═════════ */
 .question__foot {
   display: flex;
