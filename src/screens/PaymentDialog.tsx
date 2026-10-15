@@ -68,7 +68,7 @@ export function PaymentDialog({ open, clientId, onClose }: { open: boolean; clie
     (v) => { setWho(v.who); setAmount(v.amount); setPeriod(v.period); setMethod(v.method); setDate(v.date); },
     (v) => !v.amount && (!v.who || v.who === clientId));
 
-  const client = who ? store.client(who) : undefined;
+  const picked = who ? store.client(who) : undefined;
   // Фокус в сумму — сразу, в том же нажатии: иначе первая набранная цифра теряется («4200» → «200»).
   function pick(id: string) {
     amountRef.current?.focus();
@@ -76,6 +76,9 @@ export function PaymentDialog({ open, clientId, onClose }: { open: boolean; clie
   }
   const recent = [...new Set(store.payments.map((p) => p.clientId))].slice(0, 5).map((id) => store.client(id)).filter(Boolean);
   const suggestions = (q ? search(store.clients.map((c) => ({ ...c, extra: [c.phone] })), q) : recent).slice(0, 5);
+  // Набрали фамилию, нашёлся ровно один клиент — он и выбран, даже если по строке не щёлкнули (находка «Пользователя» № 5).
+  const only = !picked && q.trim() && suggestions.length === 1 ? suggestions[0] : undefined;
+  const client = picked ?? only;
   const money = parseMoney(amount);
   const dateIso = parseUserDate(date);
   const errors = {
@@ -127,10 +130,10 @@ export function PaymentDialog({ open, clientId, onClose }: { open: boolean; clie
         )}
         <div className="field">
           <label className="field__label" htmlFor={`${ids}-client`}>Клиент</label>
-          {client ? (
+          {picked ? (
             <div className="picked">
-              <Avatar name={client.name} size="sm" />
-              <span className="picked__name">{client.name}</span>
+              <Avatar name={picked.name} size="sm" />
+              <span className="picked__name">{picked.name}</span>
               <button ref={otherRef} type="button" className="link" onClick={() => { setWho(null); setTimeout(() => clientRef.current?.focus(), 0); }}>Другой</button>
             </div>
           ) : (
@@ -140,7 +143,7 @@ export function PaymentDialog({ open, clientId, onClose }: { open: boolean; clie
                 role="combobox" aria-expanded="true" aria-controls={`${ids}-list`} aria-activedescendant={`${ids}-opt-${active}`}
                 placeholder="Начните фамилию — в любом падеже…"
                 onChange={(e) => { setQ(e.target.value); setActive(0); }}
-                onBlur={() => setTouched((t) => ({ ...t, client: true }))}
+                onBlur={() => { setTouched((t) => ({ ...t, client: true })); if (only) setWho(only.id); }}
                 onKeyDown={(e) => {
                   if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => Math.min(a + 1, suggestions.length - 1)); }
                   if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)); }

@@ -22,6 +22,8 @@ import { Empty } from '../ui/Empty';
 import { roAttrs } from '../ui/readonly';
 import { shortName } from '../ui/names';
 import { useUi } from '../app/ui-context';
+import { HOLD_MS } from '../data/store';
+import { useToast } from '../ui/toast';
 
 /** accept — главная кнопка, как в боте: у платежа — «Записать», у остальных сервер ставит задачу своего вида. */
 export const INBOX_TYPE: Record<InboxType, { label: string; icon: IconName; accept: string }> = {
@@ -55,7 +57,17 @@ function InboxActions({ it }: { it: InboxItem }) {
   const saving = store.pending.some((p) => p.op.kind === 'decideInbox' && p.op.id === it.id);
   const parsed = parseMoney(sum);
   const tooSmall = parsed.ok && parsed.kopecks < MIN_KOPECKS;
-  const decide = (action: InboxAction, amount?: number) => { store.decideInbox(it.id, action, amount); setEditing(false); };
+  const toast = useToast();
+  const decide = (action: InboxAction, amount?: number) => {
+    const rid = store.decideInbox(it.id, action, amount);
+    setEditing(false);
+    // «Нет» — 10 с на «Отменить», клиенту при этом ничего не уходит (находка «Пользователя» № 15).
+    if (action === 'reject' && can) {
+      toast({ text: `Скрыто: ${it.clientName} — клиенту ничего не отправим`, tone: 'info', timeout: HOLD_MS, action: { label: 'Отменить', run: () => {
+        void store.undoHeld(rid).then((ok) => { if (!ok) toast({ text: 'Уже записано в таблицу — сообщение остаётся в «Решено»', tone: 'info' }); });
+      } } });
+    }
+  };
   if (saving) return <p className="sub">сохраняется…</p>;
   if (editing) {
     return (

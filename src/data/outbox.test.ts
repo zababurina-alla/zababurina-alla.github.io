@@ -17,12 +17,31 @@ const op = (id: string): WriteOp => ({ kind: 'cancelPayment', requestId: id, id:
 const ok: WriteResult = { ok: true, changes: [], cursor: 1 };
 
 function apiWith(write: (o: WriteOp) => Promise<WriteResult>): CabinetApi {
-  return { snapshot: vi.fn(), changesSince: vi.fn(), write, listPayments: vi.fn(), listQuestions: vi.fn(), referenceRates: vi.fn(), referenceKved: vi.fn(), referenceKvedAll: vi.fn(), clientCard: vi.fn(), remindClient: vi.fn(), remindPreview: vi.fn() };
+  return { snapshot: vi.fn(), changesSince: vi.fn(), write, listPayments: vi.fn(), listQuestions: vi.fn(), referenceRates: vi.fn(), referenceKved: vi.fn(), referenceKvedAll: vi.fn(), clientCard: vi.fn(), remindClient: vi.fn(), remindPreview: vi.fn(), cancelNotify: vi.fn() };
 }
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 describe('очередь записей', () => {
+  it('окно «Отменить»: запись ждёт 10 с, другие её не ждут; отмена в окне — не уходит, после окна — false', async () => {
+    vi.useFakeTimers();
+    const sent: string[] = [];
+    const store = memStorage();
+    const ob = new Outbox(apiWith(async (o) => { sent.push(o.requestId); return ok; }), store, () => undefined);
+    await ob.enqueue(op('held'), 'Нет', 10_000);
+    await ob.enqueue(op('plain'), 'Платёж');
+    await ob.enqueue(op('held2'), 'Ответ', 10_000);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(sent).toEqual(['plain']);
+    expect(store.m.has('held')).toBe(true); // уже в хранилище — переживёт закрытие вкладки
+    expect(await ob.cancelHeld('held')).toBe(true);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(sent).toEqual(['plain', 'held2']);
+    expect(await ob.cancelHeld('held2')).toBe(false);
+    expect(store.m.size).toBe(0);
+    vi.useRealTimers();
+  });
+
   it('отправляет по порядку и считает ступени', async () => {
     const order: string[] = [];
     const store = memStorage();

@@ -2,7 +2,7 @@
 // (docs/api-contract.md v2.1). Экраны и очередь записей не знают, с кем говорят.
 import { ApiError, call } from './transport';
 import type { Envelope } from './transport';
-import type { CabinetApi, Change, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
+import type { CabinetApi, CancelNotifyResult, Change, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Deadline, InboxItem, InboxType, KvedItem, Payment, Question, RateGroup, Rates, Task } from './types';
 import { INBOX_TYPES } from './types';
 
@@ -296,6 +296,21 @@ export class LiveApi implements CabinetApi {
         const r: RemindResult = { sent: false, reason: 'rateLimit', message: e.message || 'Этому клиенту уже напоминали недавно' };
         if (e.retryAt) r.retryAt = e.retryAt;
         return r;
+      }
+      throw e;
+    }
+  }
+
+  /** «Не писать клиенту»: снять сообщение о закрытии срока, пока оно ждёт 2 мин. С requestId, мимо очереди —
+   *  через 2 мин действие уже бессмысленно, а ответ нужен сразу. */
+  async cancelNotify(deadlineId: string, requestId: string): Promise<CancelNotifyResult> {
+    try {
+      const env = await this.rpc<{ cancelled?: unknown }>('deadlines.cancelNotify', { id: deadlineId }, requestId);
+      return env.data.cancelled === true ? { status: 'cancelled' } : { status: 'nothing' };
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'CONFLICT') {
+        const cur = e.current as { sentAt?: unknown } | null;
+        return { status: 'sent', sentAt: text(cur?.sentAt) || null };
       }
       throw e;
     }

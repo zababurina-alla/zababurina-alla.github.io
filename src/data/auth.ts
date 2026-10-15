@@ -240,6 +240,10 @@ export class Auth {
   }
 
   signOut(): void {
+    // Сервер отзывает сеанс (auth.logout, аудит M7): токен берём до стирания у себя. Ответ не ждём — «Выйти» мгновенное,
+    // а без связи токен всё равно истечёт сам (12 ч).
+    const session = this.stored?.session;
+    if (session) void call({ url: this.url, action: 'auth.logout', session, fetchImpl: this.fetchImpl, timeoutMs: 8000 }).catch(() => undefined);
     gis()?.disableAutoSelect();
     this.signOutLocal(null);
   }

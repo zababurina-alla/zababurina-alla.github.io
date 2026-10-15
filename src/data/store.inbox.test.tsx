@@ -50,4 +50,26 @@ describe('входящие на сайте', () => {
     expect(box.s?.inbox[0]?.status).toBe('accepted');
     act(() => root.unmount());
   });
+
+  it('«Нет» — 10 с на «Отменить»: отмена возвращает «новое», в таблицу ничего не уходит', async () => {
+    const box: { s: ReturnType<typeof useStore> | null } = { s: null };
+    function Grab() { const s = useStore(); useEffect(() => { box.s = s; }); return null; }
+    const root = createRoot(document.createElement('div'));
+    await act(async () => { root.render(<StoreProvider><Grab /></StoreProvider>); });
+    for (let i = 0; i < 50 && !box.s?.loaded; i++) await tick();
+    feed = [{ cursor: 3, entity: 'inbox', op: 'upsert', id: 'I-2', origin: 'бот', record: { ...ITEM, id: 'I-2' } }];
+    await act(async () => { await box.s?.syncNow(); });
+    write.mockClear();
+    let rid = '';
+    await act(async () => { rid = box.s?.decideInbox('I-2', 'reject') ?? ''; });
+    await tick();
+    expect(box.s?.inbox.find((x) => x.id === 'I-2')?.status).toBe('rejected');
+    let undone = false;
+    await act(async () => { undone = (await box.s?.undoHeld(rid)) ?? false; });
+    expect(undone).toBe(true);
+    expect(box.s?.inbox.find((x) => x.id === 'I-2')?.status).toBe('new');
+    await tick();
+    expect(write).not.toHaveBeenCalled();
+    act(() => root.unmount());
+  });
 });

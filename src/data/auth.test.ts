@@ -147,6 +147,7 @@ describe('вход: одноразовый код (nonce)', () => {
     expect(new Auth('https://x/exec', 'cid').getState().status).toBe('signedIn'); // открыла приложение снова
     a.signOut();
     expect(localStorage.getItem('buh.session')).toBeNull();
+    expect(s.sent.at(-1)).toMatchObject({ action: 'auth.logout', session: 'S' }); // сервер отзывает токен
     localStorage.setItem('buh.session', JSON.stringify({ session: 'OLD', expiresAt: '2000-01-01T00:00:00Z', user: { email: 'a', name: 'А', role: 'owner' } }));
     expect(new Auth('https://x/exec', 'cid').getState().status).toBe('signedOut');
     expect(localStorage.getItem('buh.session')).toBeNull();

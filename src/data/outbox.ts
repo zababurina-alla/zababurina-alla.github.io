@@ -16,6 +16,9 @@ export interface OutboxItem {
   /** Когда началась текущая отправка — для «таблица отвечает дольше обычного» (> 5 с). */
   sentAt?: number;
   error?: string;
+  /** Не отправлять раньше (мс): окно «Отменить» у решений, которые сервер вернуть не умеет («Нет» во «Входящих»,
+   *  ответ на вопрос). Запись уже в IndexedDB — закрыли вкладку в эти 10 с, уйдёт при следующем открытии. */
+  notBefore?: number;
 }
 
 export interface Storage {
@@ -47,6 +50,7 @@ export class Outbox {
   private items = new Map<string, OutboxItem>();
   private busy = false;
   private timer: ReturnType<typeof setTimeout> | null = null;
+  private holdTimer: ReturnType<typeof setTimeout> | null = null;
   /** До этого момента не отправлять даже по «сейчас» (опрос, связь вернулась): сервер сам назвал retryAt. */
   private holdUntil = 0;
   counters: Counters = { entered: 0, sent: 0, accepted: 0, rejected: 0, applied: 0, seenInTable: 0 };
@@ -72,8 +76,8 @@ export class Outbox {
     return this.items.has(requestId);
   }
 
-  async enqueue(op: WriteOp, label: string): Promise<void> {
-    const item: OutboxItem = { op, label, createdAt: Date.now(), attempts: 0, state: 'queued' };
+  async enqueue(op: WriteOp, label: string, holdMs = 0): Promise<void> {
+    const item: OutboxItem = { op, label, createdAt: Date.now(), attempts: 0, state: 'queued', ...(holdMs > 0 ? { notBefore: Date.now() + holdMs } : {}) };
     this.items.set(op.requestId, item);
     this.counters.entered++;
     await this.storage.set(op.requestId, item);
@@ -91,6 +95,14 @@ export class Outbox {
     void this.kick(true);
   }
 
+  /** «Отменить», пока запись ждёт в окне отмены: убрать её, не отправляя. false — уже ушла (или её нет). */
+  async cancelHeld(requestId: string): Promise<boolean> {
+    const it = this.items.get(requestId);
+    if (!it || it.state !== 'queued' || !it.notBefore || it.notBefore <= Date.now()) return false;
+    await this.discard(requestId);
+    return true;
+  }
+
   async discard(requestId: string): Promise<void> {
     this.items.delete(requestId);
     await this.storage.del(requestId);
@@ -101,8 +113,16 @@ export class Outbox {
   async kick(now = false): Promise<void> {
     if (now && this.timer && Date.now() >= this.holdUntil) { clearTimeout(this.timer); this.timer = null; }
     if (this.busy || this.timer) return;
-    const next = this.list().find((i) => i.state === 'queued');
-    if (!next) return;
+    const now0 = Date.now();
+    // Записи в окне «Отменить» пропускаем (другие не ждут их); когда окно кончится — проснуться и отправить.
+    const next = this.list().find((i) => i.state === 'queued' && (!i.notBefore || i.notBefore <= now0));
+    if (!next) {
+      const held = this.list().filter((i) => i.state === 'queued' && i.notBefore).map((i) => i.notBefore ?? 0);
+      if (this.holdTimer) clearTimeout(this.holdTimer);
+      // Свой таймер, не this.timer: иначе новая обычная запись ждала бы конца чужого окна отмены.
+      this.holdTimer = held.length ? setTimeout(() => { this.holdTimer = null; void this.kick(); }, Math.max(0, Math.min(...held) - now0) + 20) : null;
+      return;
+    }
     this.busy = true;
     next.state = 'sending';
     next.sentAt = Date.now();
