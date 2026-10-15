@@ -19,8 +19,12 @@ const isArea = (x: unknown): x is WriteArea => typeof x === 'string' && (WRITE_A
  *  Нет файла или он битый — выдуманные данные; нет "writes" — запись во всех разделах; [] — только просмотр. */
 export async function loadRuntimeConfig(fetchImpl: typeof fetch = fetch): Promise<void> {
   try {
-    const r = await fetchImpl('./config.json', { cache: 'no-store' });
-    if (!r.ok) return;
+    // Локальная проверка против тестовой копии таблицы: public/config.local.json (в .gitignore, из сборки удаляется).
+    // Читается только в режиме разработки — на опубликованном сайте его нет и быть не может.
+    let r = import.meta.env.DEV ? await fetchImpl('./config.local.json', { cache: 'no-store' }) : null;
+    const local = r?.ok && (r.headers.get('content-type') ?? '').includes('json');
+    if (!local) r = await fetchImpl('./config.json', { cache: 'no-store' });
+    if (!r || !r.ok) return;
     const j = await r.json() as { apiUrl?: unknown; writes?: unknown };
     runtime = {
       apiUrl: typeof j.apiUrl === 'string' ? j.apiUrl.trim() : '',
