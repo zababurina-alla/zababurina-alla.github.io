@@ -276,7 +276,9 @@
   max-width: 32ch;
 }
 
+/* iframe кнопки Google наследует color-scheme страницы: в тёмной теме браузер рисовал ему белый фон-рамку. */
 .login__button {
+  color-scheme: light;
   min-height: 44px;
 }
 

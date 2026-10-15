@@ -1,6 +1,6 @@
 // Интерфейс данных кабинета — тот же, что будет у JSON-API в Apps Script (контракт: docs/api-contract.md, этап 3).
 // Сейчас его реализует fakeServer.ts (выдуманная «таблица»); на этапе 4 — живой адаптер. Экраны знают только это.
-import type { Activity, Client, Deadline, DeadlineStatus, InboxItem, KvedItem, Payment, Question, Rates, Task } from './types';
+import type { Activity, Client, Deadline, DeadlineStatus, InboxItem, KvedItem, Payment, Priority, Question, Rates, Task, TaskType } from './types';
 
 /** Снимок данных при открытии кабинета. cursor — номер последнего изменения в таблице (выдаёт сервер, не часы браузера). */
 export interface Snapshot {
@@ -32,6 +32,8 @@ export interface Change {
 /** Запись с сайта. requestId создаёт браузер: повтор из очереди с тем же requestId не создаёт дубль. */
 export type WriteOp =
   | { kind: 'closeDeadline'; requestId: string; id: string; baseVersion: number }
+  | { kind: 'updateTask'; requestId: string; id: string; baseVersion: number; patch: TaskPatch }
+  | { kind: 'deleteTask'; requestId: string; id: string; baseVersion: number }
   /** deadlines.closeMany: 1…20 сроков одним запросом; отказ по одному — в failed, остальные закрываются. */
   | { kind: 'closeDeadlines'; requestId: string; items: { id: string; baseVersion: number }[] }
   | { kind: 'reopenDeadline'; requestId: string; id: string; undoOf: string }
@@ -60,9 +62,12 @@ export type WriteResult =
       notifyAt?: string | null;
       /** closeMany: сроки, которые не закрылись (PERIOD_OPEN / CONFLICT / NOT_FOUND), — остальные закрыты. */
       failed?: { id: string; code: ErrorCode; message: string; current?: Deadline }[] }
-  | { ok: false; code: ErrorCode; message: string; current?: Client | Deadline | Payment | Question | InboxItem;
+  | { ok: false; code: ErrorCode; message: string; current?: Client | Deadline | Payment | Question | InboxItem | Task;
       /** MAINTENANCE: когда ночные задачи закончатся (флаг сервера, не часы) — раньше не повторять. */
       retryAt?: string };
+
+/** tasks.update: что поменять; null очищает срок или клиента. Сделанную задачу сервер править не даёт. */
+export interface TaskPatch { text?: string; due?: string | null; type?: TaskType; priority?: Priority; clientId?: string | null }
 
 export interface DeadlinePatch { due?: string; status?: Exclude<DeadlineStatus, 'done'>; note?: string }
 

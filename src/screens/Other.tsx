@@ -15,6 +15,9 @@ import { Empty } from '../ui/Empty';
 import { shortName } from '../ui/names';
 import { useUi } from '../app/ui-context';
 import { TableText } from '../ui/TableText';
+import { TaskEdit } from './TaskEdit';
+import { useToast } from '../ui/toast';
+import { roAttrs, roMessage } from '../ui/readonly';
 import { URGENCY_ICON } from './DeadlineTable';
 import { Me, SoundSettings, useTheme } from '../app/Shell';
 
@@ -177,6 +180,13 @@ export function Tasks() {
   const client = parsed?.clientId ? store.client(parsed.clientId) : undefined;
 
   const open = store.tasks.filter((t) => !t.done);
+  const [editing, setEditing] = useState<string | null>(null);
+  const toast = useToast();
+  const edit = (t: Task) => {
+    if (!canWrite('tasks')) { toast({ text: roMessage('tasks'), tone: 'info' }); return; }
+    if (t.done) { toast({ text: 'Сделанную задачу править нельзя — сначала верните её в работу (снимите галочку)', tone: 'info' }); return; }
+    setEditing(t.id);
+  };
   const [showDone, setShowDone] = useState(false); // «Сделано» свёрнуто: их десятки (находка «Пользователя» № 29)
   // В снимке — все задачи листа: сделанных бывают сотни, на экране — 20 последних, остальное в таблице.
   const done = store.tasks.filter((t) => t.done);
@@ -248,6 +258,11 @@ export function Tasks() {
                     </span>
                     {saving ? <SaveBadge state="saving" offline={!store.online} />
                       : t.due && !t.done && st && <span className={`tasks__when due--${st}`}><Icon name={URGENCY_ICON[st]} size={16} className={`urgency--${st}`} />{daysLabel(daysBetween(TODAY, t.due))}</span>}
+                    {editing !== t.id && (
+                      <button type="button" className="icon-btn tasks__edit" aria-label={`Изменить задачу: ${t.text}`} title="Изменить или удалить"
+                        onClick={() => edit(t)} {...roAttrs('tasks')}><Icon name="edited" size={16} /></button>
+                    )}
+                    {editing === t.id && <TaskEdit t={t} onDone={() => setEditing(null)} />}
                   </li>
                 );
               })}

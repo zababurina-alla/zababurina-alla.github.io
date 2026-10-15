@@ -179,6 +179,14 @@ export class LiveApi implements CabinetApi {
           for (const it of op.items) if (!seen.has(it.id)) failed.push({ id: it.id, code: 'SERVER', message: 'Таблица не ответила по этому сроку' });
           return { ok: true, changes, cursor: env.cursor, failed };
         }
+        case 'updateTask': {
+          const env = await this.rpc<{ task: Task }>('tasks.update', { id: op.id, baseVersion: op.baseVersion, patch: op.patch }, o);
+          return { ok: true, changes: [up('task', env.data.task, env.cursor)], cursor: env.cursor };
+        }
+        case 'deleteTask': {
+          const env = await this.rpc<{ deleted: string }>('tasks.delete', { id: op.id, baseVersion: op.baseVersion }, o);
+          return { ok: true, changes: [{ cursor: env.cursor, entity: 'task', op: 'delete', id: env.data.deleted, origin: o }], cursor: env.cursor };
+        }
         case 'reopenDeadline': {
           const env = await this.rpc<{ reopened: Deadline }>('deadlines.reopen', { id: op.id, undoOf: op.undoOf }, o);
           return { ok: true, changes: [up('deadline', env.data.reopened, env.cursor)], cursor: env.cursor };
@@ -247,7 +255,7 @@ export class LiveApi implements CabinetApi {
       const res: WriteResult = { ok: false, code, message: e.message };
       if (e.retryAt) res.retryAt = e.retryAt;
       if (e.current && typeof e.current === 'object') {
-        res.current = 'kind' in e.current ? normClient(e.current) : e.current as Deadline | Payment | Question | InboxItem;
+        res.current = 'kind' in e.current ? normClient(e.current) : e.current as Deadline | Payment | Question | InboxItem | Task;
       }
       return res;
     }
