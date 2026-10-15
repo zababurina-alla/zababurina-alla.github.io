@@ -22,18 +22,18 @@ const { StoreProvider, useStore } = await import('./store');
 
 describe('отказ таблицы в новой задаче', () => {
   it('VALIDATION — задачи на экране нет, в очереди не висит', async () => {
-    let store: ReturnType<typeof useStore> | null = null;
-    function Grab() { const s = useStore(); useEffect(() => { store = s; }); return null; }
+    const box: { s: ReturnType<typeof useStore> | null } = { s: null };
+    function Grab() { const s = useStore(); useEffect(() => { box.s = s; }); return null; }
     const host = document.createElement('div');
     const root = createRoot(host);
     await act(async () => { root.render(<StoreProvider><Grab /></StoreProvider>); });
-    for (let i = 0; i < 50 && !store?.loaded; i++) await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
-    await act(async () => { store?.addTask({ clientId: 'C-117', text: 'Проверка сайта', due: null, type: 'docs', priority: 'medium' }); });
-    expect(store?.tasks.map((t) => t.text)).toEqual(['Проверка сайта']); // сразу видна, «сохраняется»
-    for (let i = 0; i < 100 && (store?.tasks.length ?? 0) > 0; i++) await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    for (let i = 0; i < 50 && !box.s?.loaded; i++) await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    await act(async () => { box.s?.addTask({ clientId: 'C-117', text: 'Проверка сайта', due: null, type: 'docs', priority: 'medium' }); });
+    expect(box.s?.tasks.map((t) => t.text)).toEqual(['Проверка сайта']); // сразу видна, «сохраняется»
+    for (let i = 0; i < 100 && (box.s?.tasks.length ?? 0) > 0; i++) await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
     expect(write).toHaveBeenCalled();
-    expect(store?.tasks).toEqual([]);
-    expect(store?.pending.filter((p) => p.op.kind === 'createTask')).toEqual([]);
+    expect(box.s?.tasks).toEqual([]);
+    expect(box.s?.pending.filter((p) => p.op.kind === 'createTask')).toEqual([]);
     act(() => root.unmount());
   });
 });
