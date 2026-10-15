@@ -13,6 +13,10 @@ describe('закрыть несколько сроков', () => {
     const done = r.changes.filter((c) => c.entity === 'deadline' && (c.record as Deadline | undefined)?.status === 'done').map((c) => c.id);
     expect(done.sort()).toEqual(['d2', 'd4']);
     expect(r.failed).toEqual([expect.objectContaining({ id: 'd5', code: 'PERIOD_OPEN' })]);
+    // Пара «закрытый → следующий» из ответа: у следующего квартала другое название, по нему не сопоставить.
+    expect(Object.keys(r.nextOf ?? {}).sort()).toEqual(['d2', 'd4']);
+    const n4 = r.nextOf?.d4;
+    expect(n4 && r.changes.find((c) => c.id === n4)?.record).toMatchObject({ clientId: 'c1', status: 'new' });
     const back = await fakeServer.write({ kind: 'reopenDeadline', requestId: 'U1', id: 'd4', undoOf: 'B1' });
     expect(back.ok && back.changes.some((c) => c.id === 'd4' && (c.record as Deadline | undefined)?.status === 'new')).toBe(true);
   }, 15_000);

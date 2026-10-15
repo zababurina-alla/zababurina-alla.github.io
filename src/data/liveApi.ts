@@ -161,6 +161,7 @@ export class LiveApi implements CabinetApi {
           const env = await this.rpc<{ results?: unknown[] }>('deadlines.closeMany', { items: op.items }, o);
           const changes: Change[] = [];
           const failed: NonNullable<Extract<WriteResult, { ok: true }>['failed']> = [];
+          const nextOf: Record<string, string | null> = {};
           const seen = new Set<string>();
           for (const raw of env.data.results ?? []) {
             const r = (raw ?? {}) as { id?: unknown; ok?: unknown; closed?: Deadline | null; next?: Deadline | null; code?: unknown; message?: unknown;
@@ -178,10 +179,11 @@ export class LiveApi implements CabinetApi {
             }
             if (r.closed) changes.push(up('deadline', r.closed, env.cursor));
             if (r.next) changes.push(up('deadline', r.next, env.cursor));
+            nextOf[id] = r.next?.id ?? null;
           }
           // Срок, о котором сервер ничего не сказал, не считаем закрытым.
           for (const it of op.items) if (!seen.has(it.id)) failed.push({ id: it.id, code: 'SERVER', message: 'Таблица не ответила по этому сроку' });
-          return { ok: true, changes, cursor: env.cursor, failed };
+          return { ok: true, changes, cursor: env.cursor, failed, nextOf };
         }
         case 'updateTask': {
           const env = await this.rpc<{ task: Task }>('tasks.update', { id: op.id, baseVersion: op.baseVersion, patch: op.patch }, o);

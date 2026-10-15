@@ -143,12 +143,16 @@ class FakeServer implements CabinetApi {
         // Как deadlines.closeMany: каждый срок — как отдельное закрытие; отказ по одному не мешает остальным.
         const changes: Change[] = [];
         const failed: NonNullable<Extract<WriteResult, { ok: true }>['failed']> = [];
+        const nextOf: Record<string, string | null> = {};
         for (const it of op.items) {
           const r = this.apply({ kind: 'closeDeadline', requestId: `${o}#${it.id}`, id: it.id, baseVersion: it.baseVersion });
-          if (r.ok) changes.push(...r.changes);
+          if (r.ok) {
+            changes.push(...r.changes);
+            nextOf[it.id] = r.changes.find((c) => c.entity === 'deadline' && c.id !== it.id && c.op === 'upsert')?.id ?? null;
+          }
           else failed.push({ id: it.id, code: r.code, message: r.message, ...(r.current && 'periodicity' in r.current ? { current: r.current } : {}) });
         }
-        return { ok: true, changes, cursor: this.cursor, failed };
+        return { ok: true, changes, cursor: this.cursor, failed, nextOf };
       }
       case 'reopenDeadline': {
         // Отмена одного из пакета: undoOf — requestId пакета, срок — по id.

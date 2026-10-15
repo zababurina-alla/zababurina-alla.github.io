@@ -44,7 +44,7 @@ export interface Conflict {
 /** batch — закрыт пакетом (closeMany): requestId общий у всех сроков пакета. */
 export interface ClosedEntry { deadline: Deadline; next: Deadline | null; save: SaveState; requestId: string; by: 'сайт' | 'бот'; batch?: boolean }
 /** Что сервер сказал о записи, кроме изменений: когда уйдут уведомления, что из пакета не закрылось. */
-type Applied = Pick<Extract<WriteResult, { ok: true }>, 'notifyAt' | 'failed'>;
+type Applied = Pick<Extract<WriteResult, { ok: true }>, 'notifyAt' | 'failed' | 'nextOf'>;
 
 interface Store {
   loaded: boolean;
@@ -548,7 +548,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             if (c.requestId !== requestId) return [c];
             const f = failed.find((x) => x.id === c.deadline.id);
             if (f) { putOpen(f.current && isDated(f.current) ? f.current : c.deadline); return []; }
-            const next = nexts.find((n) => n.clientId === c.deadline.clientId && n.what === c.deadline.what) ?? null;
+            // Пара из ответа сервера; без неё (старый сервер) — тот же клиент, ещё не занятый другим закрытым.
+            const nid = result.nextOf?.[c.deadline.id];
+            const next = (nid !== undefined ? nexts.find((n) => n.id === nid) : nexts.find((n) => n.clientId === c.deadline.clientId)) ?? null;
             return [{ ...c, save: 'saved' as const, next }];
           }));
           if (nexts.length) markFresh(nexts.map((n) => n.id));

@@ -283,6 +283,7 @@ describe('живой адаптер: чтение', () => {
       items: [{ id: 'D-1', baseVersion: 3 }, { id: 'D-2', baseVersion: 3 }, { id: 'D-3', baseVersion: 3 }, { id: 'D-4', baseVersion: 3 }] });
     expect(s.sent[0]).toMatchObject({ action: 'deadlines.closeMany', requestId: 'B1', payload: { items: [{ id: 'D-1', baseVersion: 3 }, { id: 'D-2', baseVersion: 3 }, { id: 'D-3', baseVersion: 3 }, { id: 'D-4', baseVersion: 3 }] } });
     expect(r.ok && r.changes.map((c) => c.id)).toEqual(['D-1', 'D-9']);
+    expect(r.ok && r.nextOf).toEqual({ 'D-1': 'D-9' });
     expect(r.ok && r.failed?.map((f) => [f.id, f.code, f.current?.version ?? null])).toEqual([['D-2', 'PERIOD_OPEN', null], ['D-3', 'CONFLICT', 8], ['D-4', 'SERVER', null]]);
   });
 

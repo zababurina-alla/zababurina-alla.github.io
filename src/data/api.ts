@@ -61,7 +61,9 @@ export type WriteResult =
       /** Закрытие срока: когда уйдут уведомления (через 2 мин); null — у клиента нет Telegram, уведомления не будет. */
       notifyAt?: string | null;
       /** closeMany: сроки, которые не закрылись (PERIOD_OPEN / CONFLICT / NOT_FOUND), — остальные закрыты. */
-      failed?: { id: string; code: ErrorCode; message: string; current?: Deadline }[] }
+      failed?: { id: string; code: ErrorCode; message: string; current?: Deadline }[];
+      /** closeMany: какой следующий срок создан для какого закрытого (у следующего квартала другое название). */
+      nextOf?: Record<string, string | null> }
   | { ok: false; code: ErrorCode; message: string; current?: Client | Deadline | Payment | Question | InboxItem | Task;
       /** MAINTENANCE: когда ночные задачи закончатся (флаг сервера, не часы) — раньше не повторять. */
       retryAt?: string };

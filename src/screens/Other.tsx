@@ -186,7 +186,6 @@ export function Tasks() {
   const toast = useToast();
   const edit = (t: Task) => {
     if (!canWrite('tasks')) { toast({ text: roMessage('tasks'), tone: 'info' }); return; }
-    if (t.done) { toast({ text: 'Сделанную задачу править нельзя — сначала верните её в работу (снимите галочку)', tone: 'info' }); return; }
     setEditing(t.id);
   };
   const [showDone, setShowDone] = useState(false); // «Сделано» свёрнуто: их десятки (находка «Пользователя» № 29)

@@ -33,6 +33,18 @@ export function TaskEdit({ t, onDone }: { t: Task; onDone: () => void }) {
     onDone();
   };
 
+  // Сделанную задачу сервер править не даёт (VALIDATION), а удалить — можно (вечерняя проверка 15.10).
+  if (t.done) {
+    return (
+      <div className="tedit tedit--done" role="group" aria-label={`Сделанная задача: ${t.text}`}>
+        <p className="sub">Сделанную задачу править нельзя — можно удалить или вернуть в работу (снять галочку).</p>
+        <span className="tedit__acts">
+          <button type="button" className="btn btn--ghost btn--sm" onClick={onDone}>Отмена</button>
+          <button type="button" className={`btn btn--sm ${sure ? 'btn--danger' : 'btn--ghost'}`} onClick={remove}>{sure ? 'Да, удалить' : 'Удалить'}</button>
+        </span>
+      </div>
+    );
+  }
   return (
     <form className="tedit" onSubmit={save} aria-label={`Изменить задачу: ${t.text}`}>
       <label className="tedit__text"><span className="visually-hidden">Текст задачи</span>
