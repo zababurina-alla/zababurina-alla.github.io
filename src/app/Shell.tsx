@@ -29,7 +29,7 @@ const NAV: { id: RouteName; label: string; icon: IconName; group: 'work' | 'ref'
 ];
 const PHONE_NAV: RouteName[] = ['today', 'clients', 'deadlines', 'payments'];
 
-function useTheme(): [string, () => void] {
+export function useTheme(): [string, () => void] {
   const theme = useSyncExternalStore(subscribeTheme, getTheme);
   return [theme, toggleTheme];
 }
@@ -39,7 +39,7 @@ const SOUND_MODES: { id: SoundMode; label: string }[] = [
 ];
 
 /** Звук: режим (вкл / ночью тихо 22–7 / выкл), громкость, «Проверить». Настройка — удобство этого браузера (localStorage). */
-function SoundSettings() {
+export function SoundSettings() {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<SoundMode>(soundSettings.mode);
   const [vol, setVol] = useState(Math.round(soundSettings.volume * 100));
@@ -128,7 +128,7 @@ function SyncStatus() {
 }
 
 /** Кто вошёл. На выдуманных данных — честная пометка вместо пользователя. */
-function Me() {
+export function Me() {
   const state = useAuth();
   if (!auth || !state.user) {
     return <span className="me"><span className="avatar avatar--sm" aria-hidden="true">Д</span><span className="me__text">Выдуманные данные</span></span>;

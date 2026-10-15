@@ -37,7 +37,9 @@ export function flyToCounter(from: HTMLElement, text: string): Promise<void> {
   const b = target.getBoundingClientRect();
   const ghost = document.createElement('span');
   ghost.className = 'fx-ghost';
-  ghost.textContent = `✓ ${text}`;
+  // Свой значок-галочка (svg), не символ «✓»: на сайте только свои значки.
+  ghost.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+  ghost.append(document.createTextNode(text));
   ghost.style.left = `${a.left}px`;
   ghost.style.top = `${a.top + a.height / 2 - 18}px`;
   document.body.appendChild(ghost);

@@ -480,6 +480,17 @@
   }
 }
 
+.rail .pop {
+  left: calc((var(--tap) + 2px) * -1); /* выровнено по левому краю меню: кнопка звука — вторая после темы */
+  width: calc(var(--rail-w) - var(--space-3) * 2 + 2px);
+  padding: var(--space-4) var(--space-3);
+}
+
+.rail .pop .seg__opt {
+  flex: 1 1 auto;
+  padding: 0 var(--space-2);
+}
+
 .pop__title {
   font-weight: var(--weight-semibold);
 }

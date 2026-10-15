@@ -15,7 +15,10 @@ import { Icon } from '../ui/Icon';
 import { Empty } from '../ui/Empty';
 import { SaveBadge, Tabs, reducedMotion } from '../ui/kit';
 import { shortName } from '../ui/names';
+import { TableText } from '../ui/TableText';
 import { DayGroups } from './DayGroups';
+import type { GroupBy } from './DayGroups';
+import { OBLIGATION_ICON } from '../ui/obligationIcon';
 
 type Range = 'month' | 'overdue' | 'week' | 'all';
 const RANK: Record<Status, number> = { red: 4, orange: 3, yellow: 2, green: 1, grey: 0 };
@@ -93,6 +96,7 @@ export function Deadlines() {
   const scope = useRef<HTMLDivElement>(null);
   const [range, setRange] = useState<Range>('month');
   const [picked, setPicked] = useState<string | null>(null);
+  const [by, setBy] = useState<GroupBy>('day');
 
   useGSAP(() => {
     if (reducedMotion()) return;
@@ -109,7 +113,13 @@ export function Deadlines() {
   const pool = store.deadlines.filter(passes);
   const filtered = kindF !== 'all' || statusF !== 'all' || clientF !== 'all';
   const fits = (days: number, r: Range) => (r === 'overdue' ? days < 0 : r === 'week' ? days <= 7 : r === 'month' ? days <= 30 : true);
-  const items = pool.filter((d) => (picked ? d.due === picked : fits(daysBetween(TODAY, d.due), range)));
+  // Период → (без вида) фишки видов с числами → вид. Статус и тип клиента — фильтры техники сайта (pool).
+  const inRange = store.deadlines.filter((d) => (statusF === 'all' || d.status === statusF)
+    && (clientF === 'all' || clientGroup(store.client(d.clientId)?.kind ?? null) === clientF)
+    && (picked ? d.due === picked : fits(daysBetween(TODAY, d.due), range)));
+  const kinds = new Map<ObligationKind, number>();
+  for (const d of inRange) kinds.set(obligationKind(d.what), (kinds.get(obligationKind(d.what)) ?? 0) + 1);
+  const items = kindF === 'all' ? inRange : inRange.filter((d) => obligationKind(d.what) === kindF);
   const count = (r: Range) => pool.filter((d) => fits(daysBetween(TODAY, d.due), r)).length;
   const overdue = count('overdue');
 
@@ -136,25 +146,37 @@ export function Deadlines() {
                 { id: 'all', label: 'Все', count: count('all') },
               ]} />}
           </header>
-          <div className="dfilters" role="group" aria-label="Фильтры сроков">
-            <label><span className="sub">Вид</span>
-              <select className="input input--sm" value={kindF} onChange={(e) => setKindF(e.target.value as ObligationKind | 'all')}>
-                <option value="all">Все</option>
-                {(Object.keys(OBLIGATION_LABEL) as ObligationKind[]).map((k) => <option key={k} value={k}>{OBLIGATION_LABEL[k]}</option>)}
-              </select></label>
-            <label><span className="sub">Статус</span>
-              <select className="input input--sm" value={statusF} onChange={(e) => setStatusF(e.target.value as OpenStatus | 'all')}>
-                <option value="all">Все</option>
-                {OPEN_STATUSES.map((st) => <option key={st} value={st}>{STATUS_LABEL[st]}</option>)}
-              </select></label>
-            <label><span className="sub">Клиент</span>
-              <select className="input input--sm" value={clientF} onChange={(e) => setClientF(e.target.value as ClientGroup | 'all')}>
-                <option value="all">Все</option>
-                {(Object.keys(CLIENT_GROUP_LABEL) as ClientGroup[]).map((g) => <option key={g} value={g}>{CLIENT_GROUP_LABEL[g]}</option>)}
-              </select></label>
-            {filtered && <button type="button" className="link" onClick={() => { setKindF('all'); setStatusF('all'); setClientF('all'); }}>Сбросить</button>}
+          <div className="dl-tools">
+            <div className="seg seg--fill dl-tools__by" role="group" aria-label="Как сгруппировать">
+              {([['day', 'По дням'], ['kind', 'По виду'], ['client', 'По клиенту']] as const).map(([id, label]) => (
+                <button key={id} type="button" className="seg__opt" aria-pressed={by === id} onClick={() => { setBy(id); play('tick'); }}>{label}</button>
+              ))}
+            </div>
+            <div className="dfilters" role="group" aria-label="Фильтры сроков">
+              <label><span className="sub">Статус</span>
+                <select className="input input--sm" value={statusF} onChange={(e) => setStatusF(e.target.value as OpenStatus | 'all')}>
+                  <option value="all">Все</option>
+                  {OPEN_STATUSES.map((st) => <option key={st} value={st}>{STATUS_LABEL[st]}</option>)}
+                </select></label>
+              <label><span className="sub">Клиент</span>
+                <select className="input input--sm" value={clientF} onChange={(e) => setClientF(e.target.value as ClientGroup | 'all')}>
+                  <option value="all">Все</option>
+                  {(Object.keys(CLIENT_GROUP_LABEL) as ClientGroup[]).map((g) => <option key={g} value={g}>{CLIENT_GROUP_LABEL[g]}</option>)}
+                </select></label>
+              {filtered && <button type="button" className="link" onClick={() => { setKindF('all'); setStatusF('all'); setClientF('all'); }}>Сбросить</button>}
+            </div>
+            {kinds.size > 1 && (
+              <div className="chips dl-tools__kinds" role="group" aria-label="Вид отчёта">
+                {[...kinds.entries()].sort((x, y) => y[1] - x[1]).map(([k, n]) => (
+                  <button key={k} type="button" className="chip chip--icon" aria-pressed={kindF === k}
+                    onClick={() => { setKindF(kindF === k ? 'all' : k); play('tick'); }}>
+                    <Icon name={OBLIGATION_ICON[k]} size={16} />{OBLIGATION_LABEL[k]}<span className="chip__n num">{n}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-          <DayGroups items={items} empty={
+          <DayGroups by={by} items={items} empty={
             <Empty pic="calm" title={picked ? 'В этот день сроков нет' : 'На этот период открытых сроков нет'}>
               {picked ? 'Выберите другой день в календаре.' : 'Всё сдано. Новые сроки система создаст сама.'}
             </Empty>
@@ -170,7 +192,7 @@ export function Deadlines() {
             {store.undated.map((d) => (
               <li key={d.id} className="closed__row">
                 <Icon name="calendar" tile="wheat" />
-                <span className="closed__text"><strong>{(() => { const c = store.client(d.clientId); return c ? shortName(c.name) : 'клиент не найден'; })()}</strong> — {d.what}</span>
+                <span className="closed__text"><strong>{(() => { const c = store.client(d.clientId); return c ? shortName(c.name) : 'клиент не найден'; })()}</strong> — <TableText text={d.what} /></span>
               </li>
             ))}
           </ul>
@@ -186,7 +208,7 @@ export function Deadlines() {
               return (
                 <li key={deadline.id} className="closed__row">
                   <span className="closed__check"><Icon name="check" size={16} /></span>
-                  <span className="closed__text"><strong>{c ? shortName(c.name) : 'Клиент не указан'}</strong> — {deadline.what}
+                  <span className="closed__text"><strong>{c ? shortName(c.name) : 'Клиент не указан'}</strong> — <TableText text={deadline.what} />
                     {next && <span className="sub">Система создала следующий: {next.what}, до {fmtDue(next.due)}</span>}</span>
                   <SaveBadge state={save} offline={!store.online} onRetry={() => store.retry(requestId)} />
                   <button type="button" className="btn btn--ghost btn--sm" onClick={() => store.reopenDeadline(deadline.id)}><Icon name="undo" size={16} />Вернуть</button>

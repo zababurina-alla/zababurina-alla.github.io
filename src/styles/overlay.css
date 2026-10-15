@@ -152,7 +152,7 @@
 /* Карточка клиента: лист справа (ноутбук) / во весь экран (телефон) */
 .modal--panel {
   inset: 0 0 0 auto;
-  width: min(var(--panel-w), 100vw);
+  width: min(var(--panel-w), 100%); /* не 100vw: он считает полосу прокрутки, и лист уезжал за левый край */
   height: 100dvh;
   padding: var(--space-3);
 }

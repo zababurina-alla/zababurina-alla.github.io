@@ -247,6 +247,28 @@
   font-size: var(--text-sm);
 }
 
+@media (max-width: 559px) {
+  .tasks__text {
+    display: block;
+  }
+
+  .tasks__text > .icon {
+    display: inline-block;
+    margin-right: 6px;
+    vertical-align: -3px;
+  }
+
+  .tasks__text > .ttext {
+    display: inline;
+  }
+
+  .tasks__client {
+    display: flex;
+    padding: 0;
+    text-align: left;
+  }
+}
+
 .tasks__when {
   display: inline-flex;
   align-items: center;
@@ -297,6 +319,25 @@
 .tasks__more {
   margin: 0;
   padding: var(--space-1) var(--space-5) var(--space-3);
+}
+
+/* «Ещё» → настройки на телефоне: окошко звука открывается вверх (внизу — вкладки и «+»); лист его не обрезает */
+.more--settings {
+  overflow: visible;
+}
+
+.more--settings .pop {
+  left: auto;
+  right: 0;
+  transform-origin: calc(100% - 1.5rem) 100%;
+}
+
+.more--settings .me {
+  margin-left: 0;
+}
+
+.more--settings .me__text {
+  max-width: none;
 }
 
 /* «Входящие» (техника сайта): сообщения клиентов с кнопками решения. Оформление — за отделом дизайна. */

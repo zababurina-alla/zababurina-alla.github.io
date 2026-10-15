@@ -14,7 +14,9 @@ import { Avatar, Money, SaveBadge } from '../ui/kit';
 import { Empty } from '../ui/Empty';
 import { shortName } from '../ui/names';
 import { useUi } from '../app/ui-context';
+import { TableText } from '../ui/TableText';
 import { URGENCY_ICON } from './DeadlineTable';
+import { Me, SoundSettings, useTheme } from '../app/Shell';
 
 // Группы ключей — шкала словаря (п. 1): просрочен, горит 0–7, скоро 8–30, в порядке; «нет ключа» — ⚪ (п. 3, № 79).
 const KEY_GROUPS: { st: Status; title: string }[] = [
@@ -233,7 +235,7 @@ export function Tasks() {
                     </button>
                     <span className="tasks__text">
                       {t.priority !== 'medium' && !t.done && <Icon name={PRIORITY_ICON[t.priority]} size={18} className={`prio prio--${t.priority}`} label={PRIORITY_LABEL[t.priority]} />}
-                      <span>{t.text}</span>
+                      <TableText text={t.text} />
                       {c && <button type="button" className="link tasks__client" onClick={() => ui.openClient(c.id)}>{shortName(c.name)}</button>}
                     </span>
                     {saving ? <SaveBadge state="saving" offline={!store.online} />
@@ -257,6 +259,7 @@ const MORE: [string, IconName, string, string][] = [
 ];
 
 export function More() {
+  const [theme, toggleTheme] = useTheme();
   return (
     <div className="page">
       <header className="page__head"><h1 className="page__title">Ещё</h1></header>
@@ -269,6 +272,20 @@ export function More() {
           </a>
         ))}
       </nav>
+      {/* На телефоне меню нет — тема, звук и вход здесь (на ноутбуке они внизу меню) */}
+      <section className="panel more more--settings" aria-label="Настройки">
+        <div className="more__item">
+          <Icon name={theme === 'dark' ? 'moon' : 'sun'} tile="accent" />
+          <span className="more__text"><strong>Тема</strong><span className="sub">{theme === 'dark' ? 'тёмная' : 'светлая'}</span></span>
+          <button type="button" className="btn btn--secondary btn--sm" onClick={toggleTheme}>{theme === 'dark' ? 'Светлая' : 'Тёмная'}</button>
+        </div>
+        <div className="more__item">
+          <Icon name="sound" tile="accent" />
+          <span className="more__text"><strong>Звук</strong><span className="sub">только в ответ на ваши действия</span></span>
+          <SoundSettings />
+        </div>
+        <div className="more__item"><Me /></div>
+      </section>
     </div>
   );
 }

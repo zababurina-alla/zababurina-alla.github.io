@@ -19,6 +19,7 @@ import { useToast } from '../ui/toast';
 import { canWrite, hasFeature } from '../config';
 import type { Question } from '../data/types';
 import { URGENCY_ICON } from './DeadlineTable';
+import { TableText } from '../ui/TableText';
 import { DayGroups } from './DayGroups';
 
 type Filter = 'week' | 'month' | 'overdue' | 'burning' | 'soon';
@@ -71,7 +72,7 @@ function AreaChart({ cumulative, month }: { cumulative: number[]; month: string 
 }
 
 /** Ответ на вопрос: варианты — кнопками, текст или число — полем. Записывается в таблицу, вопрос уходит из списка. */
-function QuestionAnswer({ q }: { q: Question }) {
+export function QuestionAnswer({ q }: { q: Question }) {
   const store = useStore();
   const toast = useToast();
   const [text, setText] = useState('');
@@ -128,6 +129,9 @@ export function Today() {
   const scope = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLElement>(null);
   const [filter, setFilter] = useState<Filter>('week');
+  // Вопросов бывает десятки (на живой таблице 48): видно 2, остальные — по кнопке, чтобы колонка не растягивалась.
+  const Q_SHOWN = 2;
+  const [allQ, setAllQ] = useState(false);
 
   // Пороги — словарь значков, п. 1: просрочено < 0, горит 0–7, скоро 8–30 (как цвет строк, statusByDays).
   const withDays = store.deadlines.map((d) => ({ d, st: statusByDays(daysBetween(TODAY, d.due)), days: daysBetween(TODAY, d.due) }));
@@ -138,6 +142,10 @@ export function Today() {
   const keys = store.clients.filter((c) => c.keyUntil && daysBetween(TODAY, c.keyUntil) <= KEY_DAYS)
     .sort((a, b) => (a.keyUntil ?? '').localeCompare(b.keyUntil ?? ''));
   const month = monthStats(store.payments, TODAY);
+  // Задачи на сегодня: просроченные и сегодняшние, самые важные — выше.
+  const PRIO = { critical: 0, high: 1, medium: 2, low: 3 } as const;
+  const todayTasks = store.tasks.filter((t) => !t.done && t.due && t.due <= TODAY)
+    .sort((a, b) => PRIO[a.priority] - PRIO[b.priority] || (a.due ?? '').localeCompare(b.due ?? ''));
 
   const pick = { week: [...overdue, ...burning], overdue, burning, soon, month: withDays.filter((x) => x.days <= 30) }[filter];
   const list = pick.map((x) => x.d);
@@ -172,6 +180,7 @@ export function Today() {
   if (overdue.length && burning.length) lede.push(`Ещё ${burning.length} ${plural(burning.length, 'горит', 'горят', 'горят')} до ${fmtDayMonth(weekEnd)}.`);
   if (!overdue.length && !burning.length) lede.push(soon.length ? `Ближайшие сроки — через 8–30 дней, их ${soon.length}.` : 'Открытых сроков на месяц вперёд нет.');
   if (keys.length) lede.push(`${keys.length} ${plural(keys.length, 'ключ ЭЦП заканчивается', 'ключа ЭЦП заканчиваются', 'ключей ЭЦП заканчиваются')} в ближайшие ${KEY_DAYS} дней.`);
+  if (todayTasks.length) lede.push(`${todayTasks.length} ${plural(todayTasks.length, 'задача', 'задачи', 'задач')} на сегодня.`);
   if (store.questions.length) lede.push(`Дмитрий ждёт ответа на ${store.questions.length} ${plural(store.questions.length, 'вопрос', 'вопроса', 'вопросов')}.`);
   if (overdue.length) lede.push('Начните с красных.');
 
@@ -218,13 +227,44 @@ export function Today() {
               <header className="panel__head">
                 <h2 id="t-q" className="panel__title"><Icon name="questions" tile="wheat" />{store.questions.length === 1 ? 'Вопрос от Дмитрия' : `Вопросы от Дмитрия: ${store.questions.length}`}</h2>
               </header>
-              {store.questions.map((q) => (
+              {(allQ ? store.questions : store.questions.slice(0, Q_SHOWN)).map((q) => (
                 <div key={q.id} className="question">
-                  <p className="question__text">{q.text}</p>
+                  <p className="question__text"><TableText text={q.text} /></p>
                   <QuestionAnswer q={q} />
                   <p className="question__foot sub">{q.askedAt ? `${fmtDayMonth(q.askedAt.slice(0, 10))}, ${q.askedAt.slice(11, 16)} · ` : ''}можно ответить и в Telegram-боте</p>
                 </div>
               ))}
+              {!allQ && store.questions.length > Q_SHOWN && (
+                <button type="button" className="dgroup__more" onClick={() => setAllQ(true)}>
+                  Показать все {store.questions.length} {plural(store.questions.length, 'вопрос', 'вопроса', 'вопросов')}
+                </button>
+              )}
+            </section>
+          )}
+
+          {todayTasks.length > 0 && (
+            <section className="panel reveal" aria-labelledby="t-tasks">
+              <header className="panel__head"><h2 id="t-tasks" className="panel__title">Задачи на сегодня<span className="sub num">{todayTasks.length}</span></h2><a className="link" href="#/tasks">Все задачи</a></header>
+              <ul className="tasks">
+                {todayTasks.slice(0, 6).map((t) => {
+                  const c = t.clientId ? store.client(t.clientId) : undefined;
+                  const late = (t.due ?? TODAY) < TODAY;
+                  return (
+                    <li key={t.id} className={`tasks__row${store.fresh.includes(t.id) ? ' is-fresh' : ''}`}>
+                      <button type="button" className="check-btn tasks__check" aria-pressed={false} aria-label={`Сделано: ${t.text}`}
+                        onClick={() => store.toggleTask(t.id, true)}>
+                        <span className="check-btn__ring" aria-hidden="true"><Icon name="check" size={16} /></span>
+                      </button>
+                      <span className="tasks__text">
+                        <TableText text={t.text} />
+                        {c && <button type="button" className="link tasks__client" onClick={() => ui.openClient(c.id)}>{shortName(c.name)}</button>}
+                      </span>
+                      {late && <span className="tasks__when due--red"><Icon name="overdue" size={16} className="urgency--red" />{daysLabel(daysBetween(TODAY, t.due ?? TODAY))}</span>}
+                    </li>
+                  );
+                })}
+              </ul>
+              {todayTasks.length > 6 && <p className="sub tasks__more">Ещё {todayTasks.length - 6} — в «Задачах»</p>}
             </section>
           )}
 
@@ -268,7 +308,7 @@ export function Today() {
                 {store.activity.slice(0, 5).map((a) => (
                   <li key={a.id} className={`feed__item${store.fresh.includes(a.id) ? ' is-fresh' : ''}`}>
                     <span className="feed__icon" title={`Источник: ${a.source}`}><Icon name={SOURCE_ICON[a.source] ?? 'sync'} size={16} /></span>
-                    <span className="feed__text">{a.text}<span className="sub">{a.source === 'сайт' ? 'с сайта' : a.source === 'бот' ? 'через бота' : 'в таблице'}, {a.when.slice(11)}</span></span>
+                    <span className="feed__text"><TableText text={a.text} /><span className="sub">{a.source === 'сайт' ? 'с сайта' : a.source === 'бот' ? 'через бота' : 'в таблице'}, {a.when.slice(11)}</span></span>
                   </li>
                 ))}
               </ul>
