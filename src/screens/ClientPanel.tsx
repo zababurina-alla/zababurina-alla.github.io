@@ -246,6 +246,22 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                     </dl>
                   ) : <p className="sub">Начисления ТОВ считаются по отчётности.</p>}
                 </section>
+                {/* «Связь» — как достучаться до клиента: телефон, почта, бот. Отдельным блоком над фактами (координатор). */}
+                <section className="cp__block" aria-labelledby={`${c.id}-contact`}>
+                  <h3 id={`${c.id}-contact`} className="cp__h">Связь</h3>
+                  <ul className="contact">
+                    <li className="contact__row"><Icon name="call" tile="accent" />
+                      <div className="contact__body"><span className="contact__label">Телефон</span><PhoneField clientId={c.id} phone={c.phone} version={c.version} /></div></li>
+                    <li className="contact__row"><Icon name="email" tile="accent" />
+                      <div className="contact__body"><span className="contact__label">Почта</span><EditableField clientId={c.id} value={c.email ?? ''} version={c.version} label="Почта" inputMode="email"
+                        empty="не указана" onSave={(v, base) => store.updateEmail(c.id, v, base)} /></div></li>
+                    {c.botConnected !== undefined && (
+                      <li className="contact__row"><Icon name="bot" tile={c.botConnected ? 'green' : 'grey'} />
+                        <div className="contact__body"><span className="contact__label">Telegram-бот</span>
+                          <p className={`contact__bot${c.botConnected ? ' is-on' : ''}`}>{c.botConnected ? 'подключён — уведомления уходят клиенту' : 'не подключён — уведомлений клиенту нет'}</p></div></li>
+                    )}
+                  </ul>
+                </section>
                 <section className="cp__block cp__facts">
                   <div><h3 className="cp__h">Ключ ЭЦП</h3>{keyDays === null ? <p className="cp__key"><Icon name="inactive" size={18} className="urgency--grey" /><span className="nil">ключа нет в таблице</span></p>
                     : <p className="cp__key"><Icon name={URGENCY_ICON[statusByDays(keyDays)]} size={18} className={`urgency--${statusByDays(keyDays)}`} /><span className="num">до {fmtDate(c.keyUntil ?? '')}</span><span className={`due--${statusByDays(keyDays)}`}>{daysLabel(keyDays)}</span></p>}{c.keyFrom && <p className="sub">выпущен {fmtDate(c.keyFrom)}</p>}<KeyRenew c={c} />
@@ -254,12 +270,6 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                     )}
                     {remindKey && <RemindDialog open onClose={() => setRemindKey(false)} client={c} keyReminder />}</div>
                   <div><h3 className="cp__h">Ключ выпущен</h3><p>{c.keyIssuer ? <TableText text={c.keyIssuer} tidy /> : <span className="nil">не указано</span>}</p></div>
-                  <div><h3 className="cp__h">Телефон</h3><PhoneField clientId={c.id} phone={c.phone} version={c.version} /></div>
-                  <div><h3 className="cp__h">Почта</h3><EditableField clientId={c.id} value={c.email ?? ''} version={c.version} label="Почта" inputMode="email"
-                    empty="не указана" onSave={(v, base) => store.updateEmail(c.id, v, base)} /></div>
-                  {c.botConnected !== undefined && (
-                    <div><h3 className="cp__h">Telegram-бот</h3><p>{c.botConnected ? 'подключён — уведомления уходят клиенту' : <span className="nil">не подключён — уведомлений клиенту нет</span>}</p></div>
-                  )}
                   <div><h3 className="cp__h">Пароль от кабинета</h3><PasswordReveal clientId={c.id} /></div>
                 </section>
                 <section className="cp__block">
