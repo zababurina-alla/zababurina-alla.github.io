@@ -108,6 +108,11 @@ export const INBOX: InboxItem[] = [
   // Ясенко — вопрос
   { id: 'in3', at: '2026-10-13T19:05', clientId: 'c5', clientName: 'Ясенко Микола', type: 'question',
     snippet: 'Чи треба мені подавати щось через новий КВЕД?', amount: null, status: 'new' },
+  // Поручение и голосовое (сервер 16.10)
+  { id: 'in10', at: '2026-10-14T07:40', clientId: 'c5', clientName: 'Ясенко Микола', type: 'order',
+    snippet: 'Оплатіть, будь ласка, оренду землі до п’ятниці, 12 000', amount: 1200000, status: 'new' },
+  { id: 'in11', at: '2026-10-14T07:42', clientId: 'c5', clientName: 'Ясенко Микола', type: 'voice',
+    snippet: '🎤 голосове, 0:37', amount: null, status: 'new' },
   // Неизвестный номер — свой чат по имени
   { id: 'in4', at: '2026-10-13T12:10', clientId: null, clientName: 'Невідомий номер +380…', type: 'question',
     snippet: 'Добрий день, мені порадили вас як бухгалтера', amount: null, status: 'new' },

@@ -20,7 +20,7 @@ import type { Change, DeadlinePatch, InboxAction, RemindPreview, RemindRequest, 
 import type { Activity, Client, DatedDeadline, Deadline, InboxItem, Payment, Question, SaveState, Task } from './types';
 import { isDated } from './types';
 import { TODAY, addDays, fmtDate, plural } from '../lib/dates';
-import { play, soundSettings } from '../lib/sound';
+import { play } from '../lib/sound';
 import { threadKey } from '../lib/inboxThreads';
 
 // Опрос изменений из таблицы: бриф — раз в 30–60 с. Квоты Apps Script дневного лимита на запросы не задают
@@ -243,8 +243,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             setInbox((xs) => {
               if (!xs.some((x) => x.id === rec.id)) {
                 setNotices((ns) => [...ns, { id: `in-${rec.id}`, text: `Новое сообщение: ${rec.clientName} — «${rec.snippet.slice(0, 60)}${rec.snippet.length > 60 ? '…' : ''}»`, info: true, key: `inbox-new-${rec.id}`, href: `#/inbox/${encodeURIComponent(threadKey(rec))}` }]);
-                // Звук на новое сообщение — даже без нажатия (владелец, 16.10).
-                if (soundSettings.on) play('incoming', true); // force — без нажатия; on — «выкл» и «ночью тихо» соблюдаются
+                // Звук «сообщение» играет FailureWatcher (оформление), здесь — только уведомление.
               }
               return upsert(xs, rec);
             });

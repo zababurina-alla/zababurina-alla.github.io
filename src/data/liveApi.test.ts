@@ -341,4 +341,11 @@ describe('живой адаптер: чтение', () => {
     const c = await api.write({ kind: 'decideInbox', requestId: 'R2', id: 'I-1', action: 'accept' });
     expect(!c.ok && [c.code, c.current && 'status' in c.current ? c.current.status : null]).toEqual(['CONFLICT', 'accepted']);
   });
+  it('входящие 16.10: order / voice / tax читаются как есть; незнакомый тип — как вопрос (экран не падает)', async () => {
+    const base = { version: 1, at: '2026-10-16T09:00', clientId: 'C-1', clientName: 'К', snippet: '…', amount: null, status: 'new' };
+    const s = server(ok({ clients: [], deadlines: [], payments: [], tasks: [], activity: [], cursor: 1,
+      inbox: ['order', 'voice', 'tax', 'sticker'].map((type, n) => ({ ...base, id: `I-${n}`, type })) }));
+    const snap = await new LiveApi(URL_, auth(), s.fetchImpl).snapshot();
+    expect(snap.inbox.map((x) => x.type)).toEqual(['order', 'voice', 'tax', 'question']);
+  });
 });

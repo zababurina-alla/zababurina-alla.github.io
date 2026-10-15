@@ -23,11 +23,15 @@ import { roAttrs } from '../ui/readonly';
 import { shortName } from '../ui/names';
 import { useUi } from '../app/ui-context';
 
-export const INBOX_TYPE: Record<InboxType, { label: string; icon: IconName }> = {
-  payment: { label: 'Платёж', icon: 'wallet' },
-  document: { label: 'Документ', icon: 'documents' },
-  question: { label: 'Вопрос', icon: 'questions' },
-  file: { label: 'Файл', icon: 'documents' },
+/** accept — главная кнопка, как в боте: у платежа — «Записать», у остальных сервер ставит задачу своего вида. */
+export const INBOX_TYPE: Record<InboxType, { label: string; icon: IconName; accept: string }> = {
+  payment: { label: 'Платёж', icon: 'wallet', accept: 'Записать' },
+  tax: { label: 'Налог', icon: 'taxPay', accept: 'Принято' },
+  order: { label: 'Поручение', icon: 'transfer', accept: 'В задачи: оплатить' },
+  document: { label: 'Документ', icon: 'documents', accept: 'Принято' },
+  question: { label: 'Вопрос', icon: 'questions', accept: 'В задачи: ответить' },
+  voice: { label: 'Голосовое', icon: 'mic', accept: 'В задачи: ответить' },
+  file: { label: 'Файл', icon: 'documents', accept: 'Принято' },
 };
 
 const DONE_LABEL: Record<Exclude<InboxStatus, 'new'>, string> = { accepted: 'принято', task: 'задача создана', rejected: 'отклонено' };
@@ -73,7 +77,7 @@ function InboxActions({ it }: { it: InboxItem }) {
           <button type="button" className="btn btn--secondary btn--sm" onClick={() => (can ? setEditing(true) : decide('accept'))} {...roAttrs('inbox')}>{it.amount ? 'Изменить сумму' : 'Указать сумму'}</button>
         </>
       ) : it.clientId && (
-        <button type="button" className="btn btn--primary btn--sm" onClick={() => decide('accept')} {...roAttrs('inbox')}>Принято</button>
+        <button type="button" className="btn btn--primary btn--sm" onClick={() => decide('accept')} {...roAttrs('inbox')}>{INBOX_TYPE[it.type].accept}</button>
       )}
       {it.taxKopecks ? <button type="button" className="btn btn--secondary btn--sm" onClick={() => decide('taxTask')} {...roAttrs('inbox')}>Задача по налогу</button> : null}
       <button type="button" className="btn btn--secondary btn--sm" onClick={() => decide('task')} {...roAttrs('inbox')}>Задача</button>
@@ -96,7 +100,10 @@ export function InboxCard({ it, compact = false }: { it: InboxItem; compact?: bo
         <span className="sub num">{when(it.at)}</span>
         {it.file && <span className="tag inbox__file" title="К сообщению приложен файл — он в Telegram"><Icon name="attach" size={14} />файл</span>}
       </div>
-      <p className="inbox__snippet">«{it.snippet}»</p>
+      {voiceText(it) !== null
+        ? <p className="inbox__snippet inbox__voice"><Icon name="mic" size={16} />{voiceText(it) || 'Голосовое — послушать в Telegram'}</p>
+        : <p className="inbox__snippet">«{it.snippet}»</p>}
+      {it.type === 'order' && it.amount ? <p className="sub inbox__tax">Оплатить за клиента: {formatMoney(it.amount)}</p> : null}
       {it.taxKopecks ? <p className="sub inbox__tax">В сообщении и налог: {formatMoney(it.taxKopecks)}</p> : null}
       {it.status !== 'new'
         ? <p className="sub inbox__done"><Icon name="check" size={14} />{DONE_LABEL[it.status]}</p>
@@ -123,13 +130,23 @@ function doneText(it: InboxItem): string {
   return it.decidedAt ? `${what} · ${hhmm(it.decidedAt)}` : what;
 }
 
+/** Голосовое: текст без «🎤» в начале (эмодзи в строках сайта не показываем — свой значок). null — не голосовое. */
+function voiceText(it: InboxItem): string | null {
+  if (it.type !== 'voice') return null;
+  const t = it.snippet.replace(/^\p{Extended_Pictographic}️?\s*/u, '').trim();
+  return t === '…' || t === '...' ? '' : t;
+}
+
 function Bubble({ it, i }: { it: InboxItem; i: number }) {
   const t = INBOX_TYPE[it.type];
   return (
     <li className={`bubble${it.status === 'new' ? ' is-new' : ''}`} style={{ '--i': i } as CSSProperties}>
       <div className="bubble__box">
         <span className="bubble__type"><Icon name={t.icon} size={14} />{t.label}</span>
-        <p className="bubble__text">{it.snippet}</p>
+        {voiceText(it) !== null
+          ? <p className="bubble__voice"><Icon name="mic" size={18} /><span>{voiceText(it) || 'Голосовое — послушать в Telegram'}</span></p>
+          : <p className="bubble__text">{it.snippet}</p>}
+        {it.type === 'order' && it.amount ? <p className="bubble__order">Оплатить за клиента: <span className="num">{formatMoney(it.amount)}</span></p> : null}
         {it.file && <span className="bubble__file"><Icon name="attach" size={16} />Файл — в Telegram</span>}
         {it.taxKopecks ? <p className="bubble__tax">В сообщении и налог: <span className="num">{formatMoney(it.taxKopecks)}</span></p> : null}
         <time className="bubble__time num" dateTime={it.at}>{hhmm(it.at)}</time>
@@ -224,7 +241,7 @@ export function Inbox() {
                     <Avatar name={c.name} {...(c.clientId ? { clientId: c.clientId } : {})} />
                     <span className="chat__top"><strong className="chat__name">{c.clientId ? shortName(c.name) : c.name}</strong><span className="chat__time num">{listTime(c.last.at)}</span></span>
                     <span className="chat__bottom">
-                      <span className="chat__snippet">{c.last.file && <Icon name="attach" size={14} />}{c.last.snippet}</span>
+                      <span className="chat__snippet">{c.last.file && <Icon name="attach" size={14} />}{voiceText(c.last) !== null ? <><Icon name="mic" size={14} />{voiceText(c.last) || 'Голосовое'}</> : c.last.snippet}</span>
                       {c.unread > 0 && <span className="chat__badge num" aria-label={`новых: ${c.unread}`}>{c.unread}</span>}
                     </span>
                   </a>

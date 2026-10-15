@@ -227,6 +227,12 @@ class FakeServer implements CabinetApi {
             const p: Payment = { id: `${o}`, version: this.cursor + 1, clientId: it.clientId, kopecks, period: 'Октябрь 2026', method: 'bank', date: TODAY, source: 'сайт' };
             this.payments.set(p.id, p);
             changes.push(this.record('payment', 'upsert', p.id, o, p));
+          } else {
+            const text = it.type === 'order' ? `Оплатить за ${it.clientName}${it.amount ? ` ${formatPayMoney(it.amount)}` : ''}`
+              : it.type === 'question' || it.type === 'voice' ? `Ответить ${it.clientName}` : `${it.clientName}: ${it.snippet.slice(0, 60)}`;
+            const t: Task = { id: `${o}`, version: this.cursor + 1, clientId: it.clientId, text, due: null, type: it.type === 'order' || it.type === 'tax' ? 'taxes' : 'call', priority: 'medium', done: false };
+            this.tasks.set(t.id, t);
+            changes.push(this.record('task', 'upsert', t.id, o, t));
           }
         } else if (op.action === 'task') {
           status = 'task';

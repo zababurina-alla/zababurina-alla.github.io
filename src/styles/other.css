@@ -412,6 +412,19 @@
   margin: 0;
 }
 
+/* Голосовое на карточке «Сегодня»: значок микрофона вместо эмодзи */
+.inbox__voice {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink-2);
+  font-style: italic;
+}
+
+.inbox__voice > .icon {
+  color: var(--accent);
+}
+
 /* «файл» в шапке — нейтральная метка со скрепкой: отличается от метки типа сообщения (та — «море») */
 .inbox__file {
   background: var(--surface-sunk);
@@ -987,6 +1000,33 @@
   color: var(--wheat-ink);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
+}
+
+/* Поручение: «Оплатить за клиента: N» — плашкой «море», это деньги, которые маме платить самой */
+.bubble__order {
+  justify-self: start;
+  margin: 0;
+  padding: 4px var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+/* Голосовое: значок микрофона и подпись вместо текста */
+.bubble__voice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--ink-2);
+  font-style: italic;
+}
+
+.bubble__voice > .icon {
+  flex: none;
+  color: var(--accent);
 }
 
 .bubble__time {
