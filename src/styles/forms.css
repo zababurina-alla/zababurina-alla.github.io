@@ -391,6 +391,26 @@
   margin-top: var(--space-1);
 }
 
+/* Сервер заранее сказал «у клиента нет бота» / «тестовый клиент»: спокойная пшеничная плашка, как в меню «Действия»
+   в режиме просмотра (.dactions__ro) — не ошибка, а объяснение, почему «Отправить» неактивна */
+.remind__blocked {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--wheat-soft);
+  color: var(--wheat-ink);
+  line-height: 1.45;
+  text-wrap: pretty; /* без одного слова на второй строке */
+}
+
+.remind__blocked > .icon {
+  flex: none;
+  margin-top: 1px;
+}
+
 /* Карточка клиента, блок ключа: «Напомнить про ключ» под продлением, по левому краю */
 .cp__remind {
   justify-self: start;
