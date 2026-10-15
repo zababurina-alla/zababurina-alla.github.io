@@ -58,6 +58,16 @@ export function apiUrl(): string {
   return pickApiUrl(import.meta.env.MODE, runtime.apiUrl, import.meta.env.VITE_API_URL ?? '');
 }
 
+/** Учебный режим: всё «в таблице» — в учебной (находка «Пользователя» № 3: «записано в таблицу» было неправдой). */
+export function demoWords(s: string): string {
+  return isLive() ? s : s.replace(/ в таблицу/g, ' в учебную таблицу').replace(/ в таблице/g, ' в учебной таблице');
+}
+
+/** Учебный режим включён ссылкой ?demo=1 на сайте, где есть настоящий кабинет, — из него можно выйти. */
+export function canLeaveDemo(): boolean {
+  return Boolean(apiUrl() && GOOGLE_CLIENT_ID) && !isLive();
+}
+
 /** Живой режим: адрес задан и не включён показ на выдуманных данных (?demo=1). */
 export function isLive(): boolean {
   if (!apiUrl() || !GOOGLE_CLIENT_ID) return false;
@@ -87,6 +97,14 @@ export function visibleAreas(): WriteArea[] {
 export function readOnlyAreas(): WriteArea[] {
   return isLive() ? visibleAreas().filter((a) => !runtime.writes.includes(a)) : [];
 }
+
+/** Бот, где мама отвечает на вопросы и решает сообщения, пока на сайте это выключено (публичное имя бота). */
+export const BOT_URL = 'https://t.me/za_control_bot';
+
+/** Где это делать, пока раздел на сайте только для просмотра. */
+export const AREA_PLACE: Record<WriteArea, 'table' | 'telegram'> = {
+  payments: 'table', tasks: 'table', questions: 'telegram', deadlines: 'table', clients: 'table', inbox: 'telegram', remind: 'telegram',
+};
 
 export const AREA_LABEL: Record<WriteArea, string> = {
   payments: 'платежи', tasks: 'задачи', questions: 'ответы на вопросы', deadlines: 'сроки', clients: 'клиенты', inbox: 'входящие', remind: 'напоминания клиентам',

@@ -17,13 +17,24 @@ export function readSnap(): Snapshot | null {
   }
 }
 
+/** Когда снимок вкладки был свежим (мс) — для «Показываю данные на 09:40» при обрыве. */
+export function readSnapAt(): number | null {
+  try {
+    const n = Number(sessionStorage.getItem(`${KEY}.at`));
+    return Number.isFinite(n) && n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+
 export function saveSnap(s: Snapshot): void {
   try {
     const raw = JSON.stringify(s);
     if (raw.length <= MAX_CHARS) sessionStorage.setItem(KEY, raw); else sessionStorage.removeItem(KEY);
+    sessionStorage.setItem(`${KEY}.at`, String(Date.now()));
   } catch { /* частный режим или переполнено — без кэша, как раньше */ }
 }
 
 export function clearSnap(): void {
-  try { sessionStorage.removeItem(KEY); } catch { /* нечего чистить */ }
+  try { sessionStorage.removeItem(KEY); sessionStorage.removeItem(`${KEY}.at`); } catch { /* нечего чистить */ }
 }

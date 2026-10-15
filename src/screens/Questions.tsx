@@ -1,7 +1,8 @@
 // Вопросы Дмитрия маме: ответ кнопками или полем, «Позже» (только на сайте, localStorage — ui/later.ts),
 // весь список — по клиентам. Одна деталь на «Сегодня»; ответ на вопрос — и в карточке клиента.
 import { useState } from 'react';
-import { canWrite } from '../config';
+import { BOT_URL, canWrite } from '../config';
+import { HOLD_MS } from '../data/store';
 import { useStore } from '../data/store';
 import type { Question } from '../data/types';
 import { fmtDayMonth, plural } from '../lib/dates';
@@ -16,11 +17,24 @@ export function QuestionAnswer({ q }: { q: Question }) {
   const store = useStore();
   const toast = useToast();
   const [text, setText] = useState('');
-  if (!canWrite('questions')) return null;
+  // Запись ответов выключена — не пустота, а куда идти (находка «Пользователя» № 1).
+  if (!canWrite('questions')) {
+    return (
+      <div className="question__answers question__answers--ro">
+        <span className="sub">На сайте ответить пока нельзя.</span>
+        <a className="btn btn--secondary btn--sm" href={BOT_URL} target="_blank" rel="noopener noreferrer"><Icon name="bot" size={16} />Ответить в Telegram</a>
+      </div>
+    );
+  }
   const send = (value: string) => {
     const v = value.trim();
     if (!v) return;
-    store.answerQuestion(q.id, v, () => toast({ text: `Ответ «${v}» записан в таблицу` }));
+    // 10 с на «Отменить»: нажатая не та кнопка не уходит в таблицу (находка № 2).
+    const rid = store.answerQuestion(q.id, v, () => toast({ text: `Ответ «${v}» записан в таблицу` }));
+    toast({ text: `Ответ «${v}» — отправлю через 10 с`, tone: 'info', timeout: HOLD_MS, action: { label: 'Отменить', run: () => {
+      void store.undoHeld(rid).then((ok) => toast(ok ? { text: 'Ответ отменён — вопрос снова в списке', tone: 'info' }
+        : { text: 'Ответ уже в таблице — исправить можно в таблице', tone: 'info' }));
+    } } });
   };
   if (q.type === 'choice') {
     return (
@@ -44,7 +58,7 @@ function QuestionItem({ q, later }: { q: Question; later: boolean }) {
       <p className="question__text"><TableText text={q.text} /></p>
       <QuestionAnswer q={q} />
       <p className="question__foot sub">
-        <span>{q.askedAt ? `${fmtDayMonth(q.askedAt.slice(0, 10))}, ${q.askedAt.slice(11, 16)} · ` : ''}можно ответить и в Telegram-боте</span>
+        <span>{q.askedAt ? `${fmtDayMonth(q.askedAt.slice(0, 10))}, ${q.askedAt.slice(11, 16)}` : ''}{canWrite('questions') ? `${q.askedAt ? ' · ' : ''}можно ответить и в Telegram-боте` : ''}</span>
         <button type="button" className="link question__later" onClick={() => setLater(q.id, !later)}>
           <Icon name={later ? 'undo' : 'later'} size={16} />{later ? 'Вернуть' : 'Позже'}
         </button>

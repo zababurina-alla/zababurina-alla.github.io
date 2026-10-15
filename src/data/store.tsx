@@ -12,7 +12,7 @@ import { canWrite, hasFeature, isLive } from '../config';
 import { roMessage } from '../ui/readonly';
 import type { WriteArea } from '../config';
 import { kvAll, kvDelete, kvSet } from './idb';
-import { readSnap, saveSnap } from './snapCache';
+import { readSnap, readSnapAt, saveSnap } from './snapCache';
 import { Outbox } from './outbox';
 import type { Counters, OutboxEvent, OutboxItem } from './outbox';
 import { newRequestId } from './api';
@@ -27,6 +27,8 @@ import { threadKey } from '../lib/inboxThreads';
 // (developers.google.com/apps-script/guides/services/quotas), но одновременных выполнений — 30 на владельца.
 const POLL_MS = 30_000;
 const FRESH_MS = 2600;
+/** Окно «Отменить» до отправки для решений, которые сервер вернуть не умеет; столько же живёт уведомление. */
+export const HOLD_MS = 10_000;
 
 export type CloseResult = { ok: true } | { ok: false; reason: string };
 export type ExternalKind = 'payment' | 'key' | 'close' | 'phone' | 'inbox';
@@ -50,6 +52,8 @@ type Applied = Pick<Extract<WriteResult, { ok: true }>, 'notifyAt' | 'failed' | 
 interface Store {
   loaded: boolean;
   online: boolean;
+  /** Когда данные на экране последний раз сошлись с таблицей (мс); null — ещё ни разу. */
+  syncedAt: number | null;
   clients: Client[];
   /** Открытые сроки с датой — раскладываются по дням. */
   deadlines: DatedDeadline[];
@@ -96,7 +100,11 @@ interface Store {
   /** Открытые вопросы заново (questions.list) — без перезагрузки снимка. */
   refreshQuestions: () => Promise<void>;
   /** Решение по сообщению из «Входящих» (inbox.decide). amount — копейки, если мама поправила сумму. */
-  decideInbox: (id: string, action: InboxAction, amount?: number) => void;
+  /** Возвращает requestId: «Нет» ждёт 10 с в окне «Отменить» (undoHeld), остальное уходит сразу. */
+  decideInbox: (id: string, action: InboxAction, amount?: number) => string;
+  /** «Отменить» в окне 10 с (ответ на вопрос, «Нет» во «Входящих»): запись не уходит, на экране — как было.
+   *  false — окно кончилось, запись уже в таблице. */
+  undoHeld: (requestId: string) => Promise<boolean>;
   /** clients.remind — напомнить клиенту в Telegram (под writes.deadlines). Ответ — сразу, мимо очереди. */
   remindClient: (req: RemindRequest) => Promise<RemindResult>;
   /** Черновик напоминания от сервера (пробный запуск) — только если сервер это умеет (features: remindPreview). */
@@ -108,7 +116,8 @@ interface Store {
   /** Удалить задачу (tasks.delete). «Вернуть» нет — на экране подтверждение перед удалением. */
   deleteTask: (id: string) => void;
   /** Ответ на вопрос маме (questions.answer). */
-  answerQuestion: (id: string, text: string, onSaved?: () => void) => void;
+  /** Ответ ждёт 10 с в окне «Отменить» (undoHeld); возвращает requestId. */
+  answerQuestion: (id: string, text: string, onSaved?: () => void) => string;
   dismissNotice: (id: string) => void;
   toggleTask: (id: string, done: boolean) => void;
   resolveConflict: (keep: 'mine' | 'theirs') => void;
@@ -164,6 +173,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   /** На экране снимок из прошлой загрузки этой вкладки, свежий ещё не пришёл. */
   const [stale, setStale] = useState(false);
+  const [syncedAt, setSyncedAt] = useState<number | null>(null);
   const [attempt, setAttempt] = useState(0);
   /** Вопросы, убранные с экрана до ответа сервера, — вернуть, если ответ не записался. */
   const answering = useRef(new Map<string, Question>());
@@ -434,12 +444,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     void (async () => {
       // Обновили вкладку — прошлый снимок этой вкладки сразу, свежий следом (п. 20: первый экран ждал 7–9 с).
       const cached = isLive() ? readSnap() : null;
-      if (cached) { applySnapshot(cached, false); setStale(true); setLoaded(true); }
+      if (cached) { applySnapshot(cached, false); setStale(true); setLoaded(true); setSyncedAt(readSnapAt()); }
       try {
         const snap = await api.snapshot();
         if (!alive) return;
         applySnapshot(snap);
         if (isLive()) saveSnap(snap);
+        setSyncedAt(Date.now());
         setStale(false);
         setLoadError(null);
       } catch (e) {
@@ -464,6 +475,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     try {
       const res = await api.changesSince(cursorRef.current);
       setOnlineState(true);
+      setSyncedAt(Date.now());
       applyChanges(res.changes);
       cursorRef.current = Math.max(cursorRef.current, res.cursor);
       setCursor(cursorRef.current);
@@ -497,7 +509,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => { window.clearInterval(t); document.removeEventListener('visibilitychange', tick); window.removeEventListener('online', tick); };
   }, [syncNow]);
 
-  const send = useCallback((op: WriteOp, label: string, onApplied?: (changes: Change[], result: Applied) => void, showAfterMs = 0) => {
+  const send = useCallback((op: WriteOp, label: string, onApplied?: (changes: Change[], result: Applied) => void, showAfterMs = 0, holdMs = 0) => {
     // Раздел ещё только для просмотра (config.json → writes): в таблицу не пишем, говорим, где сделать.
     const area = AREA_OF[op.kind];
     if (!canWrite(area)) {
@@ -510,7 +522,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // в фоновой вкладке кадры почти не идут, а запись ждать не должна).
     if (showAfterMs > 0) window.setTimeout(() => applyOptimistic(op), showAfterMs);
     else applyOptimistic(op);
-    void outboxRef.current?.enqueue(op, label);
+    void outboxRef.current?.enqueue(op, label, holdMs);
   }, [applyOptimistic]);
 
   const client = useCallback((id: string) => clients.find((c) => c.id === id), [clients]);
@@ -733,12 +745,33 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const it = inbox.find((x) => x.id === id);
     const label = action === 'accept' ? `Принять: ${it?.clientName ?? 'сообщение'}` : action === 'task' ? `Задача из сообщения: ${it?.clientName ?? ''}`
       : action === 'taxTask' ? `Задача по налогу: ${it?.clientName ?? ''}` : `Отклонить: ${it?.clientName ?? 'сообщение'}`;
-    send({ kind: 'decideInbox', requestId: newRequestId(), id, action, ...(amount !== undefined ? { amount } : {}) }, label);
+    const requestId = newRequestId();
+    // «Нет» сервер вернуть не умеет — 10 с на «Отменить» до отправки (находка «Пользователя» № 15).
+    send({ kind: 'decideInbox', requestId, id, action, ...(amount !== undefined ? { amount } : {}) }, label, undefined, 0, action === 'reject' ? HOLD_MS : 0);
+    return requestId;
   }, [inbox, send]);
 
   const answerQuestion = useCallback((id: string, text: string, onSaved?: () => void) => {
-    send({ kind: 'answerQuestion', requestId: newRequestId(), id, text }, 'Ответ на вопрос', () => onSaved?.());
+    const requestId = newRequestId();
+    // Ответ в таблице сайт изменить не может — 10 с на «Отменить» до отправки (находка № 2).
+    send({ kind: 'answerQuestion', requestId, id, text }, 'Ответ на вопрос', () => onSaved?.(), 0, HOLD_MS);
+    return requestId;
   }, [send]);
+
+  const undoHeld = useCallback(async (requestId: string) => {
+    const ob = outboxRef.current;
+    const op = ob?.list().find((i) => i.op.requestId === requestId)?.op;
+    if (!ob || !op || !(await ob.cancelHeld(requestId))) return false;
+    mine.current.delete(requestId);
+    callbacks.current.delete(requestId);
+    if (op.kind === 'decideInbox') setInbox((xs) => xs.map((x) => (x.id === op.id ? { ...x, status: 'new' } : x)));
+    if (op.kind === 'answerQuestion') {
+      const q = answering.current.get(requestId);
+      if (q) setQuestions((xs) => upsert(xs, q));
+      answering.current.delete(requestId);
+    }
+    return true;
+  }, []);
 
   const dismissNotice = useCallback((id: string) => setNotices((ns) => ns.filter((n) => n.id !== id)), []);
 
@@ -747,11 +780,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const setMaintenance = useCallback((on: boolean) => { fakeServer.maintenance = on; if (!on) void outboxRef.current?.kick(true); }, []);
 
   const value = useMemo<Store>(() => ({
-    loaded, online, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview,
+    loaded, online, syncedAt, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance,
-  }), [loaded, online, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview,
+  }), [loaded, online, syncedAt, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

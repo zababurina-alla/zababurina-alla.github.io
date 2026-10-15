@@ -15,7 +15,7 @@ import type { IconName } from '../ui/Icon';
 import type { RouteName } from '../router';
 import { navigate, toHash } from '../router';
 import { useUi } from './ui-context';
-import { readOnlyAreas, visibleAreas } from '../config';
+import { demoWords, readOnlyAreas, visibleAreas } from '../config';
 import '../ui/fx';
 import { BrandMark } from '../ui/BrandMark';
 
@@ -129,7 +129,8 @@ function SyncStatus() {
       </p>
     );
   }
-  const state = failed ? 'is-failed' : !online && waiting ? 'is-offline' : waiting ? 'is-saving' : '';
+  // Нет связи — точка не зелёная, даже когда ничего не ждёт отправки (находка № 4).
+  const state = failed ? 'is-failed' : !online ? 'is-offline' : waiting ? 'is-saving' : '';
   const text = failed ? `Не сохранилось: ${failed}`
     : !online && waiting ? `Нет связи — ждут отправки: ${waiting}`
       : waitReason ? waitReason
@@ -138,7 +139,7 @@ function SyncStatus() {
   return (
     <p className={`sync ${state}`} role="status">
       <span className="sync__dot" aria-hidden="true" />
-      <span className="sync__text">{text}</span>
+      <span className="sync__text">{demoWords(text)}</span>
     </p>
   );
 }

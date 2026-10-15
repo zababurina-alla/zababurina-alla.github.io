@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ReactNode } from 'react';
+import { demoWords } from '../config';
 import { Icon } from './Icon';
 import type { IconName } from './Icon';
 
@@ -83,7 +84,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     window.setTimeout(() => setItems((xs) => xs.filter((x) => x.id !== id)), 180);
   }, []);
   const push = useCallback((t: ToastInput) => {
-    setItems((xs) => (t.key && xs.some((x) => x.key === t.key && !x.leaving) ? xs : [...xs.slice(-2), { ...t, id: Date.now() + Math.random() }]));
+    setItems((xs) => (t.key && xs.some((x) => x.key === t.key && !x.leaving) ? xs : [...xs.slice(-2), { ...t, text: demoWords(t.text), id: Date.now() + Math.random() }]));
   }, []);
   return (
     <Ctx.Provider value={push}>

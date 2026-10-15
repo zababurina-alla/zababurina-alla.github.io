@@ -4,12 +4,15 @@ import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../data/store';
 import { kindLabel } from '../data/fake';
 import { fold, search } from '../lib/search';
+import { splitFieldQuery } from '../lib/fieldQuery';
+import type { ClientField } from '../lib/fieldQuery';
+import type { Client } from '../data/types';
 import { navigate } from '../router';
 import { toggleTheme } from '../lib/theme';
 import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
 import { useUi } from './ui-context';
-import { TODAY, daysBetween, daysLabel } from '../lib/dates';
+import { TODAY, daysBetween, daysLabel, fmtDate } from '../lib/dates';
 import { formatPayMoney } from '../lib/money';
 import { obligationKind } from '../lib/obligation';
 import { OBLIGATION_ICON } from '../ui/obligationIcon';
@@ -18,6 +21,15 @@ import { splitEmoji } from '../ui/TableText';
 
 
 interface Item { id: string; group: string; label: string; hint?: string | undefined; icon: IconName; run: () => void }
+
+/** «ромашко ключ» — в строке клиента сразу нужное поле (пароль не показываем: только «Показать» в карточке). */
+function fieldHint(c: Client, f: ClientField): string {
+  if (f === 'key') return c.keyUntil ? `ключ до ${fmtDate(c.keyUntil)}` : 'ключа нет в таблице';
+  if (f === 'phone') return c.phone || 'телефона нет в таблице';
+  if (f === 'password') return 'пароль — в карточке, «Показать»';
+  if (f === 'kved') return c.kved.length ? `КВЕД ${c.kved.map((k) => k.code).join(', ')}` : 'КВЕД не указан';
+  return c.email || 'почты нет в таблице';
+}
 
 export function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
   const store = useStore();
@@ -48,10 +60,15 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     { id: 'r-keys', group: 'Разделы', label: 'Ключи ЭЦП', icon: 'keys', run: () => navigate('#/keys') },
     { id: 'r-ref', group: 'Разделы', label: 'Справочник', icon: 'reference', run: () => navigate('#/reference') },
   ];
+  // «фамилия + поле» (находка «Пользователя» № 11): клиент ищется по имени, в строке — нужное поле.
+  const fq = splitFieldQuery(q);
+  const clientItems = store.clients.map((c) => ({ ...c, extra: [...c.kved.map((k) => k.code), c.phone],
+    words: [...c.kved.map((k) => k.title), c.keyIssuer, ...store.deadlines.filter((d) => d.clientId === c.id).map((d) => d.what)] }));
+  const byField = fq.field ? search(clientItems, fq.name) : [];
+  const field = byField.length ? fq.field : null;
   const clients: Item[] = q
-    ? search(store.clients.map((c) => ({ ...c, extra: [...c.kved.map((k) => k.code), c.phone],
-      words: [...c.kved.map((k) => k.title), c.keyIssuer, ...store.deadlines.filter((d) => d.clientId === c.id).map((d) => d.what)] })), q).slice(0, 6)
-      .map((c) => ({ id: c.id, group: 'Клиенты', label: c.name, hint: kindLabel(c.kind), icon: 'fop' as IconName, run: () => ui.openClient(c.id) }))
+    ? (field ? byField : search(clientItems, q)).slice(0, 6)
+      .map((c) => ({ id: c.id, group: 'Клиенты', label: c.name, hint: field ? fieldHint(c, field) : kindLabel(c.kind), icon: 'fop' as IconName, run: () => ui.openClient(c.id) }))
     : [];
   // Сроки, задачи и платежи — по имени клиента и тексту («ромашко єсв», «первичка», «1500»), от 2 букв.
   // Ищем той же читалкой, что и клиентов (search техники сайта): имя клиента + текст записи.

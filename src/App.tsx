@@ -18,7 +18,7 @@ import { Skeleton } from './app/Skeleton';
 import { ScreenBoundary } from './app/ScreenBoundary';
 import { DebugDock } from './app/DebugDock';
 import { CommandPalette } from './app/CommandPalette';
-import { ConflictDialog, FailureWatcher, OfflineBanner } from './app/SyncUi';
+import { ConflictDialog, DemoBanner, FailureWatcher, OfflineBanner } from './app/SyncUi';
 import { Login } from './app/Login';
 import { auth, useAuth } from './data/session';
 import { ServerDown, ReadOnlyBanner } from './app/SyncUi';
@@ -61,6 +61,7 @@ function Screens() {
   return (
     <UiCtx.Provider value={ui}>
       <Shell route={route.name}>
+        <DemoBanner />
         <OfflineBanner />
         <ReadOnlyBanner />
         {store.loadError && <ServerDown message={store.loadError} onRetry={store.reload} />}
