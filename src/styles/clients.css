@@ -516,3 +516,20 @@
   flex-wrap: wrap;
   gap: var(--space-2);
 }
+
+/* Сумма в месяц под именем — только на узком листе, где колонки «В месяц» нет (№ 21) */
+.ctable__month-inline {
+  display: none;
+}
+
+@container (max-width: 1099px) {
+  .ctable__month-inline {
+    display: inline;
+  }
+}
+
+@container (min-width: 760px) and (max-width: 1099px) {
+  .ctable__month-inline {
+    display: none;
+  }
+}

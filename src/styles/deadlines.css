@@ -644,3 +644,51 @@
   box-shadow: inset 0 0 0 1px var(--line);
   animation: warn-in var(--dur-pop) var(--spring-pop);
 }
+
+/* Быстрые действия в строке срока: позвонить, платёж, «…». На мыши — проступают при наведении на строку,
+   на пальце и с клавиатуры — видны всегда. */
+.dtable__tools {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  margin: -6px 0;
+}
+
+.dtable__tool,
+.dtable__tools .dactions__toggle {
+  width: 2.25rem;
+  height: 2.25rem;
+  margin: 0;
+  color: var(--ink-2);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dtable__tools > .icon-btn,
+  .dtable__tools > .dactions__toggle {
+    opacity: 0;
+    transition: opacity var(--dur-fast) ease, background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+  }
+
+  .dtable__row:hover .dtable__tools > .icon-btn,
+  .dtable__row:focus-within .dtable__tools > .icon-btn,
+  .dtable__row:hover .dtable__tools > .dactions__toggle,
+  .dtable__row:focus-within .dtable__tools > .dactions__toggle {
+    opacity: 1;
+  }
+}
+
+.dtable__tools .dactions {
+  flex-basis: 100%;
+}
+
+/* «Действия» — явная кнопка со словом, а не бледное «⋯» под текстом (№ 9) */
+.dtable__tools .dactions__toggle {
+  width: auto;
+  height: 2.25rem;
+  min-height: 0;
+  padding: 0 var(--space-2);
+  gap: 4px;
+  color: var(--accent);
+  font-weight: var(--weight-semibold);
+}

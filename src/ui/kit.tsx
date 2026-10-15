@@ -126,7 +126,8 @@ export function Tabs<T extends string>({ items, value, onChange, label }: {
     // Выбрано то, чего нет среди вкладок (например, фильтр плашкой «Просрочено»), — индикатор прячется.
     ind.current.style.opacity = btn ? '1' : '0';
     if (!btn) return;
-    ind.current.style.transform = `translateX(${btn.offsetLeft}px)`;
+    ind.current.style.transform = `translate(${btn.offsetLeft}px, ${btn.offsetTop - 3}px)`;
+    ind.current.style.height = `${btn.offsetHeight}px`;
     ind.current.style.width = `${btn.offsetWidth}px`;
   }, [value, items]);
   return (

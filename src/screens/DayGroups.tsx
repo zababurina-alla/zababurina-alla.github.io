@@ -17,6 +17,8 @@ const FOLD_SHOW = 6;
 
 function dayTitle(key: string): string {
   if (key === 'overdue') return 'Просрочено';
+  // «20 января» после декабря — это следующий год: пишем год, чтобы не спутать (находка «Пользователя» № 28).
+  if (key.slice(0, 4) !== TODAY.slice(0, 4)) return `${weekday(key).replace(/^./, (s) => s.toUpperCase())}, ${fmtDayMonth(key)} ${key.slice(0, 4)}`;
   const wd = weekday(key);
   if (key === TODAY) return `Сегодня, ${wd} ${fmtDayMonth(key)}`;
   if (key === addDays(TODAY, 1)) return `Завтра, ${wd} ${fmtDayMonth(key)}`;

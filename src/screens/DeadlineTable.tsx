@@ -13,6 +13,8 @@ import type { IconName } from '../ui/Icon';
 import { Avatar, reducedMotion } from '../ui/kit';
 import { shortName } from '../ui/names';
 import { useUi } from '../app/ui-context';
+import { roAttrs } from '../ui/readonly';
+import { dismissHint } from '../ui/Hint';
 import { TableText } from '../ui/TableText';
 import { OBLIGATION_ICON } from '../ui/obligationIcon';
 import { obligationKind } from '../lib/obligation';
@@ -63,7 +65,7 @@ export function DeadlineTable({ items, showClient = true, empty = 'Сроков 
             className={`dtable__row dtable__row--${st}${store.fresh.includes(d.id) ? ' is-fresh' : ''}`}>
             <span role="cell" className="c-act">
               <button type="button" className="check-btn" aria-disabled={closing !== null}
-                aria-label={`Сдано и оплачено: ${d.what}, ${name}`} title="Сдано и оплачено" onClick={() => close(d.id)}>
+                aria-label={`Сдано и оплачено: ${d.what}, ${name}`} title="Сдано и оплачено" onClick={() => { dismissHint('today.tick'); close(d.id); }}>
                 <span className="check-btn__ring" aria-hidden="true"><Icon name="check" size={16} /></span>
               </button>
             </span>
@@ -78,8 +80,13 @@ export function DeadlineTable({ items, showClient = true, empty = 'Сроков 
               </span>
             )}
             <span role="cell" className="dtable__what c-what">
-              <span className="dtable__line"><TableText text={d.what} fallback={OBLIGATION_ICON[obligationKind(d.what)]} /> <StatusTag status={d.status} /></span>
-              <DeadlineActions d={d} />
+              <span className="dtable__line"><TableText text={d.what} fallback={OBLIGATION_ICON[obligationKind(d.what)]} prefer="fallback" /> <StatusTag status={d.status} />
+              <span className="dtable__tools">
+                {/* Одно нажатие к нужному: позвонить клиенту, записать его платёж; «…» — статус и дата (техника сайта) */}
+                {c?.phone && <a className="icon-btn dtable__tool" href={`tel:${c.phone.replace(/[^d+]/g, '')}`} aria-label={`Позвонить: ${name}`} title={`Позвонить ${c.phone}`}><Icon name="call" size={18} /></a>}
+                {c && <button type="button" className="icon-btn dtable__tool" aria-label={`Записать платёж: ${name}`} title="Записать платёж" onClick={() => ui.openPayment(c.id)} {...roAttrs('payments')}><Icon name="payments" size={18} /></button>}
+                <DeadlineActions d={d} />
+              </span></span>
               {warn[d.id] && <span className="inline-warn" role="status"><Icon name="clock" size={16} />{warn[d.id]}</span>}
             </span>
             <span role="cell" className="dtable__due c-due">

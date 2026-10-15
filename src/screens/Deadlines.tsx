@@ -9,7 +9,7 @@ import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { useStore } from '../data/store';
 import type { Status } from '../data/types';
-import { TODAY, daysBetween, daysInMonth, fmtDayMonth, monthKey, monthName, plural, prevMonthKey, statusByDays, fmtDue } from '../lib/dates';
+import { TODAY, addDays, daysBetween, daysInMonth, fmtDayMonth, monthKey, monthName, plural, prevMonthKey, statusByDays, fmtDue } from '../lib/dates';
 import { play } from '../lib/sound';
 import { Icon } from '../ui/Icon';
 import { Empty } from '../ui/Empty';
@@ -122,6 +122,12 @@ export function Deadlines() {
   const items = kindF === 'all' ? inRange : inRange.filter((d) => obligationKind(d.what) === kindF);
   const count = (r: Range) => pool.filter((d) => fits(daysBetween(TODAY, d.due), r)).length;
   const overdue = count('overdue');
+  // Печать «сроки на неделю» — мамин бумажный список: неделя, по дням, без меню и кнопок (styles/print.css).
+  // Сначала показываем неделю без фильтров, потом печать — в следующем кадре, когда список перерисован.
+  const printWeek = () => {
+    setPicked(null); setRange('week'); setBy('day'); setKindF('all'); setStatusF('all'); setClientF('all');
+    window.setTimeout(() => window.print(), 150);
+  };
 
   return (
     <div ref={scope} className="page">
@@ -130,7 +136,9 @@ export function Deadlines() {
           <h1 className="page__title">Сроки <em>{overdue ? `${overdue} ${plural(overdue, 'просрочен', 'просрочены', 'просрочено')}` : 'без просрочек'}</em></h1>
           <p className="page__sub">Закрыть можно, когда отчётный период закончился, — система проверит сама и создаст следующий срок.</p>
         </div>
+        <button type="button" className="btn btn--secondary" onClick={printWeek}><Icon name="pdf" />Распечатать неделю</button>
       </header>
+      <p className="print-only print-head">Сроки на неделю · {fmtDayMonth(TODAY)} — {fmtDayMonth(addDays(TODAY, 7))} {TODAY.slice(0, 4)} · просрочено и горит</p>
 
       <div className="deadlines-grid">
         <aside className="panel panel--pad reveal"><Month picked={picked} onPick={setPicked} /></aside>
@@ -142,7 +150,7 @@ export function Deadlines() {
               : <Tabs label="Период" value={range} onChange={(r) => { setRange(r); play('tick'); }} items={[
                 { id: 'overdue', label: 'Просрочено', count: count('overdue') },
                 { id: 'week', label: 'Неделя', count: count('week') },
-                { id: 'month', label: 'Месяц', count: count('month') },
+                { id: 'month', label: '30 дней', count: count('month') },
                 { id: 'all', label: 'Все', count: count('all') },
               ]} />}
           </header>
@@ -177,9 +185,15 @@ export function Deadlines() {
             )}
           </div>
           <DayGroups by={by} items={items} empty={
+            filtered ? (
+              <Empty pic="search" title="По этим фильтрам сроков нет" action={
+                <button type="button" className="btn btn--secondary btn--sm" onClick={() => { setKindF('all'); setStatusF('all'); setClientF('all'); }}>Сбросить фильтры</button>
+              }>Сроки есть — их скрыли фильтры «Вид», «Статус» или «Клиент».</Empty>
+            ) : (
             <Empty pic="calm" title={picked ? 'В этот день сроков нет' : 'На этот период открытых сроков нет'}>
               {picked ? 'Выберите другой день в календаре.' : 'Всё сдано. Новые сроки система создаст сама.'}
             </Empty>
+            )
           } />
         </section>
       </div>

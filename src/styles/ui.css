@@ -724,3 +724,16 @@ p.empty {
 .dtable__what .ttext__icon {
   color: color-mix(in srgb, var(--accent) 70%, var(--ink-2));
 }
+
+/* Телефон: вкладки не уезжают за край — переносятся во вторую строку, индикатор переезжает и по строкам
+   (находки «Пользователя» № 19, 24) */
+@media (max-width: 559px) {
+  .tabs {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+
+  .tabs__ind {
+    bottom: auto;
+  }
+}

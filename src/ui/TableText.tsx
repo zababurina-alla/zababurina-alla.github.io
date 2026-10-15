@@ -36,13 +36,18 @@ export function splitEmoji(text: string): { icon: IconName | null; rest: string 
 }
 
 /** Текст из таблицы со своим значком вместо ведущего эмодзи. fallback — значок, если эмодзи нет (вид отчёта). */
-export function TableText({ text, fallback, size = 18 }: { text: string; fallback?: IconName; size?: number }) {
+export function TableText({ text, fallback, size = 18, prefer = 'emoji' }: {
+  text: string; fallback?: IconName | undefined; size?: number; prefer?: 'emoji' | 'fallback';
+}) {
   const { icon, rest } = splitEmoji(text);
-  const name = icon ?? fallback;
+  // prefer="fallback" — значок по смыслу записи (вид отчёта) важнее эмодзи из таблицы: эмодзи там бывает не по словарю.
+  const lead = LEAD.exec(text);
+  const clean = prefer === 'fallback' && fallback && lead ? text.slice(lead[0].length) : rest;
+  const name = prefer === 'fallback' ? (fallback ?? icon) : (icon ?? fallback);
   return (
     <span className="ttext">
       {name && <Icon name={name} size={size} className={`ttext__icon ${TONE[name] ?? ''}`} />}
-      <span>{rest}</span>
+      <span>{prefer === 'fallback' ? clean : rest}</span>
     </span>
   );
 }

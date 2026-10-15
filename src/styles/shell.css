@@ -531,3 +531,22 @@
 .skip:focus-visible {
   transform: none;
 }
+
+/* «Только просмотр» — серая точка: сайт ничего не сохраняет, зелёный «всё сохранено» здесь неправда (№ 10) */
+.sync.is-readonly .sync__dot {
+  background: var(--st-grey-ink);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--st-grey-ink) 18%, transparent);
+}
+
+.topbar .sync.is-readonly .sync__text {
+  position: static;
+  width: auto;
+  height: auto;
+  clip-path: none;
+  font-size: var(--text-sm);
+}
+
+/* Записывать нельзя (только просмотр) — «+» на телефоне не показываем: он закрывал цифры плашек (№ 25) */
+.fab[aria-disabled='true'] {
+  display: none;
+}

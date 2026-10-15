@@ -15,6 +15,7 @@ import type { IconName } from '../ui/Icon';
 import type { RouteName } from '../router';
 import { navigate, toHash } from '../router';
 import { useUi } from './ui-context';
+import { WRITE_AREAS, readOnlyAreas } from '../config';
 import '../ui/fx';
 
 const NAV: { id: RouteName; label: string; icon: IconName; group: 'work' | 'ref' }[] = [
@@ -100,7 +101,7 @@ function ClosedCounter({ compact = false }: { compact?: boolean }) {
 const SLOW_HINT_MS = 5000;
 
 function SyncStatus() {
-  const { pending, online } = useStore();
+  const { pending, online, loaded } = useStore();
   const [now, setNow] = useState(() => Date.now());
   const sending = pending.some((p) => p.state === 'sending');
   useEffect(() => {
@@ -113,6 +114,17 @@ function SyncStatus() {
   const waiting = pending.length - failed;
   // Сервер попросил подождать (ночное обслуживание, занято) — говорим его словами.
   const waitReason = online ? pending.find((p) => p.state === 'queued' && p.error)?.error : undefined;
+  // Пока снимок не пришёл — не «всё сохранено», а «связываемся»; когда запись выключена во всех разделах — честно
+  // «только просмотр» (находка «Пользователя» № 10). Очередь и ошибки важнее — их показываем как раньше.
+  const readOnly = readOnlyAreas().length === WRITE_AREAS.length;
+  if (!pending.length && online && (!loaded || readOnly)) {
+    return (
+      <p className={`sync ${loaded ? 'is-readonly' : 'is-saving'}`} role="status">
+        <span className="sync__dot" aria-hidden="true" />
+        <span className="sync__text">{loaded ? 'Только просмотр' : 'Связываемся с таблицей…'}</span>
+      </p>
+    );
+  }
   const state = failed ? 'is-failed' : !online && waiting ? 'is-offline' : waiting ? 'is-saving' : '';
   const text = failed ? `Не сохранилось: ${failed}`
     : !online && waiting ? `Нет связи — ждут отправки: ${waiting}`
