@@ -164,7 +164,7 @@ export class Auth {
         if (this.buttonEl) {
           this.buttonEl.replaceChildren();
           // Тёмная тема — тёмная кнопка Google: синяя в белой рамке iframe выглядела белым пятном (отдел «Качество»).
-          g.renderButton(this.buttonEl, { type: 'standard', theme: getTheme() === 'dark' ? 'filled_black' : 'filled_blue', size: 'large', text: 'signin_with', shape: 'pill', locale: 'ru', width: '320' });
+          g.renderButton(this.buttonEl, { type: 'standard', theme: getTheme() === 'dark' ? 'filled_black' : 'filled_blue', size: 'large', text: 'signin_with', shape: 'pill', locale: 'ru', width: String(Math.min(320, this.buttonEl.clientWidth || 320)) }); // на 360 px не шире карточки
         }
         if (prompt) g.prompt();
       } catch (e) {
