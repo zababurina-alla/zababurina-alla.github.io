@@ -1,4 +1,6 @@
 {
   "apiUrl": "https://script.google.com/macros/s/AKfycbw6A5GQXe1lUnj4ySIT4C02X9M1UVyfXbKR-MDeKaXAmkGBcdSiLgZhfd0Yn-yde_0g/exec",
-  "writes": []
+  "writes": [
+    "tasks"
+  ]
 }
