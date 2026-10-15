@@ -247,6 +247,28 @@
   font-size: var(--text-sm);
 }
 
+@media (max-width: 559px) {
+  .tasks__text {
+    display: block;
+  }
+
+  .tasks__text > .icon {
+    display: inline-block;
+    margin-right: 6px;
+    vertical-align: -3px;
+  }
+
+  .tasks__text > .ttext {
+    display: inline;
+  }
+
+  .tasks__client {
+    display: flex;
+    padding: 0;
+    text-align: left;
+  }
+}
+
 .tasks__when {
   display: inline-flex;
   align-items: center;

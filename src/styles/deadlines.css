@@ -31,6 +31,8 @@
 }
 
 .dgroup__count {
+  flex: none;
+  white-space: nowrap;
   color: var(--ink-2);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
