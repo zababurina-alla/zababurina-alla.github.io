@@ -298,6 +298,14 @@ class FakeServer implements CabinetApi {
     return [...this.questions.values()].filter((q) => q.answer === null).map((q) => ({ ...q, options: [...q.options] }));
   }
 
+  async remindPreview(req: Omit<RemindRequest, 'text'>): Promise<{ preview: string; lang: string | null }> {
+    await wait(READ_MS);
+    const c = this.clients.get(req.clientId);
+    const d = req.deadlineId ? this.deadlines.get(req.deadlineId) : undefined;
+    const hi = `Добрий день${c ? `, ${c.name.split(' ')[1] ?? ''}` : ''}!`;
+    return { preview: d ? `${hi} 📅 Нагадую: ${d.what} — до ${fmtDate(d.due ?? TODAY)}.` : `${hi} 🔐 Ключ ЕЦП діє до ${fmtDate(c?.keyUntil ?? TODAY)} — час продовжити.`, lang: 'uk' };
+  }
+
   private reminded = new Map<string, number>();
   async remindClient(req: RemindRequest, requestId: string): Promise<RemindResult> {
     await wait(READ_MS * 4);

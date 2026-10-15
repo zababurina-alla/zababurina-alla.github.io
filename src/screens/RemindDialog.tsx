@@ -1,7 +1,7 @@
 // «Напомнить клиенту» (clients.remind): мама видит текст сообщения, может поправить и только потом «Отправить».
 // Уходит ровно то, что в поле. Клиентам пишем по-украински, как в боте. Ответ сервера — словами:
 // ушло / нет бота / тестовый режим / не знаю, ушло ли / уже напоминали (с какого часа можно снова).
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { canWrite } from '../config';
 import { useStore } from '../data/store';
 import type { RemindRequest, RemindResult } from '../data/api';
@@ -43,13 +43,26 @@ export function RemindDialog({ open, onClose, client, deadline, keyReminder = fa
   const toast = useToast();
   const about = deadline ? { deadline } : { key: keyReminder };
   const [text, setText] = useState(() => remindDraft(client, about));
+  const [edited, setEdited] = useState(false);
   const [sending, setSending] = useState(false);
-  const can = canWrite('deadlines');
+  const can = canWrite('remind');
+  const kind: RemindRequest['kind'] = deadline ? 'deadline' : keyReminder ? 'key' : 'custom';
+  // Черновик сервера (на языке клиента, как в боте) — если сервер умеет пробный запуск; свой украинский — запасной.
+  const { remindPreview } = store;
+  useEffect(() => {
+    let alive = true;
+    void remindPreview({ clientId: client.id, kind, ...(deadline ? { deadlineId: deadline.id } : {}) }).then((p) => {
+      if (alive && p) setText((cur) => (edited ? cur : p));
+    });
+    return () => { alive = false; };
+    // edited читаем на момент ответа — повторно звать сервер из-за него не нужно
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client.id, kind, deadline, remindPreview]);
   const name = client.name.split(' ').slice(0, 2).join(' ');
 
   const send = async () => {
-    if (!can) { toast({ text: roMessage('deadlines'), tone: 'info' }); return; }
-    const req: RemindRequest = { clientId: client.id, kind: deadline ? 'deadline' : keyReminder ? 'key' : 'custom', text: text.trim() };
+    if (!can) { toast({ text: roMessage('remind'), tone: 'info' }); return; }
+    const req: RemindRequest = { clientId: client.id, kind, text: text.trim() };
     if (deadline) { req.deadlineId = deadline.id; if (deadline.periodEnd) req.period = deadline.periodEnd; }
     setSending(true);
     try {
@@ -74,8 +87,8 @@ export function RemindDialog({ open, onClose, client, deadline, keyReminder = fa
     }>
       <div className="field remind">
         <label className="field__label" htmlFor="remind-text">Сообщение клиенту — уйдёт ровно так</label>
-        <textarea id="remind-text" className="input remind__text" rows={5} value={text} onChange={(e) => setText(e.target.value)} />
-        <p className="field__hint">Напоминание об одном и том же — не чаще раза в 12 часов. {can ? '' : roMessage('deadlines')}</p>
+        <textarea id="remind-text" className="input remind__text" rows={5} value={text} onChange={(e) => { setEdited(true); setText(e.target.value); }} />
+        <p className="field__hint">Напоминание об одном и том же — не чаще раза в 12 часов. {can ? '' : roMessage('remind')}</p>
       </div>
     </Modal>
   );

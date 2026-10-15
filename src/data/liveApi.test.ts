@@ -310,4 +310,11 @@ describe('живой адаптер: чтение', () => {
     expect(await api.remindClient(req, 'R2')).toEqual({ sent: false, reason: 'noBot', message: 'У клієнта немає бота' });
     expect(await api.remindClient(req, 'R3')).toEqual({ sent: false, reason: 'rateLimit', message: 'Вже нагадували', retryAt: '2026-10-16T07:00:00+03:00' });
   });
+
+  it('пробный запуск напоминания: clients.remind { preview:true } без requestId — текст и язык', async () => {
+    const s = server(ok({ preview: 'Добрий день! 📅 Нагадую…', lang: 'uk' }));
+    const r = await new LiveApi(URL_, auth(), s.fetchImpl).remindPreview({ clientId: 'C-1', kind: 'deadline', deadlineId: 'D-1' });
+    expect(s.sent[0]).toEqual({ v: 1, action: 'clients.remind', payload: { clientId: 'C-1', kind: 'deadline', preview: true, deadlineId: 'D-1' }, session: 'S1' });
+    expect(r).toEqual({ preview: 'Добрий день! 📅 Нагадую…', lang: 'uk' });
+  });
 });

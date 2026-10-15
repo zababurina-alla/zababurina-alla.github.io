@@ -19,6 +19,7 @@ interface FakeLike {
   listQuestions(): Promise<unknown[]>;
   referenceRates(year?: number): Promise<unknown>;
   clientCard(id: string): Promise<unknown>;
+  remindPreview(req: Record<string, unknown>): Promise<unknown>;
   remindClient(req: Record<string, unknown>, requestId: string): Promise<{ sent: boolean; reason?: string; message?: string; retryAt?: string }>;
   referenceKved(q: string): Promise<{ items: unknown[]; note: string | null }>;
   referenceKvedAll(): Promise<unknown>;
@@ -87,6 +88,7 @@ async function handle(ctx: Ctx, body: { action: string; payload?: Record<string,
   }
   if (body.action === 'diag.counters') return env({ received: ctx.counters.received, applied: ctx.counters.applied, rejectedByCode: ctx.counters.rejectedByCode, repeats: ctx.counters.repeats }, 0);
   if (body.action === 'payments.list') return env(await f.listPayments(String(p.month ?? '')), 0);
+  if (body.action === 'clients.remind' && p.preview === true) return env(await f.remindPreview(p), 0);
   if (body.action === 'clients.remind') {
     const r = await f.remindClient(p, body.requestId ?? randomUUID());
     if (!r.sent && r.reason === 'rateLimit') return fail('RATE_LIMIT', r.message ?? 'Рано', { retryable: true, retryAt: r.retryAt });

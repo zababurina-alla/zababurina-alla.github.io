@@ -15,6 +15,7 @@ const DO_IT: Record<WriteArea, string> = {
   deadlines: 'Сроки пока закрывайте и меняйте в таблице',
   clients: 'Клиентов пока добавляйте и правьте в таблице',
   inbox: 'Сообщения клиентов пока решайте в Telegram',
+  remind: 'Напоминания клиентам пока пишите сами в Telegram',
 };
 
 export function roMessage(area: WriteArea): string {

@@ -292,6 +292,15 @@ export class LiveApi implements CabinetApi {
     }
   }
 
+  /** Пробный запуск напоминания: сервер собирает текст на языке клиента и ничего не отправляет. */
+  async remindPreview(req: Omit<RemindRequest, 'text'>): Promise<{ preview: string; lang: string | null }> {
+    const payload: Record<string, unknown> = { clientId: req.clientId, kind: req.kind, preview: true };
+    if (req.deadlineId) payload.deadlineId = req.deadlineId;
+    if (req.period) payload.period = req.period;
+    const env = await this.rpc<{ preview?: unknown; lang?: unknown }>('clients.remind', payload);
+    return { preview: text(env.data.preview), lang: text(env.data.lang) || null };
+  }
+
   /** Карточка целиком: чтение, без requestId. Пустые клетки нормализуются, как в снимке. */
   async clientCard(id: string): Promise<ClientCard> {
     const env = await this.rpc<{ client: unknown; deadlines?: unknown[]; payments?: unknown[]; tasks?: unknown[]; history?: unknown[] }>('clients.get', { id });
