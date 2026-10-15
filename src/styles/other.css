@@ -68,10 +68,23 @@
 }
 
 /* ═════════ Справочник ═════════ */
+/* Ставки — ровными рядами: 3 / 2 / 1 в ряд (было auto-fit — второй ряд выходил «2 из 4», находка № 51) */
 .rates {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(13.5rem, 1fr));
+  grid-template-columns: 1fr;
   gap: var(--space-3);
+}
+
+@media (min-width: 560px) {
+  .rates {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1100px) {
+  .rates {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .rate {
@@ -412,4 +425,46 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1);
+}
+
+/* Узкий лист (боковая колонка «Сегодня», карточка, телефон): текст задачи — во всю ширину, срок — строкой под ним.
+   Раньше метка «просрочено 86 дн.» справа съедала место, и текст шёл по слову в строке (находка «Пользователя» № 42). */
+@container (max-width: 519px) {
+  .tasks__row {
+    display: grid;
+    grid-template-columns: 2.75rem minmax(0, 1fr);
+    align-items: start;
+    gap: 2px var(--space-2);
+    padding: var(--space-2) var(--space-3) var(--space-2) 0;
+  }
+
+  .tasks__row .check-btn {
+    grid-row: 1 / span 2;
+  }
+
+  .tasks__text {
+    display: block;
+    padding-top: 0.55rem;
+  }
+
+  .tasks__text > .icon {
+    display: inline-block;
+    margin-right: 6px;
+    vertical-align: -3px;
+  }
+
+  .tasks__text > .ttext {
+    display: inline;
+  }
+
+  .tasks__client {
+    display: flex;
+    padding: 0;
+  }
+
+  .tasks__when,
+  .tasks__row > .save {
+    grid-column: 2;
+    justify-self: start;
+  }
 }

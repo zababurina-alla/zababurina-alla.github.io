@@ -12,7 +12,7 @@ import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
 import { Avatar, Money, SaveBadge } from '../ui/kit';
 import { Empty } from '../ui/Empty';
-import { shortName, tidyCaps } from '../ui/names';
+import { shortName } from '../ui/names';
 import { useUi } from '../app/ui-context';
 import { TableText } from '../ui/TableText';
 import { URGENCY_ICON } from './DeadlineTable';
@@ -35,7 +35,7 @@ function KeyRow({ c }: { c: Client }) {
       <button type="button" className="keys__row" onClick={() => ui.openClient(c.id)}>
         <Icon name={URGENCY_ICON[st]} size={20} className={`urgency--${st}`} />
         <Avatar name={c.name} />
-        <span className="keys__who"><strong>{c.name}</strong><span className="sub">{c.keyIssuer ? tidyCaps(c.keyIssuer) : <span className="nil">где выпущен — не указано</span>}</span></span>
+        <span className="keys__who"><strong>{c.name}</strong><span className="sub">{c.keyIssuer ? <TableText text={c.keyIssuer} size={16} tidy /> : <span className="nil">где выпущен — не указано</span>}</span></span>
         {days === null
           ? <span className="keys__when"><span className="nil">ключа нет в таблице</span></span>
           : <span className="keys__when"><span className={`due--${st}`}>{daysLabel(days).replace('через ', 'ещё ')}</span><span className="sub num">до {fmtDate(c.keyUntil ?? '')}</span></span>}
@@ -80,7 +80,7 @@ export function Keys() {
   );
 }
 
-// Ставки и КВЕД — только с сервера (reference.rates / reference.kved, лист «⚙️ Справочники»). В коде сайта цифр нет:
+// Ставки и КВЕД — только с сервера (reference.rates / reference.kved, лист «Справочники»). В коде сайта цифр нет:
 // неверная ставка на экране бухгалтера опаснее, чем её отсутствие (координатор, 15.10.2026).
 const money = (k: number | null) => (k === null ? '—' : formatMoney(k));
 
@@ -118,7 +118,7 @@ function KvedSearch() {
       <div className="toolbar"><label className="search-input"><Icon name="search" /><span className="visually-hidden">Поиск КВЕД</span>
         <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Код или слово: «47.91», «перукар»" autoComplete="off" spellCheck={false} /></label></div>
       <div aria-live="polite">
-        {found.state === 'idle' && <p className="sub panel__note">Наберите хотя бы два знака — поиск идёт по листу «📑 КВЕДы».</p>}
+        {found.state === 'idle' && <p className="sub panel__note">Наберите хотя бы два знака — поиск идёт по листу «КВЕДы».</p>}
         {found.state === 'loading' && <p className="sub panel__note">Ищу в таблице…</p>}
         {found.state === 'error' && <p className="sub panel__note">{found.message}</p>}
         {found.state === 'ok' && (found.data.length ? (
@@ -142,10 +142,10 @@ export function Reference() {
     <div className="page">
       <header className="page__head"><div>
         <h1 className="page__title">Справочник{r && r.year ? <> <em>ставки {r.year}</em></> : null}</h1>
-        {r && <p className="page__sub">{r.updatedAt ? `Обновлено в таблице ${fmtDate(r.updatedAt.slice(0, 10))}` : 'Из листа «⚙️ Справочники»'}</p>}
+        {r && <p className="page__sub">{r.updatedAt ? `Обновлено в таблице ${fmtDate(r.updatedAt.slice(0, 10))}` : 'Из листа «Справочники»'}</p>}
       </div></header>
       {r?.source === 'fallback' && (
-        <div className="offline" role="status"><Icon name="warning" /><span><strong>Не из таблицы.</strong> Лист «⚙️ Справочники» сейчас не читается — это запасные цифры сервера. Сверьте с листом.</span></div>
+        <div className="offline" role="status"><Icon name="warning" /><span><strong>Не из таблицы.</strong> Лист «Справочники» сейчас не читается — это запасные цифры сервера. Сверьте с листом.</span></div>
       )}
       {rates.state === 'loading' && <p className="sub" aria-live="polite">Загружаю ставки из таблицы…</p>}
       {rates.state === 'error' && (

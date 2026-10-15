@@ -3,6 +3,7 @@
 // Неизвестный эмодзи остаётся текстом: честнее показать как есть, чем угадать. В таблице и в боте эмодзи остаются.
 import type { IconName } from './Icon';
 import { Icon } from './Icon';
+import { tidyCaps } from './names';
 
 export const EMOJI_ICON: Record<string, IconName> = {
   '📊': 'today', '👤': 'fop', '⏰': 'deadlines', '🧩': 'tasks', '💰': 'payments', '🔐': 'keys', '📑': 'kved',
@@ -36,18 +37,25 @@ export function splitEmoji(text: string): { icon: IconName | null; rest: string 
 }
 
 /** Текст из таблицы со своим значком вместо ведущего эмодзи. fallback — значок, если эмодзи нет (вид отчёта). */
-export function TableText({ text, fallback, size = 18, prefer = 'emoji' }: {
+export function TableText({ text, fallback, size = 18, prefer = 'emoji', icon: showIcon = true, tidy = false }: {
   text: string; fallback?: IconName | undefined; size?: number; prefer?: 'emoji' | 'fallback';
+  /** false — значок не рисуем (рядом уже есть свой, например срочность), известный эмодзи просто убираем */
+  icon?: boolean;
+  /** «НАЛОГОВЫЙ» → «Налоговый» (tidyCaps) — для значений, набранных в таблице заглавными */
+  tidy?: boolean;
 }) {
   const { icon, rest } = splitEmoji(text);
   // prefer="fallback" — значок по смыслу записи (вид отчёта) важнее эмодзи из таблицы: эмодзи там бывает не по словарю.
   const lead = LEAD.exec(text);
   const clean = prefer === 'fallback' && fallback && lead ? text.slice(lead[0].length) : rest;
   const name = prefer === 'fallback' ? (fallback ?? icon) : (icon ?? fallback);
+  const body = prefer === 'fallback' ? clean : rest;
+  const shown = tidy ? tidyCaps(body) : body;
+  if (!showIcon) return <span className="ttext ttext--plain">{shown}</span>;
   return (
     <span className="ttext">
       {name && <Icon name={name} size={size} className={`ttext__icon ${TONE[name] ?? ''}`} />}
-      <span>{prefer === 'fallback' ? clean : rest}</span>
+      <span>{shown}</span>
     </span>
   );
 }

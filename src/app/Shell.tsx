@@ -267,7 +267,8 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
         <div key={route} className="screen">{children}</div>
       </main>
 
-      <button type="button" className="fab" onClick={() => ui.openPayment()} aria-label="Записать платёж" {...roAttrs('payments')}><Icon name="plus" size={26} /></button>
+      {/* На «Ещё» записывать нечего, а «+» закрывал нижний лист (находка № 25) */}
+      {route !== 'more' && <button type="button" className="fab" onClick={() => ui.openPayment()} aria-label="Записать платёж" {...roAttrs('payments')}><Icon name="plus" size={26} /></button>}
 
       <nav className="tabbar" aria-label="Разделы">
         {PHONE_NAV.map((id) => {

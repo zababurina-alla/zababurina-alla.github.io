@@ -16,6 +16,7 @@ import { Empty } from '../ui/Empty';
 import { useUi } from '../app/ui-context';
 import { roAttrs } from '../ui/readonly';
 import { URGENCY_ICON } from './DeadlineTable';
+import { TableText } from '../ui/TableText';
 
 type KindFilter = 'all' | 'fop1' | 'fop2' | 'fop3' | 'other';
 
@@ -122,7 +123,7 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
                 <span role="cell" className="ctable__next">
                   {next && nextDays !== null && nextSt
                     ? <span className="ctable__state"><Icon name={URGENCY_ICON[nextSt]} size={18} className={`urgency--${nextSt}`} />
-                      <span className="ctable__state-text"><span>{next.what}</span><span className={`sub due--${nextSt}`}>{daysLabel(nextDays)}</span></span></span>
+                      <span className="ctable__state-text"><TableText text={next.what} icon={false} /><span className={`sub due--${nextSt}`}>{daysLabel(nextDays)}</span></span></span>
                     : <span className="sub">открытых сроков нет</span>}
                 </span>
               </div>

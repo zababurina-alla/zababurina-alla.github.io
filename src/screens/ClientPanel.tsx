@@ -15,7 +15,6 @@ import { URGENCY_ICON } from './DeadlineTable';
 import { Modal } from '../ui/Modal';
 import { useUi } from '../app/ui-context';
 import { TableText } from '../ui/TableText';
-import { tidyCaps } from '../ui/names';
 import { QuestionAnswer } from './Questions';
 import { DeadlineTable } from './DeadlineTable';
 import { useRoute } from '../router';
@@ -215,7 +214,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                     <dl className="charges">
                       {c.monthly.map((m) => (
                         <div key={m.name} className="charges__item">
-                          <dt>{m.name}</dt>
+                          <dt><TableText text={m.name} size={16} /></dt>
                           <dd className="charges__sum display">{m.kopecks !== null ? <Money text={formatMoney(m.kopecks)} /> : <span className="nil">не посчитано</span>}</dd>
                           <dd className="sub">{m.note}</dd>
                         </div>
@@ -226,7 +225,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                 <section className="cp__block cp__facts">
                   <div><h3 className="cp__h">Ключ ЭЦП</h3>{keyDays === null ? <p className="cp__key"><Icon name="inactive" size={18} className="urgency--grey" /><span className="nil">ключа нет в таблице</span></p>
                     : <p className="cp__key"><Icon name={URGENCY_ICON[statusByDays(keyDays)]} size={18} className={`urgency--${statusByDays(keyDays)}`} /><span className="num">до {fmtDate(c.keyUntil ?? '')}</span><span className={`due--${statusByDays(keyDays)}`}>{daysLabel(keyDays)}</span></p>}{c.keyFrom && <p className="sub">выпущен {fmtDate(c.keyFrom)}</p>}<KeyRenew c={c} /></div>
-                  <div><h3 className="cp__h">Ключ выпущен</h3><p>{c.keyIssuer ? tidyCaps(c.keyIssuer) : <span className="nil">не указано</span>}</p></div>
+                  <div><h3 className="cp__h">Ключ выпущен</h3><p>{c.keyIssuer ? <TableText text={c.keyIssuer} tidy /> : <span className="nil">не указано</span>}</p></div>
                   <div><h3 className="cp__h">Телефон</h3><PhoneField clientId={c.id} phone={c.phone} version={c.version} /></div>
                   <div><h3 className="cp__h">Почта</h3><EditableField clientId={c.id} value={c.email ?? ''} version={c.version} label="Почта" inputMode="email"
                     empty="не указана" onSave={(v, base) => store.updateEmail(c.id, v, base)} /></div>
