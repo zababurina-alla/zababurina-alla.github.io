@@ -320,3 +320,22 @@
   margin: 0;
   padding: var(--space-1) var(--space-5) var(--space-3);
 }
+
+/* «Ещё» → настройки на телефоне: окошко звука открывается вверх (внизу — вкладки и «+»); лист его не обрезает */
+.more--settings {
+  overflow: visible;
+}
+
+.more--settings .pop {
+  left: auto;
+  right: 0;
+  transform-origin: calc(100% - 1.5rem) 100%;
+}
+
+.more--settings .me {
+  margin-left: 0;
+}
+
+.more--settings .me__text {
+  max-width: none;
+}
