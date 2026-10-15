@@ -2,6 +2,7 @@
 // Строка: круглая галочка «Сдано и оплачено» слева (как дело в списке) → клиент → что сдать → когда.
 // Срочность — значком «цвет + форма» из словаря (просрочено ●!, горит ●◷, скоро ○◷, в порядке ○✓) и словами.
 import { useLayoutEffect, useRef } from 'react';
+import { DeadlineActions, StatusTag } from './DeadlineActions';
 import gsap from 'gsap';
 import { Flip } from 'gsap/Flip';
 import { useStore } from '../data/store';
@@ -13,7 +14,8 @@ import { Avatar, reducedMotion } from '../ui/kit';
 import { shortName } from '../ui/names';
 import { useUi } from '../app/ui-context';
 import { TableText } from '../ui/TableText';
-import { OBLIGATION, obligationOf } from '../ui/obligation';
+import { OBLIGATION_ICON } from '../ui/obligationIcon';
+import { obligationKind } from '../lib/obligation';
 import { useCloseDeadline } from './useClose';
 
 gsap.registerPlugin(Flip);
@@ -76,7 +78,8 @@ export function DeadlineTable({ items, showClient = true, empty = 'Сроков 
               </span>
             )}
             <span role="cell" className="dtable__what c-what">
-              <TableText text={d.what} fallback={OBLIGATION[obligationOf(d.what)].icon} />
+              <span className="dtable__line"><TableText text={d.what} fallback={OBLIGATION_ICON[obligationKind(d.what)]} /> <StatusTag status={d.status} /></span>
+              <DeadlineActions d={d} />
               {warn[d.id] && <span className="inline-warn" role="status"><Icon name="clock" size={16} />{warn[d.id]}</span>}
             </span>
             <span role="cell" className="dtable__due c-due">

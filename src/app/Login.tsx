@@ -6,7 +6,15 @@ export function Login() {
   const state = useAuth();
   const slot = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (slot.current && auth) void auth.mountButton(slot.current);
+    const el = slot.current;
+    if (!el || !auth) return;
+    const a = auth;
+    void a.mountButton(el);
+    // Одноразовый код входа живёт на сервере 5 мин: обновляем, пока экран открыт и когда мама вернулась во вкладку.
+    const tick = () => { if (!document.hidden) a.keepFresh(); };
+    const t = window.setInterval(tick, 30_000);
+    document.addEventListener('visibilitychange', tick);
+    return () => { window.clearInterval(t); document.removeEventListener('visibilitychange', tick); a.unmountButton(el); };
   }, []);
   return (
     <main className="login">

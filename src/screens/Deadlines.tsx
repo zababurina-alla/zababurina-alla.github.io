@@ -1,6 +1,10 @@
 // «Сроки»: календарь месяца + список по дням; закрытие одним нажатием, «Закрыто сегодня» с честным статусом.
 // Месяц считается от сегодняшней даты и листается ‹ › (раньше был жёстко «Октябрь 2026»).
 import { useRef, useState } from 'react';
+import { OBLIGATION_LABEL, obligationKind } from '../lib/obligation';
+import type { ObligationKind } from '../lib/obligation';
+import type { ClientKind, DatedDeadline, DeadlineStatus } from '../data/types';
+import { STATUS_LABEL } from './DeadlineActions';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { useStore } from '../data/store';
@@ -14,8 +18,7 @@ import { shortName } from '../ui/names';
 import { TableText } from '../ui/TableText';
 import { DayGroups } from './DayGroups';
 import type { GroupBy } from './DayGroups';
-import { OBLIGATION, obligationOf } from '../ui/obligation';
-import type { ObligationKind } from '../ui/obligation';
+import { OBLIGATION_ICON } from '../ui/obligationIcon';
 
 type Range = 'month' | 'overdue' | 'week' | 'all';
 const RANK: Record<Status, number> = { red: 4, orange: 3, yellow: 2, green: 1, grey: 0 };
@@ -78,26 +81,46 @@ function Month({ picked, onPick }: { picked: string | null; onPick: (iso: string
   );
 }
 
+type OpenStatus = Exclude<DeadlineStatus, 'done'>;
+const OPEN_STATUSES: OpenStatus[] = ['new', 'inProgress', 'waiting', 'postponed'];
+type ClientGroup = 'fop' | 'tov' | 'other';
+const CLIENT_GROUP_LABEL: Record<ClientGroup, string> = { fop: 'ФОП', tov: 'ТОВ', other: 'Другие' };
+function clientGroup(kind: ClientKind | null): ClientGroup {
+  if (kind === 'fop1' || kind === 'fop2' || kind === 'fop3' || kind === 'fopGeneral') return 'fop';
+  if (kind === 'tov3' || kind === 'tovGeneral') return 'tov';
+  return 'other';
+}
+
 export function Deadlines() {
   const store = useStore();
   const scope = useRef<HTMLDivElement>(null);
   const [range, setRange] = useState<Range>('month');
   const [picked, setPicked] = useState<string | null>(null);
   const [by, setBy] = useState<GroupBy>('day');
-  const [kind, setKind] = useState<ObligationKind | null>(null);
 
   useGSAP(() => {
     if (reducedMotion()) return;
     gsap.from('.reveal', { y: 14, opacity: 0, duration: 0.5, stagger: 0.05, ease: 'power3.out', clearProps: 'transform,opacity' });
   }, { scope });
 
+  const [kindF, setKindF] = useState<ObligationKind | 'all'>('all');
+  const [statusF, setStatusF] = useState<OpenStatus | 'all'>('all');
+  const [clientF, setClientF] = useState<ClientGroup | 'all'>('all');
+  // Фильтры по виду, статусу и типу клиента — поверх периода; счётчики периода считают уже отфильтрованное.
+  const passes = (d: DatedDeadline) => (kindF === 'all' || obligationKind(d.what) === kindF)
+    && (statusF === 'all' || d.status === statusF)
+    && (clientF === 'all' || clientGroup(store.client(d.clientId)?.kind ?? null) === clientF);
+  const pool = store.deadlines.filter(passes);
+  const filtered = kindF !== 'all' || statusF !== 'all' || clientF !== 'all';
   const fits = (days: number, r: Range) => (r === 'overdue' ? days < 0 : r === 'week' ? days <= 7 : r === 'month' ? days <= 30 : true);
-  const inRange = store.deadlines.filter((d) => (picked ? d.due === picked : fits(daysBetween(TODAY, d.due), range)));
-  // Фишки видов отчёта — только те, что есть в выбранном периоде, с числом; выбранная фильтрует список.
+  // Период → (без вида) фишки видов с числами → вид. Статус и тип клиента — фильтры техники сайта (pool).
+  const inRange = store.deadlines.filter((d) => (statusF === 'all' || d.status === statusF)
+    && (clientF === 'all' || clientGroup(store.client(d.clientId)?.kind ?? null) === clientF)
+    && (picked ? d.due === picked : fits(daysBetween(TODAY, d.due), range)));
   const kinds = new Map<ObligationKind, number>();
-  for (const d of inRange) kinds.set(obligationOf(d.what), (kinds.get(obligationOf(d.what)) ?? 0) + 1);
-  const items = kind ? inRange.filter((d) => obligationOf(d.what) === kind) : inRange;
-  const count = (r: Range) => store.deadlines.filter((d) => fits(daysBetween(TODAY, d.due), r)).length;
+  for (const d of inRange) kinds.set(obligationKind(d.what), (kinds.get(obligationKind(d.what)) ?? 0) + 1);
+  const items = kindF === 'all' ? inRange : inRange.filter((d) => obligationKind(d.what) === kindF);
+  const count = (r: Range) => pool.filter((d) => fits(daysBetween(TODAY, d.due), r)).length;
   const overdue = count('overdue');
 
   return (
@@ -129,12 +152,25 @@ export function Deadlines() {
                 <button key={id} type="button" className="seg__opt" aria-pressed={by === id} onClick={() => { setBy(id); play('tick'); }}>{label}</button>
               ))}
             </div>
+            <div className="dfilters" role="group" aria-label="Фильтры сроков">
+              <label><span className="sub">Статус</span>
+                <select className="input input--sm" value={statusF} onChange={(e) => setStatusF(e.target.value as OpenStatus | 'all')}>
+                  <option value="all">Все</option>
+                  {OPEN_STATUSES.map((st) => <option key={st} value={st}>{STATUS_LABEL[st]}</option>)}
+                </select></label>
+              <label><span className="sub">Клиент</span>
+                <select className="input input--sm" value={clientF} onChange={(e) => setClientF(e.target.value as ClientGroup | 'all')}>
+                  <option value="all">Все</option>
+                  {(Object.keys(CLIENT_GROUP_LABEL) as ClientGroup[]).map((g) => <option key={g} value={g}>{CLIENT_GROUP_LABEL[g]}</option>)}
+                </select></label>
+              {filtered && <button type="button" className="link" onClick={() => { setKindF('all'); setStatusF('all'); setClientF('all'); }}>Сбросить</button>}
+            </div>
             {kinds.size > 1 && (
               <div className="chips dl-tools__kinds" role="group" aria-label="Вид отчёта">
-                {[...kinds.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => (
-                  <button key={k} type="button" className="chip chip--icon" aria-pressed={kind === k}
-                    onClick={() => { setKind(kind === k ? null : k); play('tick'); }}>
-                    <Icon name={OBLIGATION[k].icon} size={16} />{OBLIGATION[k].label}<span className="chip__n num">{n}</span>
+                {[...kinds.entries()].sort((x, y) => y[1] - x[1]).map(([k, n]) => (
+                  <button key={k} type="button" className="chip chip--icon" aria-pressed={kindF === k}
+                    onClick={() => { setKindF(kindF === k ? 'all' : k); play('tick'); }}>
+                    <Icon name={OBLIGATION_ICON[k]} size={16} />{OBLIGATION_LABEL[k]}<span className="chip__n num">{n}</span>
                   </button>
                 ))}
               </div>

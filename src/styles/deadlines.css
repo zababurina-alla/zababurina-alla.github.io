@@ -507,6 +507,36 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+
+/* Действия со сроком (DeadlineActions, техника сайта): раскрываются в строке. Оформление — за отделом дизайна. */
+.dactions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.dactions__date {
+  display: grid;
+  gap: 2px;
+}
+
+.dactions__toggle {
+  margin-left: var(--space-1);
+  vertical-align: middle;
+}
+
+.tag--status {
+  margin-left: var(--space-1);
+  font-size: 0.8125rem;
+}
+
+/* Фильтры сроков (техника сайта): вид, статус, тип клиента. Оформление — за отделом дизайна. */
+.dfilters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
   gap: var(--space-3);
   padding: 0 var(--space-5) var(--space-3);
 }
@@ -560,4 +590,59 @@
   .dl-tools__by {
     flex: 1 1 100%;
   }
+
+.dfilters label {
+  display: grid;
+  gap: 2px;
+}
+
+/* ═════════ Сведение с техникой сайта (15.10): фильтры и действия со сроком в общем виде ═════════ */
+.dl-tools .dfilters {
+  padding: 0;
+  gap: var(--space-2) var(--space-3);
+}
+
+.dfilters label {
+  grid-auto-flow: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.dfilters .input--sm {
+  min-height: 2.5rem;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-full);
+}
+
+.dtable__line {
+  display: inline-flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+}
+
+/* Статус срока словами — цвет по смыслу словаря: в работе — синий, ожидание (⌛ ждём клиента) — пшеничный, отложено — серый */
+.tag--status {
+  margin-left: 0;
+  min-height: 1.625rem;
+  padding: 0 9px;
+  font-size: var(--text-sm);
+}
+
+.tag--inProgress { background: var(--accent-soft); color: var(--accent); }
+.tag--waiting { background: var(--wheat-soft); color: var(--wheat-ink); }
+.tag--postponed { background: var(--st-grey-bg); color: var(--st-grey-ink); }
+
+.dactions__toggle {
+  width: 2.25rem;
+  height: 2.25rem;
+  margin: -6px 0 -6px var(--space-1);
+}
+
+.dactions {
+  padding: var(--space-3);
+  border-radius: var(--radius-l);
+  background: var(--surface-sunk);
+  box-shadow: inset 0 0 0 1px var(--line);
+  animation: warn-in var(--dur-pop) var(--spring-pop);
 }

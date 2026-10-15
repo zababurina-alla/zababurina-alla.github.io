@@ -52,7 +52,10 @@ export function withTransition(update: () => void, kind = 'screen'): void {
   }
   document.documentElement.dataset.vt = kind;
   const t = document.startViewTransition(() => flushSync(update));
-  void t.finished.finally(() => { delete document.documentElement.dataset.vt; });
+  // Браузер прерывает переход (новый переход поверх, модальное окно, долгое обновление) — это не ошибка: обновление
+  // экрана уже выполнено, пропала только анимация. Без catch отказ уходит в консоль как необработанный.
+  t.ready.catch(() => undefined);
+  void t.finished.catch(() => undefined).finally(() => { delete document.documentElement.dataset.vt; });
 }
 
 export function navigate(hash: string): void {

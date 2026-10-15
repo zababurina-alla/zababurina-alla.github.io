@@ -1,13 +1,13 @@
 // «Платежи»: итог месяца крупно, столбики по дням, список по датам с источником и честным статусом записи.
 // В суммы (месяц, день, столбики) идут только полученные деньги — как в monthStats; «ожидается», «не пришло»,
 // «возвращено» видны в списке приглушённо и подписаны словами.
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { useStore } from '../data/store';
 import { METHOD_LABEL, PAY_STATUS_LABEL, isReceived } from '../data/types';
 import type { PayMethod } from '../data/types';
-import { TODAY, addDays, daysInMonth, fmtDayMonth, monthName, plural, weekday } from '../lib/dates';
+import { TODAY, addDays, daysInMonth, fmtDayMonth, monthKey, monthName, plural, prevMonthKey, weekday } from '../lib/dates';
 import { monthStats } from '../lib/monthStats';
 import { formatMoney, formatPayMoney } from '../lib/money';
 import { Icon } from '../ui/Icon';
@@ -30,13 +30,39 @@ function dayTitle(iso: string): string {
   return `${weekday(iso).replace(/^./, (s) => s.toUpperCase())}, ${fmtDayMonth(iso)}`;
 }
 
+/** Следующий месяц: «2026-12» → «2027-01». */
+function nextMonthKey(key: string): string {
+  const [y, m] = key.split('-').map(Number);
+  return m === 12 ? `${(y ?? 1970) + 1}-01` : `${y}-${String((m ?? 1) + 1).padStart(2, '0')}`;
+}
+
+/** Снимок держит платежи за 90 дней; месяцы раньше — из таблицы по запросу (payments.list). */
+const SNAPSHOT_FROM = addDays(TODAY, -90);
+
 export function Payments() {
   const store = useStore();
   const ui = useUi();
   const scope = useRef<HTMLDivElement>(null);
-  const stats = monthStats(store.payments, TODAY);
+  const current = monthKey(TODAY);
+  const [month, setMonth] = useState(current);
+  const [loading, setLoading] = useState<string | null>(null);
+  const loaded = useRef(new Set<string>());
+  const { loadPaymentsMonth } = store;
+  // Месяц (и прошлый — для сравнения), который весь или частично старше снимка, — догрузить из таблицы один раз.
+  useEffect(() => {
+    const need = [month, prevMonthKey(month)].filter((k) => `${k}-01` < SNAPSHOT_FROM && !loaded.current.has(k));
+    if (!need.length) return;
+    let alive = true;
+    setLoading(month);
+    void Promise.all(need.map((k) => loadPaymentsMonth(k).then(() => { loaded.current.add(k); })))
+      .catch(() => undefined)
+      .finally(() => { if (alive) setLoading(null); });
+    return () => { alive = false; };
+  }, [month, loadPaymentsMonth]);
+  const last = month === current ? TODAY : `${month}-${String(daysInMonth(month)).padStart(2, '0')}`;
+  const stats = monthStats(store.payments, last);
   const inMonth = store.payments.filter((p) => p.date.startsWith(stats.key));
-  const today = Number(TODAY.slice(8, 10));
+  const today = Number(last.slice(8, 10));
   const byDay = new Map<string, typeof inMonth>();
   for (const p of [...inMonth].sort((a, b) => b.date.localeCompare(a.date))) byDay.set(p.date, [...(byDay.get(p.date) ?? []), p]);
   const daySum = (xs: typeof inMonth) => xs.filter(isReceived).reduce((s, p) => s + (p.kopecks ?? 0), 0);
@@ -53,7 +79,15 @@ export function Payments() {
   return (
     <div ref={scope} className="page">
       <header className="page__head reveal">
-        <div><h1 className="page__title">Платежи <em>{monthName(stats.key, 'nom').toLowerCase()} {stats.key.slice(0, 4)}</em></h1></div>
+        <div>
+          <h1 className="page__title">Платежи <em>{monthName(stats.key, 'nom').toLowerCase()} {stats.key.slice(0, 4)}</em></h1>
+          <p className="month-nav">
+            <button type="button" className="icon-btn" onClick={() => setMonth(prevMonthKey(month))} aria-label={`Платежи за ${monthName(prevMonthKey(month), 'nom').toLowerCase()}`}><Icon name="chevronLeft" size={18} /></button>
+            <button type="button" className="icon-btn" onClick={() => setMonth(nextMonthKey(month))} disabled={month === current} aria-label={`Платежи за ${monthName(nextMonthKey(month), 'nom').toLowerCase()}`}><Icon name="chevronRight" size={18} /></button>
+            {month !== current && <button type="button" className="link" onClick={() => setMonth(current)}>к текущему месяцу</button>}
+            {loading === month && <span className="sub" role="status">Загружаем {monthName(month, 'nom').toLowerCase()} из таблицы…</span>}
+          </p>
+        </div>
         <button type="button" className="btn btn--primary" onClick={() => ui.openPayment()} {...roAttrs('payments')}><Icon name="plus" />Записать платёж</button>
       </header>
 

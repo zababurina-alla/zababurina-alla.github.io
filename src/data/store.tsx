@@ -15,7 +15,7 @@ import { kvAll, kvDelete, kvSet } from './idb';
 import { Outbox } from './outbox';
 import type { Counters, OutboxEvent, OutboxItem } from './outbox';
 import { newRequestId } from './api';
-import type { Change, Snapshot, WriteOp } from './api';
+import type { Change, DeadlinePatch, Snapshot, WriteOp } from './api';
 import type { Activity, Client, DatedDeadline, Deadline, Payment, Question, SaveState, Task } from './types';
 import { isDated } from './types';
 import { TODAY, addDays, fmtDate } from '../lib/dates';
@@ -72,7 +72,17 @@ interface Store {
   addClient: (c: Omit<Client, 'id' | 'version'>, onSaved?: (created: Deadline[], client: Client) => void) => Client;
   /** baseVersion — версия, которую мама видела, когда начала править (бриф, п. 6: конфликт). */
   updatePhone: (clientId: string, phone: string, baseVersion: number) => void;
+  /** Почта клиента (clients.update { email }). */
+  updateEmail: (clientId: string, email: string, baseVersion: number) => void;
   addTask: (t: Omit<Task, 'id' | 'version' | 'done'>) => void;
+  /** Срок: в работе / ожидание / отложить до / перенести дату (deadlines.update). */
+  updateDeadline: (id: string, patch: DeadlinePatch, label: string) => void;
+  /** Ключ ЭЦП продлён: новый срок, дата выпуска и кто выдал (clients.update). */
+  renewKey: (clientId: string, keyUntil: string, keyFrom: string | null, keyIssuer: string | null) => void;
+  /** Платежи месяца вне снимка (payments.list): дозагружает в общий список. Возвращает итог «получено» сервера. */
+  loadPaymentsMonth: (month: string) => Promise<number>;
+  /** Открытые вопросы заново (questions.list) — без перезагрузки снимка. */
+  refreshQuestions: () => Promise<void>;
   /** Ответ на вопрос маме (questions.answer). */
   answerQuestion: (id: string, text: string, onSaved?: () => void) => void;
   dismissNotice: (id: string) => void;
@@ -95,7 +105,7 @@ const Ctx = createContext<Store | null>(null);
 
 const AREA_OF: Record<WriteOp['kind'], WriteArea> = {
   closeDeadline: 'deadlines', reopenDeadline: 'deadlines', addPayment: 'payments', cancelPayment: 'payments',
-  addClient: 'clients', updateClient: 'clients', createTask: 'tasks', completeTask: 'tasks', answerQuestion: 'questions',
+  updateDeadline: 'deadlines', addClient: 'clients', updateClient: 'clients', createTask: 'tasks', completeTask: 'tasks', answerQuestion: 'questions',
 };
 
 function upsert<T extends { id: string }>(xs: T[], rec: T): T[] {
@@ -226,6 +236,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setClients((xs) => upsert(xs, op.client));
     } else if (op.kind === 'updateClient') {
       setClients((xs) => xs.map((c) => (c.id === op.id ? { ...c, ...op.patch } : c)));
+    } else if (op.kind === 'updateDeadline') {
+      const { note: _note, ...patch } = op.patch;
+      void _note;
+      setDeadlines((xs) => xs.map((d) => (d.id === op.id ? { ...d, ...patch } : d)));
     } else if (op.kind === 'createTask') {
       setTasks((xs) => upsert(xs, op.task));
     } else if (op.kind === 'completeTask') {
@@ -274,6 +288,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           return final ? cs.filter((c) => c.requestId !== op.requestId) : cs.map((c) => (c.requestId === op.requestId ? { ...c, save: 'failed' } : c));
         });
       }
+      // Правку срока таблица не приняла — срок возвращается таким, какой он в таблице.
+      if (op.kind === 'updateDeadline' && e.result.current && 'periodicity' in e.result.current) putOpen(e.result.current);
       // Отмену платежа сервер не выполнил — платёж возвращается на экран таким, каким он стал в таблице.
       if (op.kind === 'cancelPayment' && e.result.current && 'kopecks' in e.result.current) {
         const cur = e.result.current;
@@ -453,6 +469,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     send({ kind: 'updateClient', requestId: newRequestId(), id: clientId, baseVersion, patch: { phone } }, 'Телефон клиента');
   }, [send]);
 
+  const updateEmail = useCallback((clientId: string, email: string, baseVersion: number) => {
+    send({ kind: 'updateClient', requestId: newRequestId(), id: clientId, baseVersion, patch: { email } }, 'Почта клиента');
+  }, [send]);
+
   const addTask = useCallback((t: Omit<Task, 'id' | 'version' | 'done'>) => {
     const requestId = newRequestId();
     send({ kind: 'createTask', requestId, task: { ...t, id: requestId, version: 1, done: false } }, `Задача «${t.text}»`);
@@ -496,6 +516,35 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     ? liveApi.revealPassword(clientId)
     : { login: 'демо-логин', password: 'демо-пароль-не-настоящий', ttlSeconds: 30 }), []);
 
+  const updateDeadline = useCallback((id: string, patch: DeadlinePatch, label: string) => {
+    const d = deadlines.find((x) => x.id === id) ?? undated.find((x) => x.id === id);
+    if (!d) return;
+    send({ kind: 'updateDeadline', requestId: newRequestId(), id, baseVersion: d.version, patch }, label);
+  }, [deadlines, undated, send]);
+
+  const renewKey = useCallback((clientId: string, keyUntil: string, keyFrom: string | null, keyIssuer: string | null) => {
+    const c = clients.find((x) => x.id === clientId);
+    if (!c) return;
+    const patch: { keyUntil: string; keyFrom?: string; keyIssuer?: string } = { keyUntil };
+    if (keyFrom) patch.keyFrom = keyFrom;
+    if (keyIssuer) patch.keyIssuer = keyIssuer;
+    send({ kind: 'updateClient', requestId: newRequestId(), id: clientId, baseVersion: c.version, patch }, `Ключ ЭЦП: ${c.name}`);
+  }, [clients, send]);
+
+  const loadPaymentsMonth = useCallback(async (month: string) => {
+    const res = await api.listPayments(month);
+    setPayments((xs) => res.payments.reduce((acc, p) => (acc.some((x) => x.id === p.id) ? acc : [...acc, p]), xs));
+    return res.totalKopecks;
+  }, []);
+
+  const questionsAt = useRef(0);
+  const refreshQuestions = useCallback(async () => {
+    // Не чаще раза в 2 мин и только после снимка: запрос к таблице стоит 3–4 с.
+    if (!snapReady.current || Date.now() - questionsAt.current < 120_000) return;
+    questionsAt.current = Date.now();
+    try { setQuestions(await api.listQuestions()); } catch { /* вопросы останутся из снимка */ }
+  }, []);
+
   const answerQuestion = useCallback((id: string, text: string, onSaved?: () => void) => {
     send({ kind: 'answerQuestion', requestId: newRequestId(), id, text }, 'Ответ на вопрос', () => onSaved?.());
   }, [send]);
@@ -508,10 +557,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<Store>(() => ({
     loaded, online, clients, deadlines, undated, payments, activity, tasks, questions, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload,
+    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance,
   }), [loaded, online, clients, deadlines, undated, payments, activity, tasks, questions, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload,
+    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

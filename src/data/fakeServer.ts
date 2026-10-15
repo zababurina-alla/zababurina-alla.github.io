@@ -204,6 +204,17 @@ class FakeServer implements CabinetApi {
         this.tasks.set(t.id, upd);
         return { ok: true, changes: [this.record('task', 'upsert', t.id, o, upd)], cursor: this.cursor };
       }
+      case 'updateDeadline': {
+        const d = this.deadlines.get(op.id);
+        if (!d) return { ok: false, code: 'NOT_FOUND', message: 'Этого срока уже нет' };
+        if (d.version !== op.baseVersion) return { ok: false, code: 'CONFLICT', message: 'Срок изменился в таблице', current: { ...d } };
+        const { note: _note, ...patch } = op.patch;
+        void _note;
+        const upd: Deadline = { ...d, ...patch, version: this.cursor + 1 };
+        this.deadlines.set(d.id, upd);
+        const name = this.clients.get(d.clientId)?.name ?? '';
+        return { ok: true, changes: [this.record('deadline', 'upsert', d.id, o, upd), this.act(`Изменён срок «${d.what}» — ${short(name)}`, o, 'сайт')], cursor: this.cursor };
+      }
       case 'updateClient': {
         const c = this.clients.get(op.id);
         if (!c) return { ok: false, code: 'NOT_FOUND', message: 'Клиента нет в таблице' };
@@ -213,6 +224,20 @@ class FakeServer implements CabinetApi {
         return { ok: true, changes: [this.record('client', 'upsert', c.id, o, upd), this.act(`Изменена карточка: ${short(c.name)}`, o, 'сайт')], cursor: this.cursor };
       }
     }
+  }
+
+  async listPayments(month: string): Promise<{ payments: Payment[]; totalKopecks: number }> {
+    await wait(READ_MS);
+    if (!this.online) throw new Error('NETWORK');
+    const payments = [...this.payments.values()].filter((p) => p.date.startsWith(month)).map((p) => ({ ...p }));
+    const totalKopecks = payments.filter((p) => !p.status || p.status === 'received').reduce((s, p) => s + (p.kopecks ?? 0), 0);
+    return { payments, totalKopecks };
+  }
+
+  async listQuestions(): Promise<Question[]> {
+    await wait(READ_MS);
+    if (!this.online) throw new Error('NETWORK');
+    return [...this.questions.values()].filter((q) => q.answer === null).map((q) => ({ ...q, options: [...q.options] }));
   }
 
   // ── Правки «извне» для режима отладки: так выглядят изменения в таблице и через бота ──

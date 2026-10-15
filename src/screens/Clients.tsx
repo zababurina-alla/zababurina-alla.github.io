@@ -49,7 +49,8 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
   const isOther = (k: ClientKind | null) => !['fop1', 'fop2', 'fop3'].includes(k ?? '');
   const byKind = (k: ClientKind | null, f: KindFilter) => f === 'all' || k === f || (f === 'other' && isOther(k));
   const found = search(
-    store.clients.filter((c) => byKind(c.kind, kind)).map((c) => ({ ...c, extra: [...c.kved.map((k) => k.code), c.phone] })),
+    store.clients.filter((c) => byKind(c.kind, kind)).map((c) => ({ ...c, extra: [...c.kved.map((k) => k.code), c.phone],
+      words: [...c.kved.map((k) => k.title), c.keyIssuer, ...store.deadlines.filter((d) => d.clientId === c.id).map((d) => d.what)] })),
     q,
   );
   const count = (f: KindFilter) => store.clients.filter((c) => byKind(c.kind, f)).length;
@@ -70,7 +71,7 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
             <Icon name="search" size={22} />
             <span className="visually-hidden">Поиск клиента</span>
             <input ref={input} type="search" value={q} onChange={(e) => setQ(e.target.value)}
-              placeholder="Фамилия в любом падеже, КВЕД или телефон" spellCheck={false} autoComplete="off" />
+              placeholder="Фамилия, КВЕД, телефон, банк ключа, отчёт…" spellCheck={false} autoComplete="off" />
             {q ? <span className="search-input__count num" role="status">{found.length} из {total}</span> : <kbd className="kbd">/</kbd>}
           </label>
           <Tabs label="Тип клиента" value={kind} onChange={(k) => { setKind(k); play('tick'); }} items={[

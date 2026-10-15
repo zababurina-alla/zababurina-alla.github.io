@@ -17,7 +17,7 @@ const op = (id: string): WriteOp => ({ kind: 'cancelPayment', requestId: id, id:
 const ok: WriteResult = { ok: true, changes: [], cursor: 1 };
 
 function apiWith(write: (o: WriteOp) => Promise<WriteResult>): CabinetApi {
-  return { snapshot: vi.fn(), changesSince: vi.fn(), write };
+  return { snapshot: vi.fn(), changesSince: vi.fn(), write, listPayments: vi.fn(), listQuestions: vi.fn() };
 }
 
 const flush = () => new Promise((r) => setTimeout(r, 0));

@@ -498,3 +498,21 @@
   border-radius: var(--radius-l);
   box-shadow: 0 0 0 1px var(--line);
 }
+
+/* «Ключ продлён» в карточке (KeyRenew, техника сайта). Оформление — за отделом дизайна. */
+.keyrenew {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.keyrenew label {
+  display: grid;
+  gap: 2px;
+}
+
+.keyrenew__act {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

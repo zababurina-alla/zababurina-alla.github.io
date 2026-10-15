@@ -1,5 +1,6 @@
 // «Добавить клиента» — три коротких шага, на каждом одно главное действие; в конце видно, что создала система.
 import { useEffect, useRef, useState } from 'react';
+import { isLive } from '../config';
 import gsap from 'gsap';
 import { KIND_LABEL } from '../data/fake';
 import { useStore } from '../data/store';
@@ -16,7 +17,8 @@ import { reducedMotion } from '../ui/kit';
 import { Modal } from '../ui/Modal';
 import { useToast } from '../ui/toast';
 import { TableText } from '../ui/TableText';
-import { OBLIGATION, obligationOf } from '../ui/obligation';
+import { OBLIGATION_ICON } from '../ui/obligationIcon';
+import { obligationKind } from '../lib/obligation';
 import { useUi } from '../app/ui-context';
 
 // Мини-справочник КВЕД для прототипа. На живых данных — поиск по листу 📑 КВЕДы через API.
@@ -204,7 +206,10 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
                 ))}
               </ul>
             </div>
-            {kind && (
+            {kind && isLive() && (
+              <p className="sub">Начисления в месяц посчитает таблица по ставкам из «⚙️ Справочники» — они появятся в карточке после добавления.</p>
+            )}
+            {kind && !isLive() && (
               <div className="estimate">
                 <p className="field__label">Начисления в месяц ({KIND_LABEL[kind]})</p>
                 <dl className="charges charges--sm">
@@ -249,7 +254,7 @@ export function AddClientDialog({ open, onClose }: { open: boolean; onClose: () 
             <p className="created__lead"><span className="created__ok"><Icon name="check" /></span><span><strong>{result.client.name}</strong> записан в таблицу. Система сама создала сроки:</span></p>
             <ul className="created__list">
               {(result.created ?? []).map((d, i) => (
-                <li key={d.id} className="created__item" style={{ animationDelay: `${120 * i + 150}ms` }}><TableText text={d.what} fallback={OBLIGATION[obligationOf(d.what)].icon} /><span className="num sub">до {fmtDue(d.due)}</span></li>
+                <li key={d.id} className="created__item" style={{ animationDelay: `${120 * i + 150}ms` }}><TableText text={d.what} fallback={OBLIGATION_ICON[obligationKind(d.what)]} /><span className="num sub">до {fmtDue(d.due)}</span></li>
               ))}
             </ul>
           </div>

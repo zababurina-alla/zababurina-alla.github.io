@@ -19,6 +19,8 @@ interface Gis {
 const KEY = 'buh.session';
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
 const SILENT_MS = 15_000;
+/** nonce на сервере живёт 5 мин: экран входа берёт новый каждые 4 мин и при возврате во вкладку. */
+const REARM_MS = 4 * 60_000;
 
 function gis(): Gis | undefined {
   return (window as unknown as { google?: { accounts?: { id?: Gis } } }).google?.accounts?.id;
@@ -55,6 +57,8 @@ function loginMessage(e: unknown): string {
   if (e.code === 'FORBIDDEN') return 'У этого аккаунта Google нет доступа к кабинету. Войдите тем аккаунтом, который дал Дмитрий.';
   if (e.code === 'RATE_LIMIT') return 'Слишком много попыток входа — попробуйте через час';
   if (e.code === 'NETWORK') return 'Нет связи — проверьте интернет и попробуйте ещё раз';
+  // Чаще всего — устаревший одноразовый код входа: кнопка уже обновлена, повтор пройдёт.
+  if (e.code === 'AUTH_INVALID') return 'Вход не прошёл — нажмите кнопку «Войти через Google» ещё раз';
   return e.message || 'Не получилось войти — попробуйте ещё раз';
 }
 
@@ -72,6 +76,12 @@ export class Auth {
 
   private set(next: AuthState) { this.state = next; for (const fn of this.listeners) fn(); }
 
+  private armedAt = 0;
+  /** Одноразовые коды входа, уже отправленные серверу: второй раз тот же не уходит никогда. */
+  private usedNonces = new Set<string>();
+  private buttonEl: HTMLElement | null = null;
+  private arming: Promise<void> | null = null;
+
   /** Новый nonce и настройка GIS под него: initialize помнит только последний вызов, поэтому — перед каждой попыткой. */
   private async arm(): Promise<Gis> {
     const g = await loadGis();
@@ -84,9 +94,38 @@ export class Auth {
       cancel_on_tap_outside: false,
       context: 'signin',
       itp_support: true,
-      callback: (r: { credential?: string }) => { void this.finish(r.credential ?? '', nonce); },
+      callback: (r: { credential?: string }) => {
+        if (this.usedNonces.has(nonce)) {
+          // Кнопка не успела обновиться, а код уже потрачен: не отправляем, берём новый.
+          this.set({ ...this.state, error: 'Нажмите кнопку «Войти через Google» ещё раз' });
+          void this.rearm();
+          return;
+        }
+        this.usedNonces.add(nonce);
+        void this.finish(r.credential ?? '', nonce);
+      },
     });
+    this.armedAt = Date.now();
     return g;
+  }
+
+  /** Свежий код входа и кнопка заново (если экран входа на месте). Параллельные вызовы сливаются в один. */
+  private rearm(prompt = false): Promise<void> {
+    this.arming ??= (async () => {
+      try {
+        const g = await this.arm();
+        if (this.buttonEl) {
+          this.buttonEl.replaceChildren();
+          g.renderButton(this.buttonEl, { type: 'standard', theme: 'filled_blue', size: 'large', text: 'signin_with', shape: 'pill', locale: 'ru', width: '320' });
+        }
+        if (prompt) g.prompt();
+      } catch (e) {
+        this.set({ ...this.state, error: loginMessage(e) });
+      } finally {
+        this.arming = null;
+      }
+    })();
+    return this.arming;
   }
 
   private async finish(idToken: string, nonce: string) {
@@ -101,27 +140,27 @@ export class Auth {
     } catch (e) {
       this.signOutLocal(loginMessage(e));
       waiting?.reject(e);
+      // Код потрачен (или устарел) — сразу новый, чтобы следующее нажатие прошло.
+      if (this.buttonEl) void this.rearm();
     }
   }
-
-  private mounting: { el: HTMLElement; done: Promise<void> } | null = null;
 
   /** Кнопка «Войти через Google» в указанном месте экрана входа. Повторный вызов для того же места (React
    *  в разработке запускает эффекты дважды) не открывает второй запрос: FedCM допускает только один за раз. */
   mountButton(el: HTMLElement): Promise<void> {
-    if (this.mounting?.el === el) return this.mounting.done;
-    const done = (async () => {
-      try {
-        const g = await this.arm();
-        el.replaceChildren();
-        g.renderButton(el, { type: 'standard', theme: 'filled_blue', size: 'large', text: 'signin_with', shape: 'pill', locale: 'ru', width: '320' });
-        g.prompt();
-      } catch (e) {
-        this.set({ ...this.state, error: loginMessage(e) });
-      }
-    })();
-    this.mounting = { el, done };
-    return done;
+    if (this.buttonEl === el && (this.arming || Date.now() - this.armedAt < REARM_MS)) return this.arming ?? Promise.resolve();
+    this.buttonEl = el;
+    return this.rearm(true);
+  }
+
+  /** Экран входа ушёл — кнопку больше не перерисовываем. */
+  unmountButton(el: HTMLElement): void {
+    if (this.buttonEl === el) this.buttonEl = null;
+  }
+
+  /** Пока виден экран входа: код старше 4 мин — взять новый (сервер держит его 5 мин). */
+  keepFresh(): void {
+    if (this.buttonEl && !this.arming && Date.now() - this.armedAt >= REARM_MS) void this.rearm();
   }
 
   /** Тихий вход, когда сеанс истёк посреди работы. Не вышло за 15 с — экран входа. */
@@ -143,7 +182,6 @@ export class Auth {
 
   private signOutLocal(error: string | null) {
     this.stored = null;
-    this.mounting = null;
     try { sessionStorage.removeItem(KEY); } catch { /* нечего чистить */ }
     this.set({ status: 'signedOut', user: null, error });
   }

@@ -8,8 +8,9 @@ import { DeadlineTable } from './DeadlineTable';
 import { useStore } from '../data/store';
 import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
-import { OBLIGATION, obligationOf } from '../ui/obligation';
-import type { ObligationKind } from '../ui/obligation';
+import { OBLIGATION_ICON } from '../ui/obligationIcon';
+import { OBLIGATION_LABEL, obligationKind } from '../lib/obligation';
+import type { ObligationKind } from '../lib/obligation';
 
 const FOLD_AT = 8; // порог наш: больше 8 строк в дне — сворачиваем до 6
 const FOLD_SHOW = 6;
@@ -52,7 +53,7 @@ export function DayGroups({ items, empty, by = 'day' }: { items: DatedDeadline[]
   if (items.length === 0) return <>{empty}</>;
   const sorted = [...items].sort((a, b) => a.due.localeCompare(b.due));
   const groups = new Map<string, DatedDeadline[]>();
-  const keyOf = (d: DatedDeadline) => (by === 'kind' ? obligationOf(d.what) : by === 'client' ? d.clientId : daysBetween(TODAY, d.due) < 0 ? 'overdue' : d.due);
+  const keyOf = (d: DatedDeadline) => (by === 'kind' ? obligationKind(d.what) : by === 'client' ? d.clientId : daysBetween(TODAY, d.due) < 0 ? 'overdue' : d.due);
   for (const d of sorted) groups.set(keyOf(d), [...(groups.get(keyOf(d)) ?? []), d]);
   let entries = [...groups.entries()];
   if (by === 'client') {
@@ -63,8 +64,7 @@ export function DayGroups({ items, empty, by = 'day' }: { items: DatedDeadline[]
     <div className="dgroups">
       {entries.map(([k, list]) => {
         if (by === 'kind') {
-          const o = OBLIGATION[k as ObligationKind];
-          return <Group key={k} title={o.label} icon={o.icon} items={list} />;
+          return <Group key={k} title={OBLIGATION_LABEL[k as ObligationKind]} icon={OBLIGATION_ICON[k as ObligationKind]} items={list} />;
         }
         if (by === 'client') {
           const c = store.client(k);

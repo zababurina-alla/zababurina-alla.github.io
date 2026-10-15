@@ -24,6 +24,10 @@ export interface Client {
   /** [п. 17] Колонка F: банк / АЦСК, где выпущен ключ ЭЦП (одно поле вместо «банк» + «кем выдан»). */
   keyIssuer: string;
   keyFrom?: string | null; // ISO
+  /** Почта клиента (контракт §7); null — не указана. */
+  email?: string | null;
+  /** Клиент подключён к Telegram-боту (уведомления, напоминания). */
+  botConnected?: boolean;
   keyUntil: string | null; // ISO
   /** Начисления в месяц, копейки; считает сервер. kopecks = null → note — подсказка. */
   monthly: { name: string; kopecks: number | null; note: string }[];
