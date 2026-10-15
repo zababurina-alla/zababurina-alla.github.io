@@ -81,6 +81,9 @@ export type RemindResult =
   | { sent: true; sentAt: string | null; preview: string | null }
   | { sent: false; reason: 'noBot' | 'test' | 'unknown' | 'rateLimit'; message: string; retryAt?: string };
 
+/** Пробный прогон: текст на языке клиента; для «нет бота» / тестового клиента — preview null и причина. */
+export interface RemindPreview { preview: string | null; lang: string | null; reason: 'noBot' | 'test' | null; message: string | null }
+
 /** Ответ поиска КВЕД. note — пояснение сервера, когда не нашлось («не установлена радою»). */
 export interface KvedFound { items: KvedItem[]; note: string | null }
 
@@ -99,7 +102,7 @@ export interface CabinetApi {
   /** clients.remind — мимо очереди: результат нужен сразу, повтор не должен отправить сообщение дважды (requestId). */
   remindClient(req: RemindRequest, requestId: string): Promise<RemindResult>;
   /** clients.remind { preview:true } — текст сообщения на языке клиента, без отправки и без расхода лимита. */
-  remindPreview(req: Omit<RemindRequest, 'text'>): Promise<{ preview: string; lang: string | null }>;
+  remindPreview(req: Omit<RemindRequest, 'text'>): Promise<RemindPreview>;
   /** clients.get — карточка целиком (п. 3) и история изменений клиента (п. 9). */
   clientCard(id: string): Promise<ClientCard>;
   /** reference.rates — ставки года из «⚙️ Справочники». Цифр ставок в коде сайта нет. */

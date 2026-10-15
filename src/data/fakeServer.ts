@@ -3,7 +3,7 @@
 // — версии записей и ошибка CONFLICT; — журнал изменений с курсором; — повтор того же requestId не создаёт дубль.
 // Рычаги отладки (обрыв связи, отказ, правка извне) — для кнопок в режиме отладки.
 import { ACTIVITY, CLIENTS, DEADLINES, INBOX, KVEDS, PAYMENTS, QUESTIONS, RATES, TASKS } from './fake';
-import type { CabinetApi, Change, ClientCard, Entity, KvedAll, KvedFound, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
+import type { CabinetApi, Change, ClientCard, Entity, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Deadline, InboxItem, KvedItem, Payment, Question, Rates, Task } from './types';
 import { fold } from '../lib/search';
 import { TODAY, addDays, endOfMonth, fmtDate, fmtDue } from '../lib/dates';
@@ -298,12 +298,13 @@ class FakeServer implements CabinetApi {
     return [...this.questions.values()].filter((q) => q.answer === null).map((q) => ({ ...q, options: [...q.options] }));
   }
 
-  async remindPreview(req: Omit<RemindRequest, 'text'>): Promise<{ preview: string; lang: string | null }> {
+  async remindPreview(req: Omit<RemindRequest, 'text'>): Promise<RemindPreview> {
     await wait(READ_MS);
     const c = this.clients.get(req.clientId);
+    if (c?.botConnected === false) return { preview: null, lang: 'uk', reason: 'noBot', message: 'У клиента нет бота в Telegram — позвоните или напишите сами' };
     const d = req.deadlineId ? this.deadlines.get(req.deadlineId) : undefined;
     const hi = `Добрий день${c ? `, ${c.name.split(' ')[1] ?? ''}` : ''}!`;
-    return { preview: d ? `${hi} 📅 Нагадую: ${d.what} — до ${fmtDate(d.due ?? TODAY)}.` : `${hi} 🔐 Ключ ЕЦП діє до ${fmtDate(c?.keyUntil ?? TODAY)} — час продовжити.`, lang: 'uk' };
+    return { preview: d ? `${hi} 📅 Нагадую: ${d.what} — до ${fmtDate(d.due ?? TODAY)}.` : `${hi} 🔐 Ключ ЕЦП діє до ${fmtDate(c?.keyUntil ?? TODAY)} — час продовжити.`, lang: 'uk', reason: null, message: null };
   }
 
   private reminded = new Map<string, number>();

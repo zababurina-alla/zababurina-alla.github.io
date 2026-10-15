@@ -16,7 +16,7 @@ import { readSnap, saveSnap } from './snapCache';
 import { Outbox } from './outbox';
 import type { Counters, OutboxEvent, OutboxItem } from './outbox';
 import { newRequestId } from './api';
-import type { Change, DeadlinePatch, RemindRequest, RemindResult, Snapshot, TaskPatch, WriteOp, WriteResult } from './api';
+import type { Change, DeadlinePatch, RemindPreview, RemindRequest, RemindResult, Snapshot, TaskPatch, WriteOp, WriteResult } from './api';
 import type { Activity, Client, DatedDeadline, Deadline, InboxItem, Payment, Question, SaveState, Task } from './types';
 import { isDated } from './types';
 import { TODAY, addDays, fmtDate, plural } from '../lib/dates';
@@ -99,7 +99,7 @@ interface Store {
   /** clients.remind — напомнить клиенту в Telegram (под writes.deadlines). Ответ — сразу, мимо очереди. */
   remindClient: (req: RemindRequest) => Promise<RemindResult>;
   /** Черновик напоминания от сервера (пробный запуск) — только если сервер это умеет (features: remindPreview). */
-  remindPreview: (req: Omit<RemindRequest, 'text'>) => Promise<string | null>;
+  remindPreview: (req: Omit<RemindRequest, 'text'>) => Promise<RemindPreview | null>;
   /** clients.get: карточка целиком — строка клиента, его платежи и задачи дополняют общие списки; история — в ответе. */
   loadClientCard: (id: string) => Promise<Activity[]>;
   /** Поправить задачу (tasks.update): текст, срок, приоритет, тип, клиент; null очищает срок/клиента. */
@@ -657,7 +657,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const remindPreview = useCallback(async (req: Omit<RemindRequest, 'text'>) => {
     if (!hasFeature('remindPreview')) return null;
-    try { return (await api.remindPreview(req)).preview || null; } catch { return null; }
+    try { return await api.remindPreview(req); } catch { return null; }
   }, []);
 
   const loadClientCard = useCallback(async (id: string) => {

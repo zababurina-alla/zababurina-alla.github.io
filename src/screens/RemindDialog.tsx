@@ -11,11 +11,10 @@ import { Modal } from '../ui/Modal';
 import { roMessage } from '../ui/readonly';
 import { useToast } from '../ui/toast';
 
-const firstName = (c: Client) => c.name.trim().split(/\s+/)[1] ?? '';
-
-/** Черновик сообщения клиенту (украинский, без эмодзи). */
+/** Запасной черновик (украинский, без эмодзи), когда сервер не дал свой. Без имени: в обращении нужен звательный
+ *  падеж («Ірино», не «Ірина») — его правильно строит сервер на языке клиента, не сайт. */
 export function remindDraft(c: Client, about: { deadline?: DatedDeadline; key?: boolean }): string {
-  const hi = firstName(c) && !/^(ТОВ|ПП|ФГ)/.test(c.name) ? `Добрий день, ${firstName(c)}!` : 'Добрий день!';
+  const hi = 'Добрий день!';
   if (about.deadline) {
     const what = about.deadline.what.replace(/\p{Extended_Pictographic}️?/gu, '').trim();
     return `${hi} Нагадую: «${what}» — термін до ${fmtDate(about.deadline.due)}. Якщо вже все зроблено — дякую, просто напишіть мені.`;
@@ -45,6 +44,8 @@ export function RemindDialog({ open, onClose, client, deadline, keyReminder = fa
   const [text, setText] = useState(() => remindDraft(client, about));
   const [edited, setEdited] = useState(false);
   const [sending, setSending] = useState(false);
+  // Сервер заранее сказал, что не отправит (нет бота / тестовый клиент) — говорим сразу, «Отправить» не нужна.
+  const [blocked, setBlocked] = useState<string | null>(null);
   const can = canWrite('remind');
   const kind: RemindRequest['kind'] = deadline ? 'deadline' : keyReminder ? 'key' : 'custom';
   // Черновик сервера (на языке клиента, как в боте) — если сервер умеет пробный запуск; свой украинский — запасной.
@@ -52,7 +53,10 @@ export function RemindDialog({ open, onClose, client, deadline, keyReminder = fa
   useEffect(() => {
     let alive = true;
     void remindPreview({ clientId: client.id, kind, ...(deadline ? { deadlineId: deadline.id } : {}) }).then((p) => {
-      if (alive && p) setText((cur) => (edited ? cur : p));
+      if (!alive || !p) return;
+      if (p.preview) setText((cur) => (edited ? cur : p.preview ?? cur));
+      if (p.reason === 'noBot') setBlocked(p.message ?? 'У клиента нет бота в Telegram — позвоните или напишите сами');
+      else if (p.reason === 'test') setBlocked(p.message ?? 'Тестовый клиент — сообщение не уйдёт');
     });
     return () => { alive = false; };
     // edited читаем на момент ответа — повторно звать сервер из-за него не нужно
@@ -81,13 +85,14 @@ export function RemindDialog({ open, onClose, client, deadline, keyReminder = fa
     <Modal open={open} onClose={onClose} title={`Напомнить: ${name}`} footer={
       <>
         <button type="button" className="btn btn--secondary" onClick={onClose}>Отмена</button>
-        <button type="button" className="btn btn--primary btn--grow" disabled={sending || !text.trim()} onClick={() => void send()}>
+        <button type="button" className="btn btn--primary btn--grow" disabled={sending || !text.trim() || blocked !== null} onClick={() => void send()}>
           {sending ? 'Отправляю…' : 'Отправить в Telegram'}</button>
       </>
     }>
       <div className="field remind">
         <label className="field__label" htmlFor="remind-text">Сообщение клиенту — уйдёт ровно так</label>
         <textarea id="remind-text" className="input remind__text" rows={5} value={text} onChange={(e) => { setEdited(true); setText(e.target.value); }} />
+        {blocked && <p className="remind__blocked" role="status">{blocked}</p>}
         <p className="field__hint">Напоминание об одном и том же — не чаще раза в 12 часов. {can ? '' : roMessage('remind')}</p>
       </div>
     </Modal>

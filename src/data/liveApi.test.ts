@@ -315,6 +315,12 @@ describe('живой адаптер: чтение', () => {
     const s = server(ok({ preview: 'Добрий день! 📅 Нагадую…', lang: 'uk' }));
     const r = await new LiveApi(URL_, auth(), s.fetchImpl).remindPreview({ clientId: 'C-1', kind: 'deadline', deadlineId: 'D-1' });
     expect(s.sent[0]).toEqual({ v: 1, action: 'clients.remind', payload: { clientId: 'C-1', kind: 'deadline', preview: true, deadlineId: 'D-1' }, session: 'S1' });
-    expect(r).toEqual({ preview: 'Добрий день! 📅 Нагадую…', lang: 'uk' });
+    expect(r).toEqual({ preview: 'Добрий день! 📅 Нагадую…', lang: 'uk', reason: null, message: null });
+  });
+
+  it('пробный прогон: нет бота — preview null и причина (окно скажет сразу)', async () => {
+    const s = server(ok({ preview: null, lang: 'uk', reason: 'noBot', message: 'У клієнта немає бота' }));
+    expect(await new LiveApi(URL_, auth(), s.fetchImpl).remindPreview({ clientId: 'C-1', kind: 'key' }))
+      .toEqual({ preview: null, lang: 'uk', reason: 'noBot', message: 'У клієнта немає бота' });
   });
 });

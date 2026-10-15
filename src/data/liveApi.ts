@@ -2,7 +2,7 @@
 // (docs/api-contract.md v2.1). Экраны и очередь записей не знают, с кем говорят.
 import { ApiError, call } from './transport';
 import type { Envelope } from './transport';
-import type { CabinetApi, Change, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
+import type { CabinetApi, Change, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Deadline, InboxItem, KvedItem, Payment, Question, RateGroup, Rates, Task } from './types';
 
 /** Откуда брать сеанс и как тихо войти заново (auth.ts). */
@@ -293,12 +293,13 @@ export class LiveApi implements CabinetApi {
   }
 
   /** Пробный запуск напоминания: сервер собирает текст на языке клиента и ничего не отправляет. */
-  async remindPreview(req: Omit<RemindRequest, 'text'>): Promise<{ preview: string; lang: string | null }> {
+  async remindPreview(req: Omit<RemindRequest, 'text'>): Promise<RemindPreview> {
     const payload: Record<string, unknown> = { clientId: req.clientId, kind: req.kind, preview: true };
     if (req.deadlineId) payload.deadlineId = req.deadlineId;
     if (req.period) payload.period = req.period;
-    const env = await this.rpc<{ preview?: unknown; lang?: unknown }>('clients.remind', payload);
-    return { preview: text(env.data.preview), lang: text(env.data.lang) || null };
+    const env = await this.rpc<{ preview?: unknown; lang?: unknown; reason?: unknown; message?: unknown }>('clients.remind', payload);
+    const d = env.data;
+    return { preview: text(d.preview) || null, lang: text(d.lang) || null, reason: d.reason === 'noBot' || d.reason === 'test' ? d.reason : null, message: text(d.message) || null };
   }
 
   /** Карточка целиком: чтение, без requestId. Пустые клетки нормализуются, как в снимке. */
