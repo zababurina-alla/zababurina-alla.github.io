@@ -72,6 +72,8 @@ interface Store {
   addClient: (c: Omit<Client, 'id' | 'version'>, onSaved?: (created: Deadline[], client: Client) => void) => Client;
   /** baseVersion — версия, которую мама видела, когда начала править (бриф, п. 6: конфликт). */
   updatePhone: (clientId: string, phone: string, baseVersion: number) => void;
+  /** Почта клиента (clients.update { email }). */
+  updateEmail: (clientId: string, email: string, baseVersion: number) => void;
   addTask: (t: Omit<Task, 'id' | 'version' | 'done'>) => void;
   /** Срок: в работе / ожидание / отложить до / перенести дату (deadlines.update). */
   updateDeadline: (id: string, patch: DeadlinePatch, label: string) => void;
@@ -467,6 +469,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     send({ kind: 'updateClient', requestId: newRequestId(), id: clientId, baseVersion, patch: { phone } }, 'Телефон клиента');
   }, [send]);
 
+  const updateEmail = useCallback((clientId: string, email: string, baseVersion: number) => {
+    send({ kind: 'updateClient', requestId: newRequestId(), id: clientId, baseVersion, patch: { email } }, 'Почта клиента');
+  }, [send]);
+
   const addTask = useCallback((t: Omit<Task, 'id' | 'version' | 'done'>) => {
     const requestId = newRequestId();
     send({ kind: 'createTask', requestId, task: { ...t, id: requestId, version: 1, done: false } }, `Задача «${t.text}»`);
@@ -551,10 +557,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<Store>(() => ({
     loaded, online, clients, deadlines, undated, payments, activity, tasks, questions, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions,
+    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance,
   }), [loaded, online, clients, deadlines, undated, payments, activity, tasks, questions, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions,
+    client, closeDeadline, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, resolveConflict, revealPassword, answerQuestion, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

@@ -82,27 +82,36 @@ function PasswordReveal({ clientId }: { clientId: string }) {
   );
 }
 
-function PhoneField({ clientId, phone, version }: { clientId: string; phone: string; version: number }) {
+/** Поле карточки с правкой на месте: телефон, почта. Версия — та, что мама видела, начиная правку (конфликт). */
+function EditableField({ clientId, value, version, label, inputMode, empty, onSave }: {
+  clientId: string; value: string; version: number; label: string; inputMode: 'tel' | 'email';
+  empty: string; onSave: (v: string, base: number) => void;
+}) {
   const store = useStore();
   const [edit, setEdit] = useState<string | null>(null);
-  // Версия, которую мама видела в момент начала правки — с ней правка и уйдёт в таблицу.
   const [base, setBase] = useState(version);
   const saving = store.pending.some((p) => p.op.kind === 'updateClient' && p.op.id === clientId);
   if (edit === null) {
     return (
       <p className="row-gap">
-        <span className="num">{phone}</span>
-        {saving ? <SaveBadge state="saving" offline={!store.online} /> : (canWrite('clients') ? <button type="button" className="link" onClick={() => { setBase(version); setEdit(phone); }}>Изменить</button> : <span className="sub">изменить — в таблице</span>)}
+        {value ? <span className="num">{value}</span> : <span className="nil">{empty}</span>}
+        {saving ? <SaveBadge state="saving" offline={!store.online} /> : (canWrite('clients') ? <button type="button" className="link" onClick={() => { setBase(version); setEdit(value); }}>Изменить</button> : <span className="sub">изменить — в таблице</span>)}
       </p>
     );
   }
   return (
-    <form className="inline-edit" onSubmit={(e) => { e.preventDefault(); if (edit.trim() && edit !== phone) store.updatePhone(clientId, edit.trim(), base); setEdit(null); }}>
-      <input className="input num" value={edit} onChange={(e) => setEdit(e.target.value)} inputMode="tel" autoFocus aria-label="Телефон" />
+    <form className="inline-edit" onSubmit={(e) => { e.preventDefault(); if (edit.trim() && edit.trim() !== value) onSave(edit.trim(), base); setEdit(null); }}>
+      <input className="input num" value={edit} onChange={(e) => setEdit(e.target.value)} inputMode={inputMode} type={inputMode === 'email' ? 'email' : 'text'} autoFocus aria-label={label} />
       <button type="submit" className="btn btn--primary btn--sm">Сохранить</button>
       <button type="button" className="btn btn--ghost btn--sm" onClick={() => setEdit(null)}>Отмена</button>
     </form>
   );
+}
+
+function PhoneField({ clientId, phone, version }: { clientId: string; phone: string; version: number }) {
+  const store = useStore();
+  return <EditableField clientId={clientId} value={phone} version={version} label="Телефон" inputMode="tel" empty="не указан"
+    onSave={(v, base) => store.updatePhone(clientId, v, base)} />;
 }
 
 export function ClientPanel({ id, onClose }: { id: string | null; onClose: () => void }) {
@@ -168,9 +177,14 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                 </section>
                 <section className="cp__block cp__facts">
                   <div><h3 className="cp__h">Ключ ЭЦП</h3>{keyDays === null ? <p className="cp__key"><Icon name="inactive" size={18} className="urgency--grey" /><span className="nil">ключа нет в таблице</span></p>
-                    : <p className="cp__key"><Icon name={URGENCY_ICON[statusByDays(keyDays)]} size={18} className={`urgency--${statusByDays(keyDays)}`} /><span className="num">до {fmtDate(c.keyUntil ?? '')}</span><span className={`due--${statusByDays(keyDays)}`}>{daysLabel(keyDays)}</span></p>}<KeyRenew c={c} /></div>
+                    : <p className="cp__key"><Icon name={URGENCY_ICON[statusByDays(keyDays)]} size={18} className={`urgency--${statusByDays(keyDays)}`} /><span className="num">до {fmtDate(c.keyUntil ?? '')}</span><span className={`due--${statusByDays(keyDays)}`}>{daysLabel(keyDays)}</span></p>}{c.keyFrom && <p className="sub">выпущен {fmtDate(c.keyFrom)}</p>}<KeyRenew c={c} /></div>
                   <div><h3 className="cp__h">Ключ выпущен</h3><p>{c.keyIssuer || <span className="nil">не указано</span>}</p></div>
                   <div><h3 className="cp__h">Телефон</h3><PhoneField clientId={c.id} phone={c.phone} version={c.version} /></div>
+                  <div><h3 className="cp__h">Почта</h3><EditableField clientId={c.id} value={c.email ?? ''} version={c.version} label="Почта" inputMode="email"
+                    empty="не указана" onSave={(v, base) => store.updateEmail(c.id, v, base)} /></div>
+                  {c.botConnected !== undefined && (
+                    <div><h3 className="cp__h">Telegram-бот</h3><p>{c.botConnected ? 'подключён — уведомления уходят клиенту' : <span className="nil">не подключён — уведомлений клиенту нет</span>}</p></div>
+                  )}
                   <div><h3 className="cp__h">Пароль от кабинета</h3><PasswordReveal clientId={c.id} /></div>
                 </section>
                 <section className="cp__block">

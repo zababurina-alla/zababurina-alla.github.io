@@ -34,7 +34,7 @@ export type WriteOp =
   | { kind: 'addPayment'; requestId: string; payment: Payment }
   | { kind: 'cancelPayment'; requestId: string; id: string; baseVersion: number }
   | { kind: 'addClient'; requestId: string; client: Client }
-  | { kind: 'updateClient'; requestId: string; id: string; baseVersion: number; patch: Partial<Pick<Client, 'phone' | 'keyIssuer' | 'keyFrom' | 'keyUntil'>> }
+  | { kind: 'updateClient'; requestId: string; id: string; baseVersion: number; patch: Partial<Pick<Client, 'phone' | 'email' | 'keyIssuer' | 'keyFrom' | 'keyUntil'>> }
   /** deadlines.update (контракт 8.3): дата, статус (кроме done — закрытие только close), заметка. */
   | { kind: 'updateDeadline'; requestId: string; id: string; baseVersion: number; patch: DeadlinePatch }
   | { kind: 'createTask'; requestId: string; task: Task }
