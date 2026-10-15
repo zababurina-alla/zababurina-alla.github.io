@@ -15,12 +15,13 @@ import { Empty } from '../ui/Empty';
 import { shortName } from '../ui/names';
 import { play } from '../lib/sound';
 import { useUi } from '../app/ui-context';
-import { useToast } from '../ui/toast';
-import { canWrite, hasFeature } from '../config';
-import type { Question } from '../data/types';
+import { hasFeature } from '../config';
 import { URGENCY_ICON } from './DeadlineTable';
 import { TableText } from '../ui/TableText';
 import { DayGroups } from './DayGroups';
+import { QuestionsPanel } from './Questions';
+import { Hint, dismissHint } from '../ui/Hint';
+import { navigate } from '../router';
 
 type Filter = 'week' | 'month' | 'overdue' | 'burning' | 'soon';
 
@@ -72,31 +73,6 @@ function AreaChart({ cumulative, month }: { cumulative: number[]; month: string 
 }
 
 /** Ответ на вопрос: варианты — кнопками, текст или число — полем. Записывается в таблицу, вопрос уходит из списка. */
-export function QuestionAnswer({ q }: { q: Question }) {
-  const store = useStore();
-  const toast = useToast();
-  const [text, setText] = useState('');
-  if (!canWrite('questions')) return null;
-  const send = (value: string) => {
-    const v = value.trim();
-    if (!v) return;
-    store.answerQuestion(q.id, v, () => toast({ text: `Ответ «${v}» записан в таблицу` }));
-  };
-  if (q.type === 'choice') {
-    return (
-      <div className="question__answers" role="group" aria-label="Варианты ответа">
-        {q.options.map((o) => <button key={o} type="button" className="btn btn--secondary btn--sm" onClick={() => send(o)}>{o}</button>)}
-      </div>
-    );
-  }
-  return (
-    <form className="question__answers" onSubmit={(e) => { e.preventDefault(); send(text); }}>
-      <input className="input input--sm" value={text} onChange={(e) => setText(e.target.value)} aria-label="Ваш ответ"
-        inputMode={q.type === 'number' ? 'decimal' : 'text'} placeholder={q.type === 'number' ? 'Число' : 'Ответ'} autoComplete="off" />
-      <button type="submit" className="btn btn--primary btn--sm" disabled={!text.trim()}>Ответить</button>
-    </form>
-  );
-}
 
 const SOURCE_ICON: Record<string, IconName> = { 'сайт': 'globe', 'бот': 'bot', 'таблица': 'sheet' };
 
@@ -129,9 +105,6 @@ export function Today() {
   const scope = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLElement>(null);
   const [filter, setFilter] = useState<Filter>('week');
-  // Вопросов бывает десятки (на живой таблице 48): видно 2, остальные — по кнопке, чтобы колонка не растягивалась.
-  const Q_SHOWN = 2;
-  const [allQ, setAllQ] = useState(false);
 
   // Пороги — словарь значков, п. 1: просрочено < 0, горит 0–7, скоро 8–30 (как цвет строк, statusByDays).
   const withDays = store.deadlines.map((d) => ({ d, st: statusByDays(daysBetween(TODAY, d.due)), days: daysBetween(TODAY, d.due) }));
@@ -141,6 +114,9 @@ export function Today() {
   const KEY_DAYS = 14; // бриф, п. 3: ключи, истекающие ≤ 14 дней
   const keys = store.clients.filter((c) => c.keyUntil && daysBetween(TODAY, c.keyUntil) <= KEY_DAYS)
     .sort((a, b) => (a.keyUntil ?? '').localeCompare(b.keyUntil ?? ''));
+  // Закончившиеся ключи — не «заканчиваются в ближайшие 14 дней»: считаем и называем отдельно (находка «Пользователя» № 4).
+  const keysGone = keys.filter((c) => daysBetween(TODAY, c.keyUntil ?? TODAY) < 0).length;
+  const keysSoon = keys.length - keysGone;
   const month = monthStats(store.payments, TODAY);
   // Задачи на сегодня: просроченные и сегодняшние, самые важные — выше.
   const PRIO = { critical: 0, high: 1, medium: 2, low: 3 } as const;
@@ -159,11 +135,29 @@ export function Today() {
   const toggle = (f: Filter) => {
     setFilter((cur) => (cur === f ? 'week' : f));
     play('tick');
+    dismissHint('today.tally');
     // На узком экране список ниже плашек — показать его.
     window.requestAnimationFrame(() => {
       const top = listRef.current?.getBoundingClientRect().top ?? 0;
       if (top > window.innerHeight * 0.75) listRef.current?.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' });
     });
+  };
+
+  // «План на сегодня»: дела дня по порядку, как шаги «Сверки рейсов» (1 · 2 · 3). Пустые шаги не показываем.
+  // Каждый шаг — одно нажатие к нужному: фильтр списка, лист задач или вопросов, экран ключей.
+  const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' });
+  const plan = [
+    overdue.length && { key: 'overdue', icon: 'overdue' as const, tone: 'red', title: 'Закрыть просроченные', n: `${overdue.length} ${plural(overdue.length, 'срок', 'срока', 'сроков')}` },
+    todayTasks.length && { key: 'tasks', icon: 'tasks' as const, tone: 'accent', title: 'Задачи на сегодня', n: `${todayTasks.length} ${plural(todayTasks.length, 'задача', 'задачи', 'задач')}` },
+    store.questions.length && { key: 'q', icon: 'questions' as const, tone: 'wheat', title: 'Ответить Дмитрию', n: `${store.questions.length} ${plural(store.questions.length, 'вопрос', 'вопроса', 'вопросов')}` },
+    keys.length && { key: 'keys', icon: 'keys' as const, tone: keysGone ? 'red' : 'accent', title: keysGone ? 'Ключи ЭЦП: закончились' : 'Продлить ключи ЭЦП', n: `${keys.length} ${plural(keys.length, 'клиент', 'клиента', 'клиентов')}` },
+    burning.length && { key: 'burning', icon: 'burning' as const, tone: 'orange', title: 'Горит на неделе', n: `${burning.length} ${plural(burning.length, 'срок', 'срока', 'сроков')}` },
+  ].filter(Boolean) as { key: string; icon: IconName; tone: string; title: string; n: string }[];
+  const goPlan = (key: string) => {
+    if (key === 'overdue' || key === 'burning') toggle(key);
+    else if (key === 'tasks') scrollTo('t-tasks');
+    else if (key === 'q') scrollTo('t-q');
+    else if (key === 'keys') navigate('#/keys');
   };
 
   const hour = new Date().getHours();
@@ -179,7 +173,8 @@ export function Today() {
   const lede: string[] = [];
   if (overdue.length && burning.length) lede.push(`Ещё ${burning.length} ${plural(burning.length, 'горит', 'горят', 'горят')} до ${fmtDayMonth(weekEnd)}.`);
   if (!overdue.length && !burning.length) lede.push(soon.length ? `Ближайшие сроки — через 8–30 дней, их ${soon.length}.` : 'Открытых сроков на месяц вперёд нет.');
-  if (keys.length) lede.push(`${keys.length} ${plural(keys.length, 'ключ ЭЦП заканчивается', 'ключа ЭЦП заканчиваются', 'ключей ЭЦП заканчиваются')} в ближайшие ${KEY_DAYS} дней.`);
+  if (keysGone) lede.push(`${keysGone} ${plural(keysGone, 'ключ ЭЦП уже закончился', 'ключа ЭЦП уже закончились', 'ключей ЭЦП уже закончились')}.`);
+  if (keysSoon) lede.push(`${keysSoon} ${plural(keysSoon, 'ключ ЭЦП заканчивается', 'ключа ЭЦП заканчиваются', 'ключей ЭЦП заканчиваются')} в ближайшие ${KEY_DAYS} дней.`);
   if (todayTasks.length) lede.push(`${todayTasks.length} ${plural(todayTasks.length, 'задача', 'задачи', 'задач')} на сегодня.`);
   if (store.questions.length) lede.push(`Дмитрий ждёт ответа на ${store.questions.length} ${plural(store.questions.length, 'вопрос', 'вопроса', 'вопросов')}.`);
   if (overdue.length) lede.push('Начните с красных.');
@@ -190,12 +185,31 @@ export function Today() {
         <p className="eyebrow">{weekday(TODAY)} · {fmtDayMonth(TODAY)} {TODAY.slice(0, 4)}</p>
         <h1 id="t-hello" className="hero__title">{hello},<br /><em className={overdue.length ? 'is-red' : undefined}>{headline}</em></h1>
         <p className="hero__lede">{lede.join(' ')}</p>
+        <Hint id="today.tally">Нажмите плашку — в списке ниже останутся только эти сроки. Нажмите ещё раз — снова вся неделя.</Hint>
         <div className="tallies" role="group" aria-label="Сроки по срочности — нажмите, чтобы показать">
           <Tally icon="overdue" tone="red" n={overdue.length} label="Просрочено" note="срок прошёл" pressed={filter === 'overdue'} onClick={() => toggle('overdue')} />
           <Tally icon="burning" tone="orange" n={burning.length} label="Горит" note="0–7 дней" pressed={filter === 'burning'} onClick={() => toggle('burning')} />
           <Tally icon="soon" tone="yellow" n={soon.length} label="Скоро" note="8–30 дней" pressed={filter === 'soon'} onClick={() => toggle('soon')} />
-          <Tally icon="keys" tone="accent" n={keys.length} label="Ключи ЭЦП" note={`до ${KEY_DAYS} дней`} href="#/keys" />
+          <Tally icon="keys" tone={keysGone ? 'red' : 'accent'} n={keys.length} label="Ключи ЭЦП"
+            note={keysGone ? `${keysGone} ${plural(keysGone, 'закончился', 'закончились', 'закончились')}, ещё ${keysSoon} — до ${KEY_DAYS} дн.` : `до ${KEY_DAYS} дней`} href="#/keys" />
         </div>
+      </section>
+
+      <section className="plan reveal" aria-labelledby="t-plan">
+        <h2 id="t-plan" className="plan__title">План на сегодня</h2>
+        {plan.length ? (
+          <ol className="plan__steps">
+            {plan.map((p, i) => (
+              <li key={p.key}>
+                <button type="button" className={`plan__step plan__step--${p.tone}`} onClick={() => goPlan(p.key)}>
+                  <span className="plan__n display">{i + 1}</span>
+                  <span className="plan__text"><strong>{p.title}</strong><span className="sub">{p.n}</span></span>
+                  <Icon name={p.icon} size={20} className={`urgency--${p.tone === 'accent' || p.tone === 'wheat' ? 'grey' : p.tone}`} />
+                </button>
+              </li>
+            ))}
+          </ol>
+        ) : <p className="plan__done"><Icon name="done" size={20} className="urgency--green" />На сегодня всё сделано: ни просрочек, ни задач, ни вопросов.</p>}
       </section>
 
       <div className="today-grid">
@@ -204,9 +218,10 @@ export function Today() {
             <h2 id="t-dl" className="panel__title">{FILTER_TITLE[filter]}<span className="sub num">{list.length}</span></h2>
             <Tabs label="Какие сроки показать" value={filter} onChange={(f) => { setFilter(f); play('tick'); }} items={[
               { id: 'week', label: 'Неделя', count: overdue.length + burning.length },
-              { id: 'month', label: 'Месяц', count: withDays.filter((x) => x.days <= 30).length },
+              { id: 'month', label: '30 дней', count: withDays.filter((x) => x.days <= 30).length },
             ]} />
           </header>
+          {list.length > 0 && <Hint id="today.tick">Круг слева — «сдано и оплачено»: нажмите, когда отчёт сдан и налог оплачен. Ошиблись — «Отменить» 10 секунд. Наведите на строку — появятся «Позвонить», «Платёж» и «Действия».</Hint>}
           <DayGroups items={list} empty={
             <Empty pic="calm" title={filter === 'week' ? 'На этой неделе сдавать нечего' : 'Здесь пусто'}>
               {filter === 'week' ? 'Ни просроченных, ни горящих сроков. Можно выдохнуть.' : 'Сроков с такой срочностью нет.'}
@@ -222,25 +237,7 @@ export function Today() {
                 .map((it) => <InboxCard key={it.id} it={it} compact />)}</ul>
             </section>
           )}
-          {store.questions.length > 0 && (
-            <section className="panel panel--wheat reveal" aria-labelledby="t-q">
-              <header className="panel__head">
-                <h2 id="t-q" className="panel__title"><Icon name="questions" tile="wheat" />{store.questions.length === 1 ? 'Вопрос от Дмитрия' : `Вопросы от Дмитрия: ${store.questions.length}`}</h2>
-              </header>
-              {(allQ ? store.questions : store.questions.slice(0, Q_SHOWN)).map((q) => (
-                <div key={q.id} className="question">
-                  <p className="question__text"><TableText text={q.text} /></p>
-                  <QuestionAnswer q={q} />
-                  <p className="question__foot sub">{q.askedAt ? `${fmtDayMonth(q.askedAt.slice(0, 10))}, ${q.askedAt.slice(11, 16)} · ` : ''}можно ответить и в Telegram-боте</p>
-                </div>
-              ))}
-              {!allQ && store.questions.length > Q_SHOWN && (
-                <button type="button" className="dgroup__more" onClick={() => setAllQ(true)}>
-                  Показать все {store.questions.length} {plural(store.questions.length, 'вопрос', 'вопроса', 'вопросов')}
-                </button>
-              )}
-            </section>
-          )}
+          <QuestionsPanel />
 
           {todayTasks.length > 0 && (
             <section className="panel reveal" aria-labelledby="t-tasks">
@@ -291,6 +288,9 @@ export function Today() {
 
           <section className="panel reveal money-card" aria-labelledby="t-money">
             <header className="panel__head"><h2 id="t-money" className="panel__title">Получено в {monthName(month.key, 'prep')}</h2><a className="link" href="#/payments">Платежи</a></header>
+            {month.total === 0 && month.prevTotal === 0 ? (
+              <p className="panel__note sub">В таблице платежей за {monthName(month.key, 'nom').toLowerCase()} и {monthName(month.prevKey, 'nom').toLowerCase()} нет — суммы появятся, когда платёж запишут в таблицу, бота или здесь.</p>
+            ) : (
             <div className="money-card__body">
               <p className="money-card__sum display"><RollingNumber value={month.total} format={(n) => formatMoney(n)} /></p>
               <p className="sub">в {monthName(month.prevKey, 'prep')} — <Money text={formatMoney(month.prevTotal)} />
@@ -299,6 +299,7 @@ export function Today() {
                 )}</p>
               <AreaChart cumulative={month.cumulative} month={month.key} />
             </div>
+            )}
           </section>
 
           <section className="panel reveal" aria-labelledby="t-act">

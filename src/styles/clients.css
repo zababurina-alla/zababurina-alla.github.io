@@ -516,3 +516,45 @@
   flex-wrap: wrap;
   gap: var(--space-2);
 }
+
+/* Сумма в месяц под именем — только на узком листе, где колонки «В месяц» нет (№ 21) */
+.ctable__month-inline {
+  display: none;
+}
+
+@container (max-width: 1099px) {
+  .ctable__month-inline {
+    display: inline;
+  }
+}
+
+@container (min-width: 760px) and (max-width: 1099px) {
+  .ctable__month-inline {
+    display: none;
+  }
+}
+
+/* «Ключ продлён…» (KeyRenew, техника сайта): форма раскрывается вложенным блоком, как действия со сроком */
+.keyrenew {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-l);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line), var(--shadow-1);
+  animation: warn-in var(--dur-pop) var(--spring-pop);
+}
+
+.keyrenew label {
+  display: grid;
+  gap: 4px;
+}
+
+.keyrenew__act {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

@@ -107,11 +107,12 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
                     <button type="button" className="ctable__open" onClick={() => ui.openClient(c.id)}>
                       <strong data-client-name={c.id}>{c.name}</strong>
                     </button>
-                    <span className="sub">{c.kind ? kindLabel(c.kind) : <span className="nil">тип не указан</span>}{c.employer ? ', работодатель' : ''}</span>
+                    <span className="sub">{c.kind ? kindLabel(c.kind) : <span className="nil">тип не указан</span>}{c.employer ? ', работодатель' : ''}
+                      {month > 0 && <span className="ctable__month-inline"> · <Money text={formatMoney(month)} /> в месяц</span>}</span>
                   </span>
                 </span>
                 <span role="cell" className="ctable__kved num">{c.kved.length ? c.kved.map((k) => k.code).join(', ') : <span className="nil">не указан</span>}</span>
-                <span role="cell" className="ta-r ctable__sum">{month ? <Money text={formatMoney(month)} /> : <span className="sub">по доходу</span>}</span>
+                <span role="cell" className="ta-r ctable__sum">{month ? <Money text={formatMoney(month)} /> : <span className="nil" title={c.monthly.map((m) => m.note).filter(Boolean).join('; ') || undefined}>не посчитано</span>}</span>
                 <span role="cell" className="ctable__key">
                   {keyDays === null || !keySt
                     ? <span className="ctable__state"><Icon name="inactive" size={18} className="urgency--grey" /><span className="nil">ключа нет</span></span>

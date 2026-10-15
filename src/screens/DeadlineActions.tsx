@@ -29,9 +29,9 @@ export function DeadlineActions({ d }: { d: DatedDeadline }) {
   const done = () => setOpen(false);
   if (!open) {
     return (
-      <button type="button" className="icon-btn dactions__toggle" aria-expanded={false} aria-label={`Другие действия со сроком ${what}`}
+      <button type="button" className="btn btn--ghost btn--sm dactions__toggle" aria-expanded={false} aria-label={`Другие действия со сроком ${what}`}
         onClick={() => (can ? setOpen(true) : store.updateDeadline(d.id, {}, `Срок ${what}`))} {...roAttrs('deadlines')}>
-        <Icon name="more" size={18} />
+        <Icon name="more" size={18} />Действия
       </button>
     );
   }

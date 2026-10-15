@@ -12,7 +12,7 @@ import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
 import { Avatar, Money, SaveBadge } from '../ui/kit';
 import { Empty } from '../ui/Empty';
-import { shortName } from '../ui/names';
+import { shortName, tidyCaps } from '../ui/names';
 import { useUi } from '../app/ui-context';
 import { TableText } from '../ui/TableText';
 import { URGENCY_ICON } from './DeadlineTable';
@@ -35,7 +35,7 @@ function KeyRow({ c }: { c: Client }) {
       <button type="button" className="keys__row" onClick={() => ui.openClient(c.id)}>
         <Icon name={URGENCY_ICON[st]} size={20} className={`urgency--${st}`} />
         <Avatar name={c.name} />
-        <span className="keys__who"><strong>{c.name}</strong><span className="sub">{c.keyIssuer || <span className="nil">где выпущен — не указано</span>}</span></span>
+        <span className="keys__who"><strong>{c.name}</strong><span className="sub">{c.keyIssuer ? tidyCaps(c.keyIssuer) : <span className="nil">где выпущен — не указано</span>}</span></span>
         {days === null
           ? <span className="keys__when"><span className="nil">ключа нет в таблице</span></span>
           : <span className="keys__when"><span className={`due--${st}`}>{daysLabel(days).replace('через ', 'ещё ')}</span><span className="sub num">до {fmtDate(c.keyUntil ?? '')}</span></span>}
@@ -173,6 +173,7 @@ export function Tasks() {
   const client = parsed?.clientId ? store.client(parsed.clientId) : undefined;
 
   const open = store.tasks.filter((t) => !t.done);
+  const [showDone, setShowDone] = useState(false); // «Сделано» свёрнуто: их десятки (находка «Пользователя» № 29)
   // В снимке — все задачи листа: сделанных бывают сотни, на экране — 20 последних, остальное в таблице.
   const done = store.tasks.filter((t) => t.done);
   const doneShown = done.slice(-DONE_SHOWN);
@@ -222,6 +223,9 @@ export function Tasks() {
         {groups.filter(([, xs]) => xs.length).map(([title, xs]) => (
           <div key={title} className={`dgroup${title === 'Просрочено' ? ' dgroup--overdue' : ''}${title === 'Сегодня' ? ' dgroup--today' : ''}`}>
             <h2 className="dgroup__title"><span>{title}</span><span className="dgroup__count num">{title === 'Сделано' ? done.length : xs.length}</span></h2>
+            {title === 'Сделано' && !showDone ? (
+              <button type="button" className="dgroup__more" onClick={() => setShowDone(true)}>Показать сделанные: {done.length}</button>
+            ) : (
             <ul className="tasks">
               {xs.map((t) => {
                 const c = t.clientId ? store.client(t.clientId) : undefined;
@@ -244,7 +248,8 @@ export function Tasks() {
                 );
               })}
             </ul>
-            {title === 'Сделано' && doneHidden > 0 && <p className="sub tasks__more">Ещё {doneHidden} {plural(doneHidden, 'сделанная', 'сделанные', 'сделанных')} — в таблице</p>}
+            )}
+            {title === 'Сделано' && showDone && doneHidden > 0 && <p className="sub tasks__more">Ещё {doneHidden} {plural(doneHidden, 'сделанная', 'сделанные', 'сделанных')} — в таблице</p>}
           </div>
         ))}
       </section>

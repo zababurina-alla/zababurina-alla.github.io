@@ -418,3 +418,163 @@
     font-size: 2.25rem;
   }
 }
+
+/* ═════════ План на сегодня: дела по порядку, как шаги образца (1 · 2 · 3) ═════════ */
+.plan {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.plan__title {
+  padding: 0 var(--space-1);
+  font-family: var(--display);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.02em;
+}
+
+.plan__steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--space-3);
+}
+
+.plan__step {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 4.5rem;
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--edge), 0 0 0 1px var(--line), var(--shadow-1);
+  color: var(--ink);
+  text-align: left;
+  transition: transform var(--dur-press) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
+}
+
+.plan__step:active {
+  transform: scale(0.98);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .plan__step:hover {
+    box-shadow: inset 0 1px 0 var(--edge), 0 0 0 1px var(--line-strong), var(--shadow-2);
+  }
+}
+
+/* Номер шага — курсивная цифра с засечками, цветом шага (как «1 2 3» образца) */
+.plan__n {
+  font-size: 2rem;
+  font-style: italic;
+  font-weight: var(--weight-regular);
+  line-height: 1;
+  color: var(--accent);
+}
+
+.plan__step--red .plan__n { color: var(--st-red-ink); }
+.plan__step--orange .plan__n { color: var(--st-orange-ink); }
+.plan__step--wheat .plan__n { color: var(--wheat-ink); }
+
+.plan__text {
+  display: grid;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.plan__text strong {
+  font-weight: var(--weight-semibold);
+}
+
+.plan__done {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--st-green-bg);
+  color: var(--st-green-ink);
+  font-weight: var(--weight-medium);
+}
+
+/* ═════════ Подсказка (первые шаги) ═════════ */
+.hint {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  margin: 0 var(--space-5) var(--space-3);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--wheat-soft);
+  color: var(--wheat-ink);
+  font-size: var(--text-sm);
+  animation: warn-in var(--dur-pop) var(--spring-pop);
+}
+
+.hint > span {
+  flex: 1 1 14rem;
+}
+
+.hero .hint {
+  margin: var(--space-2) 0 0;
+}
+
+.hint__ok {
+  min-height: 2.25rem;
+  color: var(--wheat-ink);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+/* ═════════ Вопросы: «Позже», группы по клиенту, отложенные ═════════ */
+.question__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+}
+
+.question__later {
+  min-height: 2.25rem;
+  gap: 4px;
+  color: var(--wheat-ink);
+}
+
+.qgroup + .qgroup {
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--wheat) 25%, transparent);
+}
+
+.qgroup__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5) var(--space-2);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+
+.qgroup__title .sub {
+  display: inline;
+}
+
+.qlater {
+  padding: 0 var(--space-5) var(--space-3);
+}
+
+.qlater__toggle {
+  gap: 4px;
+  color: var(--ink-2);
+}
+
+.question--later {
+  opacity: 0.8;
+}

@@ -1,0 +1,123 @@
+/* Печать: «Распечатать неделю» на «Сроках» — список по дням на белом листе, без меню, кнопок, свечений и зерна.
+   Цвета срочности остаются (значки различаются и формой — на чёрно-белом принтере тоже читаются). */
+.print-only {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm 12mm;
+  }
+
+  :root,
+  :root[data-theme='dark'] {
+    color-scheme: light;
+    --canvas: #FFFFFF;
+    --surface: #FFFFFF;
+    --surface-sunk: #FFFFFF;
+    --ink: #000000;
+    --ink-2: #333333;
+    --line: #BBBBBB;
+    /* срочность — светлые чернила и на тёмной теме: бумага белая */
+    --st-red-ink: #B91C1C;
+    --st-orange-ink: #B43C0A;
+    --st-yellow-ink: #8A6100;
+    --st-green-ink: #166534;
+    --dot-red: #DC2626;
+    --dot-orange: #EA580C;
+    --dot-yellow: #B45309;
+    --dot-green: #16A34A;
+    --accent: #1E64CF;
+  }
+
+  html::after,
+  body::before,
+  .rail,
+  .topbar,
+  .tabbar,
+  .fab,
+  .toasts,
+  .skip,
+  .deadlines-grid > aside,
+  .dl-tools,
+  .page__head .btn,
+  .page__sub,
+  .panel__head .tabs,
+  .c-act,
+  .dtable__tools,
+  .dgroup__more,
+  .hint,
+  .offline,
+  .debug {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block;
+  }
+
+  .print-head {
+    margin: 0 0 4mm;
+    font-size: 11pt;
+    color: #333333;
+  }
+
+  body {
+    font-size: 11pt;
+  }
+
+  .shell,
+  .deadlines-grid {
+    display: block;
+  }
+
+  .main {
+    padding: 0;
+  }
+
+  .panel,
+  .hero {
+    box-shadow: none !important;
+    border-radius: 0;
+    overflow: visible;
+  }
+
+  .dgroup__title {
+    position: static;
+    padding: 3mm 0 1mm;
+    background: none;
+    break-after: avoid;
+  }
+
+  .dtable {
+    padding: 0;
+  }
+
+  .dtable__row,
+  .dtable--noclient .dtable__row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 44mm;
+    min-height: 0;
+    padding: 1.5mm 0;
+    break-inside: avoid;
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .dtable__row + .dtable__row::before {
+    left: 0;
+    right: 0;
+  }
+
+  .dtable__row .avatar {
+    display: none;
+  }
+
+  .dtable__row .c-client,
+  .dtable__row .c-what,
+  .dtable__row .c-due {
+    grid-column: auto;
+    grid-row: auto;
+  }
+}

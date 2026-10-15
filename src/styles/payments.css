@@ -208,3 +208,51 @@
   gap: var(--space-2);
   margin: var(--space-2) 0 0;
 }
+
+/* Сумма не указана в таблице — обычным текстом, не шрифтом цифр, и не налезает на метку статуса (находка № 36) */
+.paylist__sum--none {
+  font-family: var(--font);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-regular);
+  line-height: 1.3;
+  text-align: right;
+  max-width: 9rem;
+}
+
+.paylist__row > .pill {
+  justify-self: start;
+}
+
+/* Телефон: имя — до двух строк целиком, период — одной строкой с переносом по словам, а не по слову в строке (№ 37) */
+@container (max-width: 759px) {
+  .paylist__who strong {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .paylist__who .sub {
+    overflow-wrap: normal;
+  }
+
+  .paylist__sum--none {
+    max-width: 7rem;
+  }
+
+  .paylist__row > .pill {
+    grid-column: 1 / -1;
+    margin-left: 3.125rem;
+  }
+}
+
+/* Листание месяцев (техника сайта): стрелки рядом с заголовком */
+.month-nav {
+  gap: var(--space-1) var(--space-2);
+  margin: var(--space-2) 0 0 calc(var(--space-2) * -1);
+}
+
+.month-nav .icon-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}

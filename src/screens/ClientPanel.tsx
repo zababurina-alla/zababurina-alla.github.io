@@ -15,8 +15,10 @@ import { URGENCY_ICON } from './DeadlineTable';
 import { Modal } from '../ui/Modal';
 import { useUi } from '../app/ui-context';
 import { TableText } from '../ui/TableText';
-import { QuestionAnswer } from './Today';
+import { tidyCaps } from '../ui/names';
+import { QuestionAnswer } from './Questions';
 import { DeadlineTable } from './DeadlineTable';
+import { useRoute } from '../router';
 
 type Tab = 'overview' | 'deadlines' | 'payments' | 'history';
 
@@ -120,6 +122,13 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
   const store = useStore();
   const ui = useUi();
   const [tab, setTab] = useState<Tab>('overview');
+  // Сменили экран (нижнее меню, ссылка) — карточка закрывается, а не висит поверх другого раздела (находка № 26).
+  const route = useRoute();
+  const lastRoute = useRef(route.name);
+  useEffect(() => {
+    if (lastRoute.current !== route.name && id) onClose();
+    lastRoute.current = route.name;
+  }, [route.name, id, onClose]);
   const body = useRef<HTMLDivElement>(null);
   const [shownId, setShownId] = useState(id);
   if (id && id !== shownId) { setShownId(id); setTab('overview'); }
@@ -151,7 +160,9 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
               <p className="cp__kind"><span className="tag">{c.kind ? kindLabel(c.kind) : 'тип не указан'}</span>{c.employer && <span className="tag">работодатель</span>}{c.marks.map((m) => <span key={m} className="tag">{MARK_LABEL[m]}</span>)}</p>
             </div>
             <div className="cp__actions">
-              <a className="btn btn--secondary btn--sm" href={`tel:${c.phone.replace(/\s/g, '')}`}><Icon name="phone" />Позвонить</a>
+              {c.phone
+                ? <a className="btn btn--secondary btn--sm" href={`tel:${c.phone.replace(/[^\d+]/g, '')}`}><Icon name="phone" />Позвонить</a>
+                : <button type="button" className="btn btn--secondary btn--sm" disabled title="Телефон в таблице не указан"><Icon name="phone" />Телефона нет</button>}
               <button type="button" className="btn btn--primary btn--sm" onClick={() => ui.openPayment(c.id)}><Icon name="plus" />Платёж</button>
             </div>
           </header>
@@ -199,13 +210,13 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                   </section>
                 )}
                 <section className="cp__block">
-                  <h3 className="cp__h">Начисления в месяц</h3>
+                  <h3 className="cp__h">Начисления</h3>
                   {c.monthly.length ? (
                     <dl className="charges">
                       {c.monthly.map((m) => (
                         <div key={m.name} className="charges__item">
                           <dt>{m.name}</dt>
-                          <dd className="charges__sum display">{m.kopecks !== null ? <Money text={formatMoney(m.kopecks)} /> : 'по доходу'}</dd>
+                          <dd className="charges__sum display">{m.kopecks !== null ? <Money text={formatMoney(m.kopecks)} /> : <span className="nil">не посчитано</span>}</dd>
                           <dd className="sub">{m.note}</dd>
                         </div>
                       ))}
@@ -215,7 +226,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                 <section className="cp__block cp__facts">
                   <div><h3 className="cp__h">Ключ ЭЦП</h3>{keyDays === null ? <p className="cp__key"><Icon name="inactive" size={18} className="urgency--grey" /><span className="nil">ключа нет в таблице</span></p>
                     : <p className="cp__key"><Icon name={URGENCY_ICON[statusByDays(keyDays)]} size={18} className={`urgency--${statusByDays(keyDays)}`} /><span className="num">до {fmtDate(c.keyUntil ?? '')}</span><span className={`due--${statusByDays(keyDays)}`}>{daysLabel(keyDays)}</span></p>}{c.keyFrom && <p className="sub">выпущен {fmtDate(c.keyFrom)}</p>}<KeyRenew c={c} /></div>
-                  <div><h3 className="cp__h">Ключ выпущен</h3><p>{c.keyIssuer || <span className="nil">не указано</span>}</p></div>
+                  <div><h3 className="cp__h">Ключ выпущен</h3><p>{c.keyIssuer ? tidyCaps(c.keyIssuer) : <span className="nil">не указано</span>}</p></div>
                   <div><h3 className="cp__h">Телефон</h3><PhoneField clientId={c.id} phone={c.phone} version={c.version} /></div>
                   <div><h3 className="cp__h">Почта</h3><EditableField clientId={c.id} value={c.email ?? ''} version={c.version} label="Почта" inputMode="email"
                     empty="не указана" onSave={(v, base) => store.updateEmail(c.id, v, base)} /></div>

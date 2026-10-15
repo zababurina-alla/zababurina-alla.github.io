@@ -137,6 +137,7 @@
 }
 
 .quick__row {
+  min-width: 0; /* элемент сетки: без этого поле ввода распирало строку за край телефона (441 px при 328) */
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -154,7 +155,8 @@
 }
 
 .quick__row input {
-  flex: 1;
+  flex: 1 1 0;
+  width: 0;
   min-width: 0;
   min-height: 3.25rem;
   border: 0;

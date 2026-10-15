@@ -9,9 +9,14 @@ import { toggleTheme } from '../lib/theme';
 import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
 import { useUi } from './ui-context';
+import { TODAY, daysBetween, daysLabel } from '../lib/dates';
+import { formatPayMoney } from '../lib/money';
+import { obligationKind } from '../lib/obligation';
+import { OBLIGATION_ICON } from '../ui/obligationIcon';
+import { shortName } from '../ui/names';
 
 
-interface Item { id: string; group: string; label: string; hint?: string; icon: IconName; run: () => void }
+interface Item { id: string; group: string; label: string; hint?: string | undefined; icon: IconName; run: () => void }
 
 export function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
   const store = useStore();
@@ -47,7 +52,28 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       words: [...c.kved.map((k) => k.title), c.keyIssuer, ...store.deadlines.filter((d) => d.clientId === c.id).map((d) => d.what)] })), q).slice(0, 6)
       .map((c) => ({ id: c.id, group: 'Клиенты', label: c.name, hint: kindLabel(c.kind), icon: 'fop' as IconName, run: () => ui.openClient(c.id) }))
     : [];
-  const items = [...clients, ...actions.filter((a) => !q || fold(a.label).includes(fold(q)))];
+  // Сроки, задачи и платежи — по имени клиента и тексту («ромашко єсв», «первичка», «1500»), от 2 букв.
+  // Ищем той же читалкой, что и клиентов (search техники сайта): имя клиента + текст записи.
+  const who = (id: string | null) => (id ? store.client(id)?.name ?? '' : '');
+  const deep = q.trim().length >= 2;
+  const deadlines: Item[] = deep
+    ? search(store.deadlines.map((d) => ({ ...d, name: `${who(d.clientId)} ${d.what}` })), q)
+      .sort((a, b) => a.due.localeCompare(b.due)).slice(0, 5)
+      .map((d) => ({ id: `d-${d.id}`, group: 'Сроки', label: `${shortName(who(d.clientId)) || 'Клиент не указан'} — ${d.what}`,
+        hint: daysLabel(daysBetween(TODAY, d.due)), icon: OBLIGATION_ICON[obligationKind(d.what)], run: () => ui.openClient(d.clientId) }))
+    : [];
+  const tasks: Item[] = deep
+    ? search(store.tasks.filter((t) => !t.done).map((t) => ({ ...t, name: `${who(t.clientId)} ${t.text}` })), q).slice(0, 4)
+      .map((t) => ({ id: `t-${t.id}`, group: 'Задачи', label: t.text, hint: t.clientId ? shortName(who(t.clientId)) : undefined,
+        icon: 'tasks' as IconName, run: () => (t.clientId ? ui.openClient(t.clientId) : navigate('#/tasks')) }))
+    : [];
+  const payments: Item[] = deep
+    ? search(store.payments.map((p) => ({ ...p, name: `${who(p.clientId)} ${p.period}`, extra: [String(Math.round((p.kopecks ?? 0) / 100))] })), q)
+      .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '')).slice(0, 4)
+      .map((p) => ({ id: `p-${p.id}`, group: 'Платежи', label: `${shortName(who(p.clientId)) || 'Клиент не указан'} — ${p.period}`,
+        hint: formatPayMoney(p.kopecks), icon: 'payments' as IconName, run: () => (p.clientId ? ui.openClient(p.clientId) : navigate('#/payments')) }))
+    : [];
+  const items = [...clients, ...deadlines, ...tasks, ...payments, ...actions.filter((a) => !q || fold(a.label).includes(fold(q)))];
 
   function run(it: Item | undefined) {
     if (!it) return;
@@ -64,7 +90,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         <label className="palette__search">
           <Icon name="search" />
           <span className="visually-hidden">Что найти</span>
-          <input ref={input} value={q} placeholder="Клиент, раздел или действие…" autoComplete="off"
+          <input ref={input} value={q} placeholder="Клиент, срок, задача, платёж или раздел…" autoComplete="off"
             role="combobox" aria-expanded={items.length > 0} aria-controls="palette-list" aria-activedescendant={items[active] ? `pal-${active}` : undefined}
             onChange={(e) => { setQ(e.target.value); setActive(0); }}
             onKeyDown={(e) => {
