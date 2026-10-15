@@ -155,7 +155,9 @@ export function Today() {
     overdue.length && { key: 'overdue', icon: 'overdue' as const, tone: 'red', title: 'Закрыть просроченные', n: `${overdue.length} ${plural(overdue.length, 'срок', 'срока', 'сроков')}` },
     todayTasks.length && { key: 'tasks', icon: 'tasks' as const, tone: tasksLate ? 'red' : 'accent', title: tasksTitle, n: tasksN },
     store.questions.length && { key: 'q', icon: 'questions' as const, tone: 'wheat', title: 'Ответить Дмитрию', n: `${store.questions.length} ${plural(store.questions.length, 'вопрос', 'вопроса', 'вопросов')}` },
-    keys.length && { key: 'keys', icon: 'keys' as const, tone: keysGone ? 'red' : 'accent', title: keysGone ? 'Ключи ЭЦП: закончились' : 'Продлить ключи ЭЦП', n: `${keys.length} ${plural(keys.length, 'клиент', 'клиента', 'клиентов')}` },
+    keys.length && { key: 'keys', icon: 'keys' as const, tone: keysGone ? 'red' : 'accent', title: keysGone ? 'Ключи ЭЦП: закончились' : 'Продлить ключи ЭЦП',
+      // Один подсчёт на всё (п. 54): «закончились · 7», когда закончились 4, вводило в заблуждение.
+      n: keysGone ? `${keysGone} ${plural(keysGone, 'закончился', 'закончились', 'закончились')}${keysSoon ? `, ещё ${keysSoon} — до ${KEY_DAYS} дн.` : ''}` : `${keys.length} ${plural(keys.length, 'клиент', 'клиента', 'клиентов')}` },
     burning.length && { key: 'burning', icon: 'burning' as const, tone: 'orange', title: 'Горит на неделе', n: `${burning.length} ${plural(burning.length, 'срок', 'срока', 'сроков')}` },
   ].filter(Boolean) as { key: string; icon: IconName; tone: string; title: string; n: string }[];
   const goPlan = (key: string) => {
