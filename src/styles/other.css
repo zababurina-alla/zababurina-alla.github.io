@@ -1311,8 +1311,16 @@
   justify-content: center;
 }
 
+/* «Без телефона» растягивается вместе с вкладками: и в одной строке с ними, и если перенёсся один (1024) */
 .clients__bar > .clients__nophone {
+  flex: 1 0 auto;
+  justify-content: center;
   min-height: calc(2.5rem + 6px);
+}
+
+/* «Без платежа» скрыт (нет полученных платежей) — поиск первой строкой целиком, а не рядом с вкладками */
+.clients__bar:not(:has(> .clients__nopay)) > .search-input--lg {
+  flex-basis: 100%;
 }
 
 @media (max-width: 479px) {

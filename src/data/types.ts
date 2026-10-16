@@ -123,6 +123,11 @@ export interface Question {
   status: 'waiting' | 'asked';
   askedAt: string | null; // ISO date-time; null — вопрос ещё ждёт отправки (status waiting)
   answer: string | null;
+  /** Вопрос по тестовому клиенту (сервер: test: true) — маме не показывается. */
+  test?: boolean;
+  /** Пакет и блок сверки — «по какому поводу» (системные подписи сервера). */
+  pack?: string | null;
+  block?: string | null;
 }
 
 /** «Входящие»: сообщение клиента маме из Telegram (бизнес-бот), превращённое в предложение. */

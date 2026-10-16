@@ -1,4 +1,4 @@
-// Вопросы Дмитрия маме: ответ кнопками или полем, «Позже» (только на сайте, localStorage — ui/later.ts),
+// Вопросы по таблице маме (системные: пакеты сверки и импорта, лист «❓ Вопросы»; тестовые — test: true — не показываем): ответ кнопками или полем, «Позже» (только на сайте, localStorage — ui/later.ts),
 // весь список — по клиентам. Одна деталь на «Сегодня»; ответ на вопрос — и в карточке клиента.
 import { useEffect, useState } from 'react';
 import { questionBotLink } from '../lib/botLink';
@@ -95,7 +95,7 @@ export function QuestionsPanel() {
     <section className="panel panel--wheat reveal" aria-labelledby="t-q">
       <header className="panel__head">
         <h2 id="t-q" className="panel__title"><Icon name="questions" tile="wheat" />
-          {active.length === 1 ? 'Вопрос от Дмитрия' : active.length ? `Вопросы от Дмитрия: ${active.length}` : 'Вопросы отложены'}</h2>
+          {active.length === 1 ? 'Вопрос по таблице' : active.length ? `Вопросы по таблице: ${active.length}` : 'Вопросы отложены'}</h2>
         {all && <button type="button" className="link" onClick={() => setAll(false)}>Свернуть</button>}
       </header>
       {!all && active.slice(0, SHOWN).map((q) => <QuestionItem key={q.id} q={q} later={false} />)}

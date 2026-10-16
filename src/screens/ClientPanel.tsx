@@ -28,6 +28,7 @@ import { TemplateDialog } from './TemplateDialog';
 import { BotLink } from './BotLink';
 import { StatementBlock } from './Statement';
 import { ArchiveBlock } from './ArchiveBlock';
+import { KvedEdit } from './KvedEdit';
 import { roMessage } from '../ui/readonly';
 import { TASK_TEMPLATES } from '../lib/taskTemplates';
 import { addDays } from '../lib/dates';
@@ -162,7 +163,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
 
   const own = c ? store.deadlines.filter((d) => d.clientId === c.id).sort((a, b) => a.due.localeCompare(b.due)) : [];
   const pays = c ? store.payments.filter((p) => p.clientId === c.id) : [];
-  // Всё про клиента на одном экране: его открытые задачи и вопросы Дмитрия о нём — прямо в обзоре.
+  // Всё про клиента на одном экране: его открытые задачи и вопросы таблицы о нём — прямо в обзоре.
   const tasks = c ? store.tasks.filter((t) => t.clientId === c.id && !t.done) : [];
   const questions = c ? store.questions.filter((q) => q.clientId === c.id) : [];
   // Карточка целиком и история — из clients.get (п. 3, 9): снимок показывается сразу, ответ (до 7 с) дополняет его.
@@ -230,7 +231,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                 </section>
                 {questions.length > 0 && (
                   <section className="cp__block cp__questions">
-                    <h3 className="cp__h">Вопрос от Дмитрия</h3>
+                    <h3 className="cp__h">Вопрос по таблице</h3>
                     {questions.map((q) => (
                       <div key={q.id} className="question">
                         <p className="question__text"><TableText text={q.text} /></p>
@@ -315,17 +316,20 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                 <StatementBlock key={`st-${c.id}`} clientId={c.id} />
                 <section className="cp__block">
                   <h3 className="cp__h">КВЕД</h3>
-                  {c.kved.length ? <ul className="kved">{c.kved.map((k) => <li key={k.code}><span className="num kved__code">{k.code}</span>{k.title}</li>)}</ul> : <p className="nil">КВЕД в таблице не указан</p>}
+                  <KvedEdit key={`kv-${c.id}`} c={c} />
                 </section>
               </>
             )}
             {tab === 'deadlines' && (
               <>
-                <div className="cp__tools">
-                  <button type="button" className="btn btn--secondary btn--sm" onClick={() => ui.openNewDeadline(c.id)} {...roAttrs('deadlines')}><Icon name="plus" size={16} />Новый срок</button>
-                  <button type="button" className="btn btn--ghost btn--sm" onClick={openTemplates} {...roAttrs('deadlines')}
-                    title="Добавить сроки по шаблону системы налогообложения — только те, которых у клиента нет"><Icon name="sync" size={16} />Сроки по шаблону</button>
-                </div>
+                {/* Кнопки — только когда сервер это умеет и запись сроков включена (без них — лишь подсказка «пока в таблице») */}
+                {(store.createDeadline || store.templates) && (
+                  <div className="cp__tools">
+                    {store.createDeadline && <button type="button" className="btn btn--secondary btn--sm" onClick={() => ui.openNewDeadline(c.id)}><Icon name="plus" size={16} />Новый срок</button>}
+                    {store.templates && <button type="button" className="btn btn--ghost btn--sm" onClick={openTemplates}
+                      title="Добавить сроки по шаблону системы налогообложения — только те, которых у клиента нет"><Icon name="sync" size={16} />Сроки по шаблону</button>}
+                  </div>
+                )}
                 <TemplateDialog open={tplOpen} clientId={c.id} onClose={() => setTplOpen(false)} />
                 <DeadlineTable items={own} showClient={false} empty="Открытых сроков нет" />
               </>

@@ -3,7 +3,7 @@
 // — версии записей и ошибка CONFLICT; — журнал изменений с курсором; — повтор того же requestId не создаёт дубль.
 // Рычаги отладки (обрыв связи, отказ, правка извне) — для кнопок в режиме отладки.
 import { ACTIVITY, CLIENTS, CONSULTATIONS, DEADLINES, INBOX, KVEDS, PAYMENTS, QUESTIONS, RATES, TASKS } from './fake';
-import type { ApplyTemplateResult, ArchivePage, AttentionItem, BotLinkResult, CabinetApi, StatementPdf, StatementPreview, StatementResult, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, TemplatePreview, ClientCard, Entity, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
+import type { ApplyTemplateResult, ArchivePage, AttentionItem, MonthCheck, MonthItem, MonthSheet, BotLinkResult, CabinetApi, StatementPdf, StatementPreview, StatementResult, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, TemplatePreview, ClientCard, Entity, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Consultation, Deadline, InboxItem, KvedItem, Payment, Question, Rates, Task } from './types';
 import { fold } from '../lib/search';
 import { TODAY, addDays, endOfMonth, fmtDate, fmtDue } from '../lib/dates';
@@ -205,6 +205,28 @@ class FakeServer implements CabinetApi {
         changes.push(this.act(`Добавлен клиент ${c.name}. Создано сроков: ${made.length}`, o, 'сайт'));
         return { ok: true, changes, cursor: this.cursor };
       }
+      case 'updateDeadlines': {
+        const changes: Change[] = [];
+        const failed: NonNullable<Extract<WriteResult, { ok: true }>['failed']> = [];
+        for (const it of op.items) {
+          const r = this.apply({ kind: 'updateDeadline', requestId: `${o}#${it.id}`, id: it.id, baseVersion: it.baseVersion, patch: op.patch });
+          if (r.ok) changes.push(...r.changes);
+          else failed.push({ id: it.id, code: r.code, message: r.message, ...(r.current && 'periodicity' in r.current ? { current: r.current } : {}) });
+        }
+        return { ok: true, changes, cursor: this.cursor, failed };
+      }
+      case 'completeTasks': {
+        const changes: Change[] = [];
+        const failed: NonNullable<Extract<WriteResult, { ok: true }>['failed']> = [];
+        for (const id of op.ids) {
+          const t = this.tasks.get(id);
+          if (!t) { failed.push({ id, code: 'NOT_FOUND', message: 'Задачи уже нет' }); continue; }
+          const upd = { ...t, done: op.done, version: t.version + 1 };
+          this.tasks.set(id, upd);
+          changes.push(this.record('task', 'upsert', id, o, upd));
+        }
+        return { ok: true, changes, cursor: this.cursor, failed };
+      }
       case 'createTask': {
         const t = { ...op.task, version: 1 };
         this.tasks.set(t.id, t);
@@ -309,7 +331,11 @@ class FakeServer implements CabinetApi {
         const c = this.clients.get(op.id);
         if (!c) return { ok: false, code: 'NOT_FOUND', message: 'Клиента нет в таблице' };
         if (c.version !== op.baseVersion) return { ok: false, code: 'CONFLICT', message: 'Карточка изменилась в таблице', current: { ...c } };
-        const upd = { ...c, ...op.patch, version: this.cursor + 1 };
+        // КВЕД — коды; названия из справочника; главный — как сервер: по наибольшей ставке (здесь — первый с названием из
+        // справочника, где выше группа ЄП; упрощённо — первый код списка).
+        const { kved, ...rest } = op.patch;
+        const kvedList = kved?.map((code) => ({ code, title: c.kved.find((k) => k.code === code)?.title ?? KVEDS.find((k) => k.code === code)?.title ?? '' }));
+        const upd: Client = { ...c, ...rest, ...(kvedList ? { kved: kvedList, kvedMain: kvedList[0]?.code ?? null, kvedMainNote: kvedList.length > 1 ? 'max ставка' : null } : {}), version: this.cursor + 1 };
         this.clients.set(c.id, upd);
         return { ok: true, changes: [this.record('client', 'upsert', c.id, o, upd), this.act(`Изменена карточка: ${short(c.name)}`, o, 'сайт')], cursor: this.cursor };
       }
@@ -472,6 +498,28 @@ class FakeServer implements CabinetApi {
       if (score > 0) out.push({ clientId: c.id, name: c.name, score, level: score >= 60 ? 'high' : score >= 30 ? 'mid' : 'low', factors });
     }
     return out.sort((a, b) => b.score - a.score).slice(0, limit);
+  }
+
+  private month: MonthItem[] = [...this.clients.values()].filter((c) => c.employer).map((c, i) => {
+    const checks = { advance: true, advanceTax: true, salary: i > 0, salaryTax: false, timesheet: i > 1, payroll: false, report: false };
+    return { clientId: c.id, name: c.name, period: 'жовтень 2026', status: null, comment: i === 0 ? 'Чекаю табель' : null,
+      percent: Math.round((Object.values(checks).filter(Boolean).length / 7) * 100), checks };
+  });
+  async monthGet(): Promise<MonthSheet> {
+    await wait(READ_MS * 2);
+    if (!this.online) throw new Error('NETWORK');
+    return { period: 'жовтень 2026', items: this.month.map((m) => ({ ...m, checks: { ...m.checks } })) };
+  }
+  async monthSet(clientId: string, item: MonthCheck, done: boolean): Promise<MonthItem> {
+    await wait(READ_MS);
+    if (!this.online) throw new Error('NETWORK');
+    const i = this.month.findIndex((m) => m.clientId === clientId);
+    const cur = this.month[i];
+    if (!cur) throw new Error('NOT_FOUND');
+    const checks = { ...cur.checks, [item]: done };
+    const next: MonthItem = { ...cur, checks, percent: Math.round((Object.values(checks).filter(Boolean).length / 7) * 100) };
+    this.month[i] = next;
+    return { ...next, checks: { ...checks } };
   }
 
   async cancelNotify(deadlineId: string, requestId: string): Promise<CancelNotifyResult> {

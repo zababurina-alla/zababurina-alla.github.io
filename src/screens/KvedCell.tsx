@@ -7,6 +7,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Client } from '../data/types';
 import { Icon } from '../ui/Icon';
+import { useKvedTitles } from '../data/reference';
 
 type Kved = Client['kved'][number];
 
@@ -29,6 +30,8 @@ export function KvedCell({ c }: { c: Client }) {
 }
 
 function KvedMore({ main, isMain, note, others }: { main: Kved; isMain: boolean; note: string | null; others: Kved[] }) {
+  // Название из карточки клиента, иначе — из листа «📑 КВЕДы» (у большинства клиентов в карточке названия нет).
+  const titles = useKvedTitles();
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number; up: boolean } | null>(null);
   const btn = useRef<HTMLButtonElement>(null);
@@ -89,13 +92,13 @@ function KvedMore({ main, isMain, note, others }: { main: Kved; isMain: boolean;
           <ul className="kv-pop__list">
             <li className={`kv-pop__item${isMain ? ' is-main' : ''}`}>
               <span className="kv-pop__code num">{isMain && <Icon name="star" size={14} className="kv__star" />}{main.code}</span>
-              <span className="kv-pop__title">{main.title || 'название не указано'}
+              <span className="kv-pop__title">{main.title || titles.get(main.code) || 'название не указано'}
                 {isMain && <span className="kv-pop__why">по нему считается ЄП{note ? ` · ${note}` : ''}</span>}</span>
             </li>
             {others.map((k) => (
               <li key={k.code} className="kv-pop__item">
                 <span className="kv-pop__code num">{k.code}</span>
-                <span className="kv-pop__title">{k.title || 'название не указано'}</span>
+                <span className="kv-pop__title">{k.title || titles.get(k.code) || 'название не указано'}</span>
               </li>
             ))}
           </ul>

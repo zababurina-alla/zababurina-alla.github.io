@@ -44,13 +44,17 @@ export type WriteOp =
   | { kind: 'addPayment'; requestId: string; payment: Payment }
   | { kind: 'cancelPayment'; requestId: string; id: string; baseVersion: number }
   | { kind: 'addClient'; requestId: string; client: Client }
-  | { kind: 'updateClient'; requestId: string; id: string; baseVersion: number; patch: Partial<Pick<Client, 'phone' | 'email' | 'keyIssuer' | 'keyFrom' | 'keyUntil'>> }
+  | { kind: 'updateClient'; requestId: string; id: string; baseVersion: number; patch: ClientPatch }
   /** deadlines.update (контракт 8.3): дата, статус (кроме done — закрытие только close), заметка. */
   | { kind: 'updateDeadline'; requestId: string; id: string; baseVersion: number; patch: DeadlinePatch }
+  /** deadlines.updateMany (v5.89): до 20 сроков, один patch; ошибка одного — в failed (с current), остальные изменены. */
+  | { kind: 'updateDeadlines'; requestId: string; items: { id: string; baseVersion: number }[]; patch: DeadlinePatch }
   | { kind: 'createTask'; requestId: string; task: Task }
   /** consultations.create: id = requestId — сервер (v5.87) даёт записи тот же id. */
   | { kind: 'createConsultation'; requestId: string; consultation: Consultation }
   | { kind: 'completeTask'; requestId: string; id: string; done: boolean }
+  /** tasks.completeMany (v5.89): до 20 задач одним запросом; ошибка одной — в failed, остальные сделаны. */
+  | { kind: 'completeTasks'; requestId: string; ids: string[]; done: boolean }
   | { kind: 'answerQuestion'; requestId: string; id: string; text: string }
   /** inbox.decide: принять (платёж — записать с суммой), сделать задачей, отклонить. */
   | { kind: 'decideInbox'; requestId: string; id: string; action: InboxAction; amount?: number };
@@ -76,6 +80,9 @@ export type WriteResult =
 
 /** tasks.update: что поменять; null очищает срок или клиента. Сделанную задачу сервер править не даёт. */
 export interface TaskPatch { text?: string; due?: string | null; type?: TaskType; priority?: Priority; clientId?: string | null }
+
+/** clients.update: контакты, ключ; kved — весь список кодов «NN.NN» (заменяет; главный сервер выбирает сам). */
+export type ClientPatch = Partial<Pick<Client, 'phone' | 'email' | 'keyIssuer' | 'keyFrom' | 'keyUntil'>> & { kved?: string[] };
 
 export interface DeadlinePatch { due?: string; status?: Exclude<DeadlineStatus, 'done'>; note?: string }
 
@@ -122,6 +129,12 @@ export interface ArchivePage { items: ArchivedDeadline[]; total: number; more: b
 /** reports.attention: клиенты по баллу риска (как бот «внимание»): high ≥ 60, mid ≥ 30; factors с weight 0 — пометки. */
 export interface AttentionItem { clientId: string; name: string; score: number; level: 'high' | 'mid' | 'low'; factors: { label: string; weight: number }[] }
 
+/** Лист «🗓 Месяц» (v5.90): чек-лист по клиентам со штатом, только текущий месяц. */
+export const MONTH_CHECKS = ['advance', 'advanceTax', 'salary', 'salaryTax', 'timesheet', 'payroll', 'report'] as const;
+export type MonthCheck = typeof MONTH_CHECKS[number];
+export interface MonthItem { clientId: string | null; name: string; period: string; status: string | null; comment: string | null; percent: number; checks: Record<MonthCheck, boolean> }
+export interface MonthSheet { period: string | null; items: MonthItem[] }
+
 /** deadlines.cancelNotify: сообщение клиенту о закрытии снято (срок остаётся закрытым); снимать было нечего;
  *  уже забрано на отправку (sentAt — примерно когда ушло). */
 export type CancelNotifyResult = { status: 'cancelled' } | { status: 'nothing' } | { status: 'sent'; sentAt: string | null };
@@ -165,6 +178,9 @@ export interface CabinetApi {
   listArchive(clientId: string, offset?: number, limit?: number): Promise<ArchivePage>;
   /** Чтение трёх листов — не чаще раза в несколько минут. */
   attention(limit?: number): Promise<AttentionItem[]>;
+  /** «🗓 Месяц»: чтение и галочка (без requestId — ставит значение, повтор безопасен). */
+  monthGet(): Promise<MonthSheet>;
+  monthSet(clientId: string, item: MonthCheck, done: boolean): Promise<MonthItem>;
   /** Без requestId, собирается несколько секунд. В PDF есть логин клиента (не пароль) — как в меню таблицы. */
   statementPdf(clientId: string): Promise<StatementPdf>;
   statementPreview(clientId: string): Promise<StatementPreview>;

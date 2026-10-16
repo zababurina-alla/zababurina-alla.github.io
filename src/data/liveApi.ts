@@ -2,8 +2,8 @@
 // (docs/api-contract.md v2.1). Экраны и очередь записей не знают, с кем говорят.
 import { ApiError, call } from './transport';
 import type { Envelope } from './transport';
-import type { ApplyTemplateResult, ArchivePage, AttentionItem, BotLinkResult, CabinetApi, StatementPdf, StatementPreview, StatementResult, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
-import { RETRYABLE } from './api';
+import type { ApplyTemplateResult, ArchivePage, AttentionItem, MonthCheck, MonthItem, MonthSheet, BotLinkResult, CabinetApi, StatementPdf, StatementPreview, StatementResult, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
+import { MONTH_CHECKS, RETRYABLE } from './api';
 import type { Activity, Client, Consultation, Deadline, InboxItem, InboxType, KvedItem, Payment, Question, RateGroup, Rates, Task } from './types';
 import { INBOX_TYPES } from './types';
 
@@ -122,7 +122,10 @@ function normRecord(entity: Entity, raw: unknown): NonNullable<Change['record']>
 function toChange(c: ServerChange): Change | null {
   if (!ENTITIES.has(c.entity)) return null; // незнакомая сущность (новая на сервере) — пропускаем
   const entity = c.entity as Entity;
-  const change: Change = { cursor: c.rev, entity, op: c.op, id: c.id, origin: c.origin };
+  // Тестовый вопрос (test: true) — для сайта его нет: приходит как удаление, даже если сервер прислал upsert.
+  const testQ = entity === 'question' && c.op === 'upsert' && (c.record as { test?: unknown } | undefined)?.test === true;
+  const change: Change = { cursor: c.rev, entity, op: testQ ? 'delete' : c.op, id: c.id, origin: c.origin };
+  if (testQ) return change;
   if (c.op === 'upsert' && c.record !== undefined) change.record = normRecord(entity, c.record);
   return change;
 }
@@ -153,7 +156,7 @@ export class LiveApi implements CabinetApi {
       payments: d.payments.map(normPayment),
       tasks: d.tasks.map((x) => normRecord('task', x) as Task),
       activity: d.activity.map((x) => normRecord('activity', x) as Activity),
-      questions: d.questions ?? [],
+      questions: (d.questions ?? []).filter((q) => (q as { test?: unknown }).test !== true),
       inbox: (d.inbox ?? []).map((x) => normRecord('inbox', x) as InboxItem),
       consultations: (d.consultations ?? []).map(normConsultation),
       consultationsSkipped: d.consultationsSkipped === true,
@@ -184,6 +187,38 @@ export class LiveApi implements CabinetApi {
           const changes = [up('deadline', env.data.closed, env.cursor)];
           if (env.data.next) changes.push(up('deadline', env.data.next, env.cursor));
           return { ok: true, changes, cursor: env.cursor, notifyAt: env.data.notifyAt };
+        }
+        case 'updateDeadlines': {
+          const env = await this.rpc<{ results?: unknown[] }>('deadlines.updateMany', { items: op.items, patch: op.patch }, o);
+          const changes: Change[] = [];
+          const failed: NonNullable<Extract<WriteResult, { ok: true }>['failed']> = [];
+          for (const raw of env.data.results ?? []) {
+            const r = (raw ?? {}) as { id?: unknown; ok?: unknown; deadline?: Deadline | null; error?: { code?: unknown; message?: unknown }; current?: unknown };
+            const id = typeof r.id === 'string' ? r.id : r.deadline?.id ?? '';
+            if (!id) continue;
+            if (r.ok === false || r.error) {
+              const code = String(r.error?.code ?? '');
+              const item: (typeof failed)[number] = { id, code: SITE_CODES.has(code) ? code as ErrorCode : 'SERVER', message: String(r.error?.message ?? 'Не изменился') };
+              if (r.current && typeof r.current === 'object' && 'periodicity' in r.current) item.current = normRecord('deadline', r.current) as Deadline;
+              failed.push(item);
+            } else if (r.deadline) changes.push(up('deadline', r.deadline, env.cursor));
+          }
+          return { ok: true, changes, cursor: env.cursor, failed };
+        }
+        case 'completeTasks': {
+          const env = await this.rpc<{ results?: unknown[] }>('tasks.completeMany', { items: op.ids.map((id) => ({ id })), done: op.done }, o);
+          const changes: Change[] = [];
+          const failed: NonNullable<Extract<WriteResult, { ok: true }>['failed']> = [];
+          for (const raw of env.data.results ?? []) {
+            const r = (raw ?? {}) as { id?: unknown; ok?: unknown; task?: Task | null; error?: { code?: unknown; message?: unknown } };
+            const id = typeof r.id === 'string' ? r.id : r.task?.id ?? '';
+            if (!id) continue;
+            if (r.ok === false || r.error) {
+              const code = String(r.error?.code ?? '');
+              failed.push({ id, code: SITE_CODES.has(code) ? code as ErrorCode : 'SERVER', message: String(r.error?.message ?? 'Не отметилась') });
+            } else if (r.task) changes.push(up('task', r.task, env.cursor));
+          }
+          return { ok: true, changes, cursor: env.cursor, failed };
         }
         case 'closeDeadlines': {
           // Ответ { results[], closed, failed } (форма подтверждена сервером 15.10): по каждому сроку
@@ -312,7 +347,7 @@ export class LiveApi implements CabinetApi {
 
   async listQuestions(): Promise<Question[]> {
     const env = await this.rpc<{ questions: Question[] }>('questions.list', {});
-    return env.data.questions;
+    return (env.data.questions ?? []).filter((q) => (q as { test?: unknown }).test !== true);
   }
 
   /** Напоминание клиенту: запись с requestId (сервер не отправит дважды), но мимо очереди — ответ показываем сразу. */
@@ -441,6 +476,24 @@ export class LiveApi implements CabinetApi {
       return { clientId: text(r.clientId), name: text(r.name), score: num(r.score) ?? 0, level,
         factors: Array.isArray(r.factors) ? r.factors.map((f) => { const g = f as Record<string, unknown>; return { label: text(g.label), weight: num(g.weight) ?? 0 }; }) : [] };
     });
+  }
+
+  private monthItem(x: unknown): MonthItem {
+    const r = (x ?? {}) as Record<string, unknown>;
+    const c = (r.checks ?? {}) as Record<string, unknown>;
+    const checks = Object.fromEntries(MONTH_CHECKS.map((k) => [k, c[k] === true])) as Record<MonthCheck, boolean>;
+    return { clientId: text(r.clientId) || null, name: text(r.name), period: text(r.period), status: text(r.status) || null,
+      comment: text(r.comment) || null, percent: num(r.percent) ?? 0, checks };
+  }
+
+  async monthGet(): Promise<MonthSheet> {
+    const env = await this.rpc<{ period?: unknown; items?: unknown[] }>('month.get', {});
+    return { period: text(env.data.period) || null, items: (env.data.items ?? []).map((x) => this.monthItem(x)) };
+  }
+
+  async monthSet(clientId: string, item: MonthCheck, done: boolean): Promise<MonthItem> {
+    const env = await this.rpc<{ item?: unknown }>('month.set', { clientId, item, done });
+    return this.monthItem(env.data.item);
   }
 
   /** «Не писать клиенту»: снять сообщение о закрытии срока, пока оно ждёт 2 мин. С requestId, мимо очереди —

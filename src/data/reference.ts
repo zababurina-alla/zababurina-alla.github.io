@@ -2,7 +2,7 @@
 // ответ сервера (на выдуманных данных — выдуманного). Ставки держим 10 мин, как сервер держит свой кэш листа.
 // Первое открытие шло 5–10 с (п. 45): ставки — публичные цифры, не данные клиентов, поэтому прошлый ответ лежит в
 // localStorage и показывается сразу, а свежий подтягивается в фоне. Ответы поиска КВЕД помним до закрытия вкладки.
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CabinetApi, KvedAll, KvedFound } from './api';
 import { searchKved } from '../lib/kvedLocal';
 import { api } from './session';
@@ -97,6 +97,13 @@ function useKvedAll(): KvedAll | null {
     return () => { alive = false; };
   }, [all]);
   return all;
+}
+
+/** Названия КВЕД по коду из листа «📑 КВЕДы» (тот же весь лист, что для поиска): у клиента в карточке названия часто нет
+ *  («название не указано», владелец 16.10) — берём отсюда. Лист ещё не пришёл — пустая карта. */
+export function useKvedTitles(): ReadonlyMap<string, string> {
+  const all = useKvedAll();
+  return useMemo(() => new Map((all?.items ?? []).filter((k) => k.title).map((k) => [k.code, k.title])), [all]);
 }
 
 /** Поиск КВЕД на сервере: ждём паузу в наборе 300 мс; меньше двух знаков — не ищем. Запрос приводится к виду листа

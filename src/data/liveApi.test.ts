@@ -466,6 +466,48 @@ describe('живой адаптер: чтение', () => {
     expect(att.map((a) => [a.clientId, a.level, a.factors.length])).toEqual([['C-2', 'high', 2], ['C-3', 'low', 0]]);
   });
 
+  it('deadlines.updateMany: изменённые — изменения; CONFLICT одного — в failed с current', async () => {
+    const s = server(ok({ results: [{ id: 'D-1', ok: true, deadline: dl('D-1') }, { id: 'D-2', ok: false, error: { code: 'CONFLICT', message: 'Срок изменился' }, current: dl('D-2') }], updated: 1, failed: 1 }, 31));
+    const r = await new LiveApi(URL_, auth(), s.fetchImpl).write({ kind: 'updateDeadlines', requestId: 'R6', items: [{ id: 'D-1', baseVersion: 3 }, { id: 'D-2', baseVersion: 2 }], patch: { status: 'waiting' } });
+    expect(s.sent[0]).toMatchObject({ action: 'deadlines.updateMany', requestId: 'R6', payload: { items: [{ id: 'D-1', baseVersion: 3 }, { id: 'D-2', baseVersion: 2 }], patch: { status: 'waiting' } } });
+    expect(r.ok && [r.changes.map((c) => c.id), r.failed?.map((f) => [f.id, f.code, f.current?.id])]).toEqual([['D-1'], [['D-2', 'CONFLICT', 'D-2']]]);
+  });
+
+  it('«Месяц»: month.get — 7 галочек (нет — false), клиент null у тёзок; month.set ставит значение без requestId', async () => {
+    const row = { clientId: 'C-4', name: 'ТОВ', period: 'жовтень 2026', status: null, comment: 'Чекаю табель', percent: 29, checks: { advance: true, advanceTax: true } };
+    const s = server(
+      ok({ period: 'жовтень 2026', items: [row, { ...row, clientId: null, name: 'Тёзка', checks: null }] }),
+      ok({ item: { ...row, percent: 43, checks: { ...row.checks, salary: true } } }),
+    );
+    const api = new LiveApi(URL_, auth(), s.fetchImpl);
+    const m = await api.monthGet();
+    expect([m.period, m.items.map((i) => [i.clientId, Object.values(i.checks).filter(Boolean).length])]).toEqual(['жовтень 2026', [['C-4', 2], [null, 0]]]);
+    const r = await api.monthSet('C-4', 'salary', true);
+    expect(s.sent[1]).toEqual({ v: 1, action: 'month.set', payload: { clientId: 'C-4', item: 'salary', done: true }, session: 'S1' });
+    expect([r.percent, r.checks.salary, r.checks.report]).toEqual([43, true, false]);
+  });
+
+  it('вопросы: test: true не показываются — ни в снимке, ни в questions.list, ни в журнале (там — удаление)', async () => {
+    const q = { id: 'Q-1', version: 1, text: 'Подавали?', type: 'choice', options: ['Да', 'Нет'], clientId: 'C-1', status: 'asked', askedAt: null, answer: null };
+    const s = server(
+      ok({ clients: [], deadlines: [], payments: [], tasks: [], activity: [], questions: [q, { ...q, id: 'Q-T', test: true }], cursor: 1 }),
+      ok({ questions: [{ ...q, id: 'Q-T', test: true }, q] }),
+      ok({ changes: [{ rev: 2, entity: 'question', op: 'upsert', id: 'Q-T', origin: 'бот', record: { ...q, id: 'Q-T', test: true } }], cursor: 2, hasMore: false }),
+    );
+    const api = new LiveApi(URL_, auth(), s.fetchImpl);
+    expect((await api.snapshot()).questions.map((x) => x.id)).toEqual(['Q-1']);
+    expect((await api.listQuestions()).map((x) => x.id)).toEqual(['Q-1']);
+    expect((await api.changesSince(1)).changes.map((c) => [c.id, c.op, c.record])).toEqual([['Q-T', 'delete', undefined]]);
+  });
+
+  it('tasks.completeMany: сделанные — изменения, не отметившиеся — в failed', async () => {
+    const t = { id: 'T-1', version: 2, clientId: null, text: 'а', due: null, type: 'docs', priority: 'medium', done: true };
+    const s = server(ok({ results: [{ id: 'T-1', ok: true, task: t }, { id: 'T-2', ok: false, error: { code: 'NOT_FOUND', message: 'Задачи уже нет' }, current: null }], updated: 1, failed: 1 }, 30));
+    const r = await new LiveApi(URL_, auth(), s.fetchImpl).write({ kind: 'completeTasks', requestId: 'R3', ids: ['T-1', 'T-2'], done: true });
+    expect(s.sent[0]).toMatchObject({ action: 'tasks.completeMany', requestId: 'R3', payload: { items: [{ id: 'T-1' }, { id: 'T-2' }], done: true } });
+    expect(r.ok && [r.changes.map((c) => c.id), r.failed]).toEqual([['T-1'], [{ id: 'T-2', code: 'NOT_FOUND', message: 'Задачи уже нет' }]]);
+  });
+
   it('«Не писать клиенту»: снято / снимать нечего / уже ушло (CONFLICT с sentAt); requestId — свой на нажатие', async () => {
     const s = server(ok({ id: 'D-1', cancelled: true }), ok({ id: 'D-1', cancelled: false }), fail('CONFLICT', 'Уже отправлено', {}, { id: 'D-1', sentAt: '2026-10-16T02:10:00+03:00' }));
     const api = new LiveApi(URL_, auth(), s.fetchImpl);

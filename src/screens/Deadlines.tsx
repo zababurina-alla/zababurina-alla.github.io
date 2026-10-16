@@ -1,7 +1,7 @@
 // «Сроки»: календарь месяца + список по дням; закрытие одним нажатием, «Закрыто сегодня» с честным статусом.
 // Месяц считается от сегодняшней даты и листается ‹ › (раньше был жёстко «Октябрь 2026»).
 import { useMemo, useRef, useState, useEffect } from 'react';
-import { canWrite } from '../config';
+import { canWrite, hasFeature } from '../config';
 import { roAttrs, roMessage } from '../ui/readonly';
 import { useToast } from '../ui/toast';
 import { SelectionCtx } from './selection';
@@ -25,6 +25,7 @@ import type { GroupBy } from './DayGroups';
 import { OBLIGATION_ICON } from '../ui/obligationIcon';
 import { useRoute } from '../router';
 import { useUi } from '../app/ui-context';
+import { WeekLoadBar } from './WeekLoad';
 
 type Range = 'month' | 'overdue' | 'week' | 'all';
 const RANK: Record<Status, number> = { red: 4, orange: 3, yellow: 2, green: 1, grey: 0 };
@@ -188,7 +189,7 @@ export function Deadlines() {
         </div>
         <div className="page__actions">
           <button type="button" className="btn btn--secondary" onClick={printWeek}><Icon name="pdf" />Распечатать неделю</button>
-          <button type="button" className="btn btn--primary" onClick={() => ui.openNewDeadline()} {...roAttrs('deadlines')}><Icon name="plus" />Новый срок</button>
+          {store.createDeadline && <button type="button" className="btn btn--primary" onClick={() => ui.openNewDeadline()}><Icon name="plus" />Новый срок</button>}
         </div>
       </header>
       <p className="print-only print-head">Сроки на неделю · {fmtDayMonth(TODAY)} — {fmtDayMonth(addDays(TODAY, 7))} {TODAY.slice(0, 4)} · просрочено и горит</p>
@@ -218,6 +219,7 @@ export function Deadlines() {
                 <button key={id} type="button" className="seg__opt" aria-pressed={by === id} onClick={() => { setBy(id); play('tick'); }}>{label}</button>
               ))}
             </div>
+            {hasFeature('weekLoad') && <WeekLoadBar />}
             <div className="dfilters" role="group" aria-label="Фильтры сроков">
               <label><span className="sub">Статус</span>
                 <select className="input input--sm" value={statusF} onChange={(e) => setStatusF(e.target.value as OpenStatus | 'all')}>
@@ -248,6 +250,11 @@ export function Deadlines() {
               <button type="button" className="link" onClick={() => setChosen(new Set(items.map((d) => d.id)))}>Выбрать все в списке ({items.length})</button>
               {pickedNow.length > 0 && <button type="button" className="link" onClick={() => setChosen(new Set())}>Снять</button>}
               <span className="dsel-bar__grow" />
+              {/* Как меню таблицы «Выделенное → В работе / Ожидание» (deadlines.updateMany) */}
+              <button type="button" className="btn btn--secondary btn--sm" disabled={!pickedNow.length} {...roAttrs('deadlines')}
+                onClick={() => { if (!canWrite('deadlines')) { toast({ text: roMessage('deadlines'), tone: 'info' }); return; } store.updateDeadlines(pickedNow.map((d) => d.id), { status: 'inProgress' }, 'В работе'); stopSelecting(); }}>В работе</button>
+              <button type="button" className="btn btn--secondary btn--sm" disabled={!pickedNow.length} {...roAttrs('deadlines')}
+                onClick={() => { if (!canWrite('deadlines')) { toast({ text: roMessage('deadlines'), tone: 'info' }); return; } store.updateDeadlines(pickedNow.map((d) => d.id), { status: 'waiting' }, 'Ожидание'); stopSelecting(); }}>Ожидание</button>
               <button type="button" className="btn btn--ghost btn--sm" onClick={stopSelecting}>Отмена</button>
               <button type="button" className={`btn btn--sm ${confirming ? 'btn--danger' : 'btn--primary'}`} disabled={!pickedNow.length} onClick={closePicked}>
                 {confirming ? `Да, закрыть ${pickedNow.length}` : `Закрыть ${pickedNow.length || ''}`.trim()}

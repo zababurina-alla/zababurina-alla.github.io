@@ -1,12 +1,12 @@
 // «Сегодня»: за 10 секунд понять день. Сверху — одна фраза о дне из чисел и четыре плашки срочности (они же фильтр),
-// ниже — что сдать по дням; сбоку — вопрос от Дмитрия, ключи ЭЦП, деньги месяца, что изменилось.
+// ниже — что сдать по дням; сбоку — вопросы по таблице, ключи ЭЦП, деньги месяца, что изменилось.
 import { Fragment, useRef, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { InboxCard } from './Inbox';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { useStore } from '../data/store';
-import { TODAY, daysBetween, daysInMonth, daysLabel, fmtDate, monthName, plural, statusByDays, weekday, fmtDayMonth } from '../lib/dates';
+import { TODAY, daysBetween, daysInMonth, daysLabel, fmtDate, monthKey, monthName, plural, statusByDays, weekday, fmtDayMonth } from '../lib/dates';
 import { growthLabel, monthStats } from '../lib/monthStats';
 import { formatMoney } from '../lib/money';
 import { Icon } from '../ui/Icon';
@@ -85,7 +85,7 @@ const FILTER_TITLE: Record<Filter, string> = {
 
 export function Today() {
   const store = useStore();
-  // Новые вопросы от Дмитрия — при открытии «Сегодня» (не чаще раза в 2 мин, см. store.refreshQuestions).
+  // Новые вопросы по таблице — при открытии «Сегодня» (не чаще раза в 2 мин, см. store.refreshQuestions).
   const { refreshQuestions, loaded } = store;
   useEffect(() => { if (loaded) void refreshQuestions(); }, [loaded, refreshQuestions]);
   const ui = useUi();
@@ -107,6 +107,7 @@ export function Today() {
   const keysGone = keys.filter((c) => daysBetween(TODAY, c.keyUntil ?? TODAY) < 0).length;
   const keysSoon = keys.length - keysGone;
   const month = monthStats(store.payments, TODAY);
+  const noStatus = store.payments.filter((p) => p.status === 'expected' && p.date && (monthKey(p.date) === month.key || monthKey(p.date) === month.prevKey)).length;
   // Задачи на сегодня: просроченные и сегодняшние, самые важные — выше.
   const PRIO = { critical: 0, high: 1, medium: 2, low: 3 } as const;
   const todayTasks = store.tasks.filter((t) => !t.done && t.due && t.due <= TODAY)
@@ -142,7 +143,7 @@ export function Today() {
   const plan = [
     overdue.length && { key: 'overdue', icon: 'overdue' as const, tone: 'red', title: 'Закрыть просроченные', n: `${overdue.length} ${plural(overdue.length, 'срок', 'срока', 'сроков')}` },
     todayTasks.length && { key: 'tasks', icon: 'tasks' as const, tone: tasksLate ? 'red' : 'accent', title: tasksTitle, n: tasksN },
-    store.questions.length && { key: 'q', icon: 'questions' as const, tone: 'wheat', title: 'Ответить Дмитрию', n: `${store.questions.length} ${plural(store.questions.length, 'вопрос', 'вопроса', 'вопросов')}` },
+    store.questions.length && { key: 'q', icon: 'questions' as const, tone: 'wheat', title: 'Вопросы по таблице', n: `${store.questions.length} ${plural(store.questions.length, 'вопрос', 'вопроса', 'вопросов')}` },
     keys.length && { key: 'keys', icon: 'keys' as const, tone: keysGone ? 'red' : 'accent', title: keysGone ? 'Ключи закончились' : 'Продлить ключи ЭЦП',
       // Один подсчёт на всё (п. 54): «закончились · 7», когда закончились 4, вводило в заблуждение.
       n: keysGone ? `${keysGone} ${plural(keysGone, 'закончился', 'закончились', 'закончились')}${keysSoon ? `, ещё ${keysSoon} — до ${KEY_DAYS} дн.` : ''}` : `${keys.length} ${plural(keys.length, 'клиент', 'клиента', 'клиентов')}` },
@@ -217,7 +218,11 @@ export function Today() {
     money: (
       <section data-tail="money" className="panel reveal money-card" aria-labelledby="t-money">
         <header className="panel__head"><h2 id="t-money" className="panel__title">Получено в {monthName(month.key, 'prep')}</h2><a className="link" href="#/payments">Платежи</a></header>
-        {month.total === 0 && month.prevTotal === 0 ? (
+        {month.total === 0 && month.prevTotal === 0 && noStatus > 0 ? (
+          // Платежи есть, но без «✅ Получено» (сервер отдаёт пустой статус как «ожидается»): деньгами их не считаем —
+          // решение за мамой (координатор 16.10), до него честно говорим, что статусы уточняются.
+          <p className="panel__note sub">Статусы платежей уточняются: у {noStatus} {plural(noStatus, 'платежа', 'платежей', 'платежей')} за {monthName(month.prevKey, 'nom').toLowerCase()}–{monthName(month.key, 'nom').toLowerCase()} не отмечено «Получено» — сумму покажем, когда отметят.</p>
+        ) : month.total === 0 && month.prevTotal === 0 ? (
           <p className="panel__note sub">В таблице платежей за {monthName(month.key, 'nom').toLowerCase()} и {monthName(month.prevKey, 'nom').toLowerCase()} нет — суммы появятся, когда платёж запишут в таблицу, бота или здесь.</p>
         ) : (
         <div className="money-card__body">

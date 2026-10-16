@@ -45,6 +45,13 @@ describe('config.json', () => {
     expect([canWrite('remind'), hasFeature('remindPreview')]).toEqual([true, true]);
   });
 
+  it('живой config.json сегодня (features inbox, cancelNotify): новое без приёмки выключено — калькулятор, недели, микрофон, правка КВЕД, Месяц, Внимание, архив', async () => {
+    await loadRuntimeConfig(fetchJson({ apiUrl: 'https://x/exec', writes: ['tasks', 'deadlines', 'payments'], features: ['inbox', 'cancelNotify'] }));
+    const off = ['epCalc', 'weekLoad', 'voice', 'kvedEdit', 'month', 'attention', 'archive', 'deadlinesCreate', 'applyTemplate', 'botLink', 'statementPdf', 'sendStatement', 'completeMany', 'updateMany'] as const;
+    expect(off.filter((f) => hasFeature(f))).toEqual([]);
+    expect([hasFeature('inbox'), hasFeature('cancelNotify')]).toEqual([true, true]);
+  });
+
   it('dev:mock (Н-7): адрес учебного сервера главнее config.json с живой таблицей; файлы не читаются, всё включено', async () => {
     const LIVE = 'https://script.google.com/macros/s/LIVE/exec';
     const MOCK = 'http://localhost:5179/mock-api';

@@ -61,7 +61,7 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
   const isOther = (k: ClientKind | null) => !['fop1', 'fop2', 'fop3'].includes(k ?? '');
   const byKind = (k: ClientKind | null, f: KindFilter) => f === 'all' || k === f || (f === 'other' && isOther(k));
   const found = search(
-    store.clients.filter((c) => byKind(c.kind, kind) && (!noPhone || !c.phone.trim()) && (noPay === null || noPaymentFor(paidLast, c.id, noPay, TODAY))).map((c) => ({ ...c, extra: [...c.kved.map((k) => k.code), c.phone],
+    store.clients.filter((c) => byKind(c.kind, kind) && (!noPhone || !c.phone.trim()) && (noPay === null || paidLast.size === 0 || noPaymentFor(paidLast, c.id, noPay, TODAY))).map((c) => ({ ...c, extra: [...c.kved.map((k) => k.code), c.phone],
       words: [...c.kved.map((k) => k.title), c.keyIssuer, ...store.deadlines.filter((d) => d.clientId === c.id).map((d) => d.what)] })),
     q,
   );
@@ -92,8 +92,10 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
             {q ? <span className="search-input__count num" role="status">{found.length} из {total}</span> : <kbd className="kbd">/</kbd>}
           </label>
           {/* Отбор (владелец 16.10: «фильтры в две строки, справа пустая полоса»): две ровные строки во всю ширину —
-              поиск + «Без платежа 30 · 60 · 90», тип клиента + «Без телефона». Каждый блок растягивается, пустых полос нет. */}
-          <div className="seg seg--fill clients__nopay" role="group" aria-label="Без платежа">
+              поиск + «Без платежа 30 · 60 · 90», тип клиента + «Без телефона». Каждый блок растягивается, пустых полос нет.
+              «Без платежа» — только когда в снимке есть полученные платежи (техника 16.10: статус пустой → «ожидается»,
+              фильтр показал бы всех); без него поиск — первой строкой целиком. */}
+          {paidLast.size > 0 && <div className="seg seg--fill clients__nopay" role="group" aria-label="Без платежа">
             <span className="clients__nopay-label" aria-hidden="true"><Icon name="payments" size={16} /><span>Без платежа<span className="clients__nopay-unit">, дн.</span></span></span>
             {NO_PAY_DAYS.map((n) => (
               <button key={n} type="button" className="seg__opt" aria-pressed={noPay === n} onClick={() => { setNoPay((v) => (v === n ? null : n)); play('tick'); }}
@@ -102,7 +104,7 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
                 {n}<span className="clients__nopay-days"> дн.</span><span className="chip__n num">{unpaid(n)}</span>
               </button>
             ))}
-          </div>
+          </div>}
           <Tabs label="Тип клиента" value={kind} onChange={(k) => { setKind(k); play('tick'); }} items={[
             { id: 'all', label: 'Все', count: count('all') },
             { id: 'fop1', label: '1 гр.', count: count('fop1') },

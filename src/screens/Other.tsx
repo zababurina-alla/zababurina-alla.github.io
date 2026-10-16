@@ -1,7 +1,7 @@
 // Ключи ЭЦП, Справочник, Задачи и «Ещё» (телефон). Короче основных экранов, но рабочие.
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { canWrite } from '../config';
+import { canWrite, hasFeature } from '../config';
 import { useStore } from '../data/store';
 import { TODAY, addDays, daysBetween, daysLabel, fmtDate, plural, statusByDays } from '../lib/dates';
 import { play } from '../lib/sound';
@@ -23,6 +23,8 @@ import { roAttrs, roMessage } from '../ui/readonly';
 import { URGENCY_ICON } from './DeadlineTable';
 import { Me, SoundSettings, useTheme } from '../app/Shell';
 import { useFlipRows } from '../ui/flip';
+import { EpCalc } from './EpCalc';
+import { useVoiceInput, voiceSupported } from '../lib/voiceInput';
 
 // Группы ключей — шкала словаря (п. 1): просрочен, горит 0–7, скоро 8–30, в порядке; «нет ключа» — ⚪ (п. 3, № 79).
 const KEY_GROUPS: { st: Status; title: string }[] = [
@@ -166,6 +168,7 @@ export function Reference() {
       )}
       {r && <RateCards r={r} />}
       {r?.limitsSource === 'code' && <p className="sub rates__note">Пределы групп — по закону {r.year || ''}, не из таблицы.</p>}
+      {r && hasFeature('epCalc') && <EpCalc r={r} />}
       <KvedSearch />
     </div>
   );
@@ -183,6 +186,9 @@ export function Tasks() {
   const listRef = useRef<HTMLElement>(null);
   useFlipRows(listRef, '.tasks__row', store.tasks.map((t) => `${t.id}${t.done ? '+' : ''}`).join(','));
   const [line, setLine] = useState('');
+  // Голосом: распознаёт браузер; текст ложится в строку — дальше тот же разбор «кто / что / когда».
+  const voice = useVoiceInput(useCallback((text: string) => setLine(text), []));
+  const canVoice = hasFeature('voice') && voiceSupported() && canWrite('tasks');
   const parsed = line.trim() ? parseQuickTask(line, store.clients) : null;
   const client = parsed?.clientId ? store.client(parsed.clientId) : undefined;
 
@@ -202,10 +208,10 @@ export function Tasks() {
     const ids = open.filter((t) => chosen.has(t.id)).map((t) => t.id);
     if (!ids.length) return;
     play('done');
-    for (const id of ids) store.toggleTask(id, true);
+    store.completeTasks(ids, true);
     if (canWrite('tasks')) {
       toast({ text: `Сделано: ${ids.length} ${plural(ids.length, 'задача', 'задачи', 'задач')}`,
-        action: { label: 'Отменить', run: () => { for (const id of ids) store.toggleTask(id, false); } } });
+        action: { label: 'Отменить', run: () => store.completeTasks(ids, false) } });
     }
     stopSelecting();
   };
@@ -242,8 +248,15 @@ export function Tasks() {
           <span className="visually-hidden">Новая задача</span>
           <input value={line} onChange={(e) => setLine(e.target.value)} autoComplete="off"
             disabled={!canWrite('tasks')} placeholder={canWrite('tasks') ? 'Например: позвонить Ромашко завтра' : 'Задачи пока — в таблице'} />
+          {canVoice && (
+            <button type="button" className={`icon-btn quick__mic${voice.listening ? ' is-on' : ''}`} aria-pressed={voice.listening}
+              aria-label={voice.listening ? 'Остановить запись' : 'Сказать задачу голосом'} title="Сказать задачу голосом"
+              onClick={() => (voice.listening ? voice.stop() : voice.start())}><Icon name="mic" size={18} /></button>
+          )}
           <button type="submit" className="btn btn--primary btn--sm" disabled={!parsed?.text}>Добавить</button>
         </label>
+        {voice.listening && <p className="sub" role="status">Слушаю… скажите, например: «позвонить Ромашко завтра»</p>}
+        {voice.error && <p className="field__error" role="alert">{voice.error}</p>}
         {parsed && (
           <p className="quick__parsed" aria-live="polite">
             <span className="sub">Понял так:</span>
@@ -344,7 +357,7 @@ export function More() {
     <div className="page">
       <header className="page__head"><h1 className="page__title">Ещё</h1></header>
       <nav className="panel more" aria-label="Другие разделы">
-        {MORE.map(([href, icon, label, hint]) => (
+        {[...MORE, ...(hasFeature('month') ? [['#/month', 'month', 'Месяц', 'чек-лист по штату: зарплата, налоги, табель'] as [string, IconName, string, string]] : [])].map(([href, icon, label, hint]) => (
           <a key={href} href={href} className="more__item">
             <Icon name={icon} tile="accent" />
             <span className="more__text"><strong>{label}</strong><span className="sub">{hint}</span></span>

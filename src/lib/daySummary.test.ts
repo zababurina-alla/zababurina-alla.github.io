@@ -29,7 +29,7 @@ describe('итог дня словами', () => {
     expect(lines).toContain('Ключ ЭЦП заканчивается у: Ясенко Микола.');
     expect(lines).toContain('1 задача просрочена.');
     expect(lines).toContain('1 задача на сегодня.');
-    expect(lines).toContain('Дмитрий ждёт ответа на 48 вопросов.');
+    expect(lines).toContain('48 вопросов по таблице ждут ответа.');
     expect(lines.join(' ')).not.toMatch(/\p{Extended_Pictographic}/u);
   });
 
