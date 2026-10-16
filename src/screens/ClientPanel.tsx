@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { RemindDialog } from './RemindDialog';
 import { roAttrs } from '../ui/readonly';
 import { emailProblem, normEmail, phoneProblem } from '../lib/contact';
+import { play } from '../lib/sound';
 import { KeyRenew } from './KeyRenew';
 import { canWrite } from '../config';
 import gsap from 'gsap';
@@ -180,7 +181,13 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
             <span className="vt-avatar"><Avatar name={c.name} size="lg" /></span>
             <div className="cp__who">
               <h2 id="cp-name" className="cp__name"><span className="vt-name">{c.name}</span></h2>
-              <p className="cp__kind"><span className="tag">{c.kind ? kindLabel(c.kind) : 'тип не указан'}</span>{c.employer && <span className="tag">работодатель</span>}{c.marks.map((m) => <span key={m} className="tag">{MARK_LABEL[m]}</span>)}</p>
+              <p className="cp__kind"><span className="tag">{c.kind ? kindLabel(c.kind) : 'тип не указан'}</span>{c.employer && <span className="tag">работодатель</span>}{c.marks.map((m) => <span key={m} className="tag">{MARK_LABEL[m]}</span>)}
+                {/* Находка № 12: горящий ключ виден сразу, в шапке, а не ниже первого экрана (до 14 дней или уже закончился) */}
+                {keyDays !== null && keyDays <= 14 && (
+                  <span className={`tag cp__keytag cp__keytag--${keyDays < 0 ? 'gone' : 'soon'}`}>
+                    <Icon name="key" size={14} />{keyDays < 0 ? `ключ закончился ${fmtDate(c.keyUntil ?? '')}` : `ключ до ${fmtDate(c.keyUntil ?? '')}`}
+                  </span>
+                )}</p>
             </div>
             <div className="cp__actions">
               {c.phone
@@ -222,7 +229,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                       {tasks.map((t) => (
                         <li key={t.id} className="tasks__row">
                           <button type="button" className="check-btn tasks__check" aria-pressed={false} aria-label={`Сделано: ${t.text}`}
-                            onClick={() => store.toggleTask(t.id, true)}>
+                            onClick={() => { play('done'); store.toggleTask(t.id, true); }}>
                             <span className="check-btn__ring" aria-hidden="true"><Icon name="check" size={16} /></span>
                           </button>
                           <span className="tasks__text"><TableText text={t.text} /></span>

@@ -8,7 +8,7 @@
 // 3) Исключение (владелец, 16.10): новое сообщение клиента — playAmbient('message'): без недавнего нажатия, но только
 //    если звук уже разблокирован действием мамы в этой вкладке и режим сейчас слышен. Иначе — тишина, браузер не ругается.
 
-export type SoundName = 'saved' | 'closed' | 'attention' | 'incoming' | 'tick' | 'message';
+export type SoundName = 'saved' | 'closed' | 'attention' | 'incoming' | 'tick' | 'message' | 'already' | 'done';
 export type SoundMode = 'on' | 'night' | 'off';
 
 const KEY_MODE = 'sverka.sound.mode';
@@ -20,6 +20,19 @@ const NIGHT_FROM = 22; // 22:00–7:00 — «ночью тихо»
 const NIGHT_TO = 7;
 
 let ctx: AudioContext | null = null;
+
+/**
+ * Звук «как у приложения», а не как у плеера: на iPhone (Safari 16.4+) audioSession «ambient» слушается переключателя
+ * «Без звука» и не останавливает музыку мамы. Где такого нет — без изменений.
+ */
+function audio(): AudioContext {
+  if (!ctx) {
+    const nav = navigator as Navigator & { audioSession?: { type: string } };
+    try { if (nav.audioSession) nav.audioSession.type = 'ambient'; } catch { /* не поддерживается — не страшно */ }
+    ctx = new AudioContext();
+  }
+  return ctx;
+}
 let lastGesture = 0;
 
 if (typeof window !== 'undefined') {
@@ -86,8 +99,7 @@ export function play(name: SoundName, force = false): void {
   if (!force && (!soundSettings.on || performance.now() - lastGesture > GESTURE_MS)) return;
   if (force && soundSettings.mode === 'off') return;
   try {
-    ctx ??= new AudioContext();
-    voice(ctx, name);
+    voice(audio(), name);
   } catch {
     /* звук — украшение; без него всё работает */
   }
@@ -128,6 +140,14 @@ function voice(ac: AudioContext, name: SoundName): void {
       break;
     case 'tick': // щелчок выбора, 30 мс
       tone(ac, out, 2093, t, 0.03, 'sine', 0.18);
+      break;
+    case 'already': // «уже решено» (в Telegram или другой вкладке): приглушённое «тук-тук», не ошибка, 140 мс
+      tone(ac, out, 330, t, 0.06, 'triangle', 0.5);
+      tone(ac, out, 294, t + 0.08, 0.07, 'triangle', 0.4);
+      break;
+    case 'done': // задача выполнена: лёгкий щипок вверх (соль → ре), 180 мс, тише «закрыто»
+      tone(ac, out, 783.99, t, 0.08, 'sine', 0.45);
+      tone(ac, out, 1174.7, t + 0.05, 0.14, 'sine', 0.3);
       break;
     case 'message': // новое сообщение: «капля» — мягкий низ и две светлые ноты (до → фа), 260 мс, тише «записано»
       tone(ac, out, 523.25, t, 0.18, 'triangle', 0.22);

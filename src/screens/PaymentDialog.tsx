@@ -102,10 +102,13 @@ export function PaymentDialog({ open, clientId, onClose }: { open: boolean; clie
     const short = client.name.split(' ').slice(0, 2).join(' ');
     const sum = formatMoney(money.kopecks);
     // Пока сервер не подтвердил — в списке платежей «сохраняется…», в меню «Сохраняется в таблицу: 1».
+    // Находка № 6: без тишины 2–3 с — сразу «Записываю…», ответ таблицы заменяет его на месте на «Записано · Отменить».
+    const key = `pay-${Date.now()}`;
     const id = store.addPayment({ clientId: client.id, kopecks: money.kopecks, period, method, date: dateIso }, () => {
       play('saved');
-      toast({ text: `Платёж ${sum} записан в таблицу — ${short}`, action: { label: 'Отменить', run: () => store.removePayment(id) } });
+      toast({ key, replace: true, text: `Платёж ${sum} записан в таблицу — ${short}`, action: { label: 'Отменить', run: () => store.removePayment(id) } });
     });
+    toast({ key, text: `Записываю ${sum} — ${short}…`, tone: 'info', timeout: 20_000 });
     void draft.clear();
     onClose();
   }

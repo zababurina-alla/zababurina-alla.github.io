@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { canWrite } from '../config';
 import { useStore } from '../data/store';
 import { TODAY, addDays, daysBetween, daysLabel, fmtDate, plural, statusByDays } from '../lib/dates';
+import { play } from '../lib/sound';
 import { parseQuickTask } from '../lib/quickTask';
 import type { Client, Priority, Rates, Status, Task } from '../data/types';
 import { useKvedSearch, useRates } from '../data/reference';
@@ -249,7 +250,7 @@ export function Tasks() {
                 return (
                   <li key={t.id} className={`tasks__row${t.done ? ' is-done' : ''}${store.fresh.includes(t.id) ? ' is-fresh' : ''}`}>
                     <button type="button" className="check-btn tasks__check" aria-pressed={t.done} aria-label={`Сделано: ${t.text}`}
-                      onClick={() => store.toggleTask(t.id, !t.done)}>
+                      onClick={() => { if (!t.done) play('done'); store.toggleTask(t.id, !t.done); }}>
                       <span className="check-btn__ring" aria-hidden="true"><Icon name="check" size={16} /></span>
                     </button>
                     <span className="tasks__text">

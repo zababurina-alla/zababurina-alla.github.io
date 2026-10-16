@@ -273,6 +273,10 @@
   line-height: var(--leading-tight);
 }
 
+/* Горящий ключ в шапке карточки: оранжевый — до 14 дней, красный — закончился (пары статусов — контраст проверен) */
+.cp__keytag--soon { background: var(--st-orange-bg); color: var(--st-orange-ink); }
+.cp__keytag--gone { background: var(--st-red-bg); color: var(--st-red-ink); }
+
 .cp__kind {
   display: flex;
   gap: var(--space-2);

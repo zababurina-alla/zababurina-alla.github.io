@@ -18,6 +18,8 @@ export interface ToastInput {
   timeout?: number;
   /** Одно и то же событие (например, отказ по одной записи) — одно уведомление, даже если о нём сообщили дважды. */
   key?: string;
+  /** С тем же key — заменить текст на месте («Записываю…» → «Записано · Отменить»), таймер — заново. */
+  replace?: boolean;
   /** Сообщение клиента — как в Telegram: аватар, имя и время над текстом; нажатие на уведомление — действие (открыть). */
   from?: { name: string; at: string };
 }
@@ -31,6 +33,8 @@ function Toast({ t, index, onClose }: { t: ToastItem; index: number; onClose: (i
   const total = t.timeout ?? (t.tone === 'error' ? 0 : t.action ? 10_000 : 5000);
   const left = useRef(total);
   const [paused, setPaused] = useState(false);
+  // Заменили текст (replace) — отсчёт заново: «Записано · Отменить» должно висеть своё время целиком.
+  useEffect(() => { left.current = total; }, [t.text, total]);
   useEffect(() => {
     if (!total || paused) return;
     const started = Date.now();
@@ -124,7 +128,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     window.setTimeout(() => setItems((xs) => xs.filter((x) => x.id !== id)), 180);
   }, []);
   const push = useCallback((t: ToastInput) => {
-    setItems((xs) => (t.key && xs.some((x) => x.key === t.key && !x.leaving) ? xs : [...xs.slice(-2), { ...t, text: demoWords(t.text), id: Date.now() + Math.random() }]));
+    setItems((xs) => {
+      const same = t.key ? xs.find((x) => x.key === t.key && !x.leaving) : undefined;
+      if (same) return t.replace ? xs.map((x) => (x === same ? { ...t, text: demoWords(t.text), id: same.id } : x)) : xs;
+      return [...xs.slice(-2), { ...t, text: demoWords(t.text), id: Date.now() + Math.random() }];
+    });
   }, []);
   return (
     <Ctx.Provider value={push}>

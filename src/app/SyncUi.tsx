@@ -5,7 +5,7 @@ import { AREA_LABEL, AREA_PLACE, canLeaveDemo, isLive, readOnlyAreas, visibleAre
 import { Icon } from '../ui/Icon';
 import { Modal } from '../ui/Modal';
 import { useToast } from '../ui/toast';
-import { playAmbient } from '../lib/sound';
+import { play, playAmbient } from '../lib/sound';
 import { threadKey } from '../lib/inboxThreads';
 
 /** Учебный режим на каждом экране: выдуманные клиенты, в мамину таблицу ничего не уходит (находка № 3). */
@@ -54,6 +54,8 @@ export function FailureWatcher() {
         dismissNotice(n.id);
         continue;
       }
+      // «Уже решено» (сообщение решили в Telegram или в другой вкладке) — не ошибка: тихий «тук-тук»
+      if (n.info && n.key?.startsWith('inbox-')) play('already');
       // Отказ записи — ошибка, висит до закрытия; «пока в таблице» — подсказка на 7 с, одна на раздел (п. 7).
       const go = n.href;
       toast(n.info ? { key: n.key ?? `notice-${n.id}`, text: n.text, tone: 'info', timeout: go ? 12_000 : 7000, ...(go ? { action: { label: 'Открыть', run: () => { location.hash = go; } } } : {}) }

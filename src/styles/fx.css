@@ -324,3 +324,44 @@
     animation: none;
   }
 }
+
+/* ═════════ Микро-движение кнопок и строк (моушн, 16.10) ═════════ */
+/* Главная кнопка на мыши чуть приподнимается и получает тень — «можно нажать»; при нажатии садится обратно */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .btn--primary:hover:not(:disabled, [aria-disabled='true']) {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-2);
+  }
+
+  .btn--primary:active:not(:disabled, [aria-disabled='true']) {
+    transform: translateY(0) scale(0.97);
+    box-shadow: var(--shadow-1);
+  }
+}
+
+/* Строка чата и пузырь — мягко проседают под пальцем/мышью (как ячейки в Telegram) */
+@media (prefers-reduced-motion: no-preference) {
+  .chat {
+    transition: background-color var(--dur-fast) ease, transform var(--dur-press) var(--ease-out);
+  }
+
+  .chat:active {
+    transform: scale(0.985);
+  }
+}
+
+/* ═════════ Страховка: «уменьшить движение» — для всего сайта ═════════ */
+/* Точечные правила выше гасят большие движения; здесь — всё остальное (появление меню, подсказок, галочек).
+   1 мс, а не none: события конца анимации срабатывают, окна и уведомления закрываются как раньше. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}

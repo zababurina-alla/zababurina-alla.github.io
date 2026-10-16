@@ -257,7 +257,7 @@ export function Today() {
                   return (
                     <li key={t.id} className={`tasks__row${store.fresh.includes(t.id) ? ' is-fresh' : ''}`}>
                       <button type="button" className="check-btn tasks__check" aria-pressed={false} aria-label={`Сделано: ${t.text}`}
-                        onClick={() => store.toggleTask(t.id, true)}>
+                        onClick={() => { play('done'); store.toggleTask(t.id, true); }}>
                         <span className="check-btn__ring" aria-hidden="true"><Icon name="check" size={16} /></span>
                       </button>
                       <span className="tasks__text">
