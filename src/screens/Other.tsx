@@ -1,5 +1,5 @@
 // Ключи ЭЦП, Справочник, Задачи и «Ещё» (телефон). Короче основных экранов, но рабочие.
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { canWrite, hasFeature } from '../config';
 import { useStore } from '../data/store';
@@ -24,6 +24,7 @@ import { URGENCY_ICON } from './DeadlineTable';
 import { Me, SoundSettings, useTheme } from '../app/Shell';
 import { useFlipRows } from '../ui/flip';
 import { EpCalc } from './EpCalc';
+import { useVoiceInput, voiceSupported } from '../lib/voiceInput';
 
 // Группы ключей — шкала словаря (п. 1): просрочен, горит 0–7, скоро 8–30, в порядке; «нет ключа» — ⚪ (п. 3, № 79).
 const KEY_GROUPS: { st: Status; title: string }[] = [
@@ -185,6 +186,9 @@ export function Tasks() {
   const listRef = useRef<HTMLElement>(null);
   useFlipRows(listRef, '.tasks__row', store.tasks.map((t) => `${t.id}${t.done ? '+' : ''}`).join(','));
   const [line, setLine] = useState('');
+  // Голосом: распознаёт браузер; текст ложится в строку — дальше тот же разбор «кто / что / когда».
+  const voice = useVoiceInput(useCallback((text: string) => setLine(text), []));
+  const canVoice = voiceSupported() && canWrite('tasks');
   const parsed = line.trim() ? parseQuickTask(line, store.clients) : null;
   const client = parsed?.clientId ? store.client(parsed.clientId) : undefined;
 
@@ -244,8 +248,15 @@ export function Tasks() {
           <span className="visually-hidden">Новая задача</span>
           <input value={line} onChange={(e) => setLine(e.target.value)} autoComplete="off"
             disabled={!canWrite('tasks')} placeholder={canWrite('tasks') ? 'Например: позвонить Ромашко завтра' : 'Задачи пока — в таблице'} />
+          {canVoice && (
+            <button type="button" className={`icon-btn quick__mic${voice.listening ? ' is-on' : ''}`} aria-pressed={voice.listening}
+              aria-label={voice.listening ? 'Остановить запись' : 'Сказать задачу голосом'} title="Сказать задачу голосом"
+              onClick={() => (voice.listening ? voice.stop() : voice.start())}><Icon name="mic" size={18} /></button>
+          )}
           <button type="submit" className="btn btn--primary btn--sm" disabled={!parsed?.text}>Добавить</button>
         </label>
+        {voice.listening && <p className="sub" role="status">Слушаю… скажите, например: «позвонить Ромашко завтра»</p>}
+        {voice.error && <p className="field__error" role="alert">{voice.error}</p>}
         {parsed && (
           <p className="quick__parsed" aria-live="polite">
             <span className="sub">Понял так:</span>
