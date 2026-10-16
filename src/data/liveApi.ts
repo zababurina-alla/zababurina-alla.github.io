@@ -2,7 +2,7 @@
 // (docs/api-contract.md v2.1). Экраны и очередь записей не знают, с кем говорят.
 import { ApiError, call } from './transport';
 import type { Envelope } from './transport';
-import type { ApplyTemplateResult, ArchivePage, AttentionItem, MonthCheck, MonthItem, MonthSheet, BotLinkResult, CabinetApi, StatementPdf, StatementPreview, StatementResult, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
+import type { ApplyTemplateResult, ArchivedDeadline, ArchivePage, AttentionItem, MonthCheck, MonthItem, MonthSheet, BotLinkResult, CabinetApi, StatementPdf, StatementPreview, StatementResult, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
 import { MONTH_CHECKS, RETRYABLE } from './api';
 import type { Activity, Client, Consultation, Deadline, InboxItem, InboxType, KvedItem, Payment, Question, RateGroup, Rates, Task } from './types';
 import { INBOX_TYPES } from './types';
@@ -459,11 +459,11 @@ export class LiveApi implements CabinetApi {
   async listArchive(clientId: string, offset = 0, limit = 50): Promise<ArchivePage> {
     const env = await this.rpc<{ items?: unknown[]; total?: unknown; more?: unknown }>('deadlines.listArchive', { clientId, offset, limit });
     const per = (x: unknown): Deadline['periodicity'] => (x === 'month' || x === 'quarter' || x === 'year' ? x : 'once');
-    const st = (x: unknown): Deadline['status'] => (x === 'inProgress' || x === 'waiting' || x === 'postponed' || x === 'new' ? x : 'done');
+    const st = (x: unknown): ArchivedDeadline['status'] => (x === 'inProgress' || x === 'waiting' || x === 'postponed' || x === 'new' || x === 'archived' ? x : 'done');
     const items = (env.data.items ?? []).map((x) => {
       const r = x as Record<string, unknown>;
       return { id: text(r.id) || null, what: text(r.what) || text(r.obligation), periodicity: per(r.periodicity), due: text(r.due) || null,
-        periodEnd: text(r.periodEnd) || null, status: st(r.status), closedAt: text(r.closedAt) || null, archivedAt: text(r.archivedAt) || null };
+        periodEnd: text(r.periodEnd) || null, status: st(r.status), reason: text(r.reason) || null, closedAt: text(r.closedAt) || null, archivedAt: text(r.archivedAt) || null };
     });
     return { items, total: num(env.data.total) ?? items.length, more: env.data.more === true };
   }

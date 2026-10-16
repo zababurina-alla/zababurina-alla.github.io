@@ -477,7 +477,7 @@ class FakeServer implements CabinetApi {
       const m = 9 - i; const y = m > 0 ? 2026 : 2025; const mm = ((m + 11) % 12) + 1;
       const iso = `${y}-${String(mm).padStart(2, '0')}-20`;
       return { id: i < 10 ? `A-${clientId}-${i}` : null, what: `ЄП за ${mm}.${y}`, periodicity: 'month' as const, due: iso, periodEnd: null,
-        status: 'done' as const, closedAt: i < 12 ? iso : null, archivedAt: iso };
+        status: i === 3 ? 'archived' as const : 'done' as const, reason: i === 3 ? 'работников нет' : null, closedAt: i < 12 && i !== 3 ? iso : null, archivedAt: iso };
     });
     return { items: all.slice(offset, offset + limit), total: all.length, more: offset + limit < all.length };
   }

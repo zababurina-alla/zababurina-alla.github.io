@@ -124,7 +124,8 @@ export type StatementResult = RemindResult;
 
 /** deadlines.listArchive: «🗄 Архив сроков» клиента, новые первыми; только просмотр (version нет, у старых строк id null). */
 export interface ArchivedDeadline { id: string | null; what: string; periodicity: Deadline['periodicity']; due: string | null; periodEnd: string | null;
-  status: Deadline['status']; closedAt: string | null; archivedAt: string | null }
+  /** 'archived' — «не требуется» (v5.96.2: перенесён в архив со статусом «Новое» и заметкой), причина — в reason. */
+  status: Deadline['status'] | 'archived'; reason: string | null; closedAt: string | null; archivedAt: string | null }
 export interface ArchivePage { items: ArchivedDeadline[]; total: number; more: boolean }
 /** reports.attention: клиенты по баллу риска (как бот «внимание»): high ≥ 60, mid ≥ 30; factors с weight 0 — пометки. */
 export interface AttentionItem { clientId: string; name: string; score: number; level: 'high' | 'mid' | 'low'; factors: { label: string; weight: number }[] }

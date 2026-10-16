@@ -41,9 +41,12 @@ export function ArchiveBlock({ clientId }: { clientId: string }) {
           {rows.length ? (
             <ul className="feed">{rows.map((d, i) => (
               <li key={d.id ?? `old-${i}`} className="feed__item">
-                <span className="feed__icon"><Icon name="done" size={16} /></span>
+                <span className="feed__icon"><Icon name={d.status === 'archived' ? 'inactive' : 'done'} size={16} /></span>
                 <span className="feed__text"><TableText text={d.what} />
-                  <span className="sub">{d.due ? `срок ${fmtDate(d.due)}` : 'без срока'}{d.closedAt ? ` · сдано ${fmtDate(d.closedAt.slice(0, 10))}` : ''}</span></span>
+                  {/* «Не требуется» — не «закрыт»: срок убран из списка как ненужный (v5.96.2) */}
+                  <span className="sub">{d.status === 'archived'
+                    ? `Не требуется${d.reason ? ` — ${d.reason}` : ''}`
+                    : `${d.due ? `срок ${fmtDate(d.due)}` : 'без срока'}${d.closedAt ? ` · сдано ${fmtDate(d.closedAt.slice(0, 10))}` : ''}`}</span></span>
               </li>
             ))}</ul>
           ) : <p className="sub">В архиве сроков пока ничего нет.</p>}

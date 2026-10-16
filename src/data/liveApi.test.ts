@@ -461,6 +461,9 @@ describe('живой адаптер: чтение', () => {
     const page = await api.listArchive('C-1', 50, 50);
     expect(s.sent[0]).toMatchObject({ action: 'deadlines.listArchive', payload: { clientId: 'C-1', offset: 50, limit: 50 } });
     expect(page.items.map((d) => [d.id, d.what, d.closedAt])).toEqual([['D-7', 'ЄП за вересень', '2026-10-14'], [null, 'Декларація 2024', null]]);
+    const arch = server(ok({ clientId: 'C-1', items: [{ id: 'D-8', what: '4ДФ', periodicity: 'quarter', due: '2026-11-10', status: 'archived', reason: 'работников нет', closedAt: null, archivedAt: '2026-10-16' }], total: 1, more: false }));
+    const a = (await new LiveApi(URL_, auth(), arch.fetchImpl).listArchive('C-1')).items[0];
+    expect([a?.status, a?.reason, a?.closedAt]).toEqual(['archived', 'работников нет', null]);
     expect([page.total, page.more]).toEqual([120, true]);
     const att = await api.attention(10);
     expect(att.map((a) => [a.clientId, a.level, a.factors.length])).toEqual([['C-2', 'high', 2], ['C-3', 'low', 0]]);
