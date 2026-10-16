@@ -2,7 +2,7 @@
 // (docs/api-contract.md v2.1). Экраны и очередь записей не знают, с кем говорят.
 import { ApiError, call } from './transport';
 import type { Envelope } from './transport';
-import type { CabinetApi, CancelNotifyResult, Change, CreateDeadlineResult, NewDeadline, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
+import type { ApplyTemplateResult, CabinetApi, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
 import { RETRYABLE } from './api';
 import type { Activity, Client, Consultation, Deadline, InboxItem, InboxType, KvedItem, Payment, Question, RateGroup, Rates, Task } from './types';
 import { INBOX_TYPES } from './types';
@@ -338,6 +338,37 @@ export class LiveApi implements CabinetApi {
         return { ok: false, code, message: e.message, field: e.field, current: cur };
       }
       throw e; // нет связи, занято — окно скажет «повторите», тот же requestId
+    }
+  }
+
+  /** VALIDATION / CONFLICT … — ответом с полем; нет связи и «занято» — бросить (окно скажет «ещё раз»). */
+  private refusal(e: unknown): { ok: false; code: ErrorCode; message: string; field: string | null } {
+    const code = e instanceof ApiError && SITE_CODES.has(e.code) ? e.code as ErrorCode : null;
+    if (e instanceof ApiError && code && !RETRYABLE.has(code)) return { ok: false, code, message: e.message, field: e.field };
+    throw e;
+  }
+
+  async previewTemplate(clientId: string, template?: DeadlineTemplate) {
+    try {
+      const env = await this.rpc<{ template?: unknown; wouldAdd?: unknown[]; skipped?: unknown[] }>('deadlines.applyTemplate', { clientId, ...(template ? { template } : {}), dryRun: true });
+      const d = env.data;
+      return {
+        template: text(d.template) as DeadlineTemplate,
+        wouldAdd: (d.wouldAdd ?? []).map((x) => { const r = x as Record<string, unknown>; return { obligation: text(r.obligation), periodicity: (text(r.periodicity) || 'once') as Deadline['periodicity'], due: text(r.due) }; }),
+        skipped: (d.skipped ?? []).map(text),
+      };
+    } catch (e) {
+      return this.refusal(e);
+    }
+  }
+
+  async applyTemplate(clientId: string, template: DeadlineTemplate | undefined, requestId: string): Promise<ApplyTemplateResult> {
+    try {
+      const env = await this.rpc<{ template?: unknown; added?: unknown[]; skipped?: unknown[] }>('deadlines.applyTemplate', { clientId, ...(template ? { template } : {}) }, requestId);
+      const d = env.data;
+      return { ok: true, template: text(d.template) as DeadlineTemplate, added: (d.added ?? []).map((x) => normRecord('deadline', x) as Deadline), skipped: (d.skipped ?? []).map(text) };
+    } catch (e) {
+      return this.refusal(e);
     }
   }
 
