@@ -23,6 +23,7 @@ import { roAttrs, roMessage } from '../ui/readonly';
 import { URGENCY_ICON } from './DeadlineTable';
 import { Me, SoundSettings, useTheme } from '../app/Shell';
 import { useFlipRows } from '../ui/flip';
+import { EpCalc } from './EpCalc';
 
 // Группы ключей — шкала словаря (п. 1): просрочен, горит 0–7, скоро 8–30, в порядке; «нет ключа» — ⚪ (п. 3, № 79).
 const KEY_GROUPS: { st: Status; title: string }[] = [
@@ -166,6 +167,7 @@ export function Reference() {
       )}
       {r && <RateCards r={r} />}
       {r?.limitsSource === 'code' && <p className="sub rates__note">Пределы групп — по закону {r.year || ''}, не из таблицы.</p>}
+      {r && <EpCalc r={r} />}
       <KvedSearch />
     </div>
   );
