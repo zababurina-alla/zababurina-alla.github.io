@@ -187,6 +187,8 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
       const typing = e.target instanceof HTMLElement && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName);
       if (e.altKey && (e.code === 'KeyN')) { e.preventDefault(); ui.openPayment(); }
       if ((e.ctrlKey || e.metaKey) && e.code === 'KeyK') { e.preventDefault(); ui.openPalette(); }
+      // F1 — «Помощь» (находка «Пользователя» № 17); браузерную справку не открываем.
+      if (e.key === 'F1') { e.preventDefault(); navigate('#/help'); }
       if (!typing && e.key === '/') { e.preventDefault(); navigate('#/clients/search'); }
     };
     // Переходы по ссылкам «#/…» внутри приложения — с плавной сменой экрана.
