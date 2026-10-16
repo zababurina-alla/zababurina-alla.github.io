@@ -202,10 +202,10 @@ export function Tasks() {
     const ids = open.filter((t) => chosen.has(t.id)).map((t) => t.id);
     if (!ids.length) return;
     play('done');
-    for (const id of ids) store.toggleTask(id, true);
+    store.completeTasks(ids, true);
     if (canWrite('tasks')) {
       toast({ text: `Сделано: ${ids.length} ${plural(ids.length, 'задача', 'задачи', 'задач')}`,
-        action: { label: 'Отменить', run: () => { for (const id of ids) store.toggleTask(id, false); } } });
+        action: { label: 'Отменить', run: () => store.completeTasks(ids, false) } });
     }
     stopSelecting();
   };

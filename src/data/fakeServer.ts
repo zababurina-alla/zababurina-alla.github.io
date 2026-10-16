@@ -205,6 +205,18 @@ class FakeServer implements CabinetApi {
         changes.push(this.act(`Добавлен клиент ${c.name}. Создано сроков: ${made.length}`, o, 'сайт'));
         return { ok: true, changes, cursor: this.cursor };
       }
+      case 'completeTasks': {
+        const changes: Change[] = [];
+        const failed: NonNullable<Extract<WriteResult, { ok: true }>['failed']> = [];
+        for (const id of op.ids) {
+          const t = this.tasks.get(id);
+          if (!t) { failed.push({ id, code: 'NOT_FOUND', message: 'Задачи уже нет' }); continue; }
+          const upd = { ...t, done: op.done, version: t.version + 1 };
+          this.tasks.set(id, upd);
+          changes.push(this.record('task', 'upsert', id, o, upd));
+        }
+        return { ok: true, changes, cursor: this.cursor, failed };
+      }
       case 'createTask': {
         const t = { ...op.task, version: 1 };
         this.tasks.set(t.id, t);

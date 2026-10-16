@@ -145,6 +145,7 @@ interface Store {
   answerQuestion: (id: string, text: string, onSaved?: () => void) => string;
   dismissNotice: (id: string) => void;
   toggleTask: (id: string, done: boolean) => void;
+  completeTasks: (ids: string[], done: boolean) => void;
   resolveConflict: (keep: 'mine' | 'theirs') => void;
   retry: (requestId: string) => void;
   discard: (requestId: string) => void;
@@ -164,7 +165,7 @@ const Ctx = createContext<Store | null>(null);
 const AREA_OF: Record<WriteOp['kind'], WriteArea> = {
   createConsultation: 'consultations',
   closeDeadline: 'deadlines', closeDeadlines: 'deadlines', updateTask: 'tasks', deleteTask: 'tasks', reopenDeadline: 'deadlines', addPayment: 'payments', cancelPayment: 'payments',
-  updateDeadline: 'deadlines', addClient: 'clients', updateClient: 'clients', createTask: 'tasks', completeTask: 'tasks', answerQuestion: 'questions', decideInbox: 'inbox',
+  updateDeadline: 'deadlines', addClient: 'clients', updateClient: 'clients', createTask: 'tasks', completeTask: 'tasks', completeTasks: 'tasks', answerQuestion: 'questions', decideInbox: 'inbox',
 };
 
 function upsert<T extends { id: string }>(xs: T[], rec: T): T[] {
@@ -349,6 +350,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setTasks((xs) => xs.filter((t) => t.id !== op.id));
     } else if (op.kind === 'completeTask') {
       setTasks((xs) => xs.map((t) => (t.id === op.id ? { ...t, done: op.done } : t)));
+    } else if (op.kind === 'completeTasks') {
+      setTasks((xs) => xs.map((t) => (op.ids.includes(t.id) ? { ...t, done: op.done } : t)));
     } else if (op.kind === 'decideInbox') {
       // «Задача по налогу» статус сообщения не меняет (v5.72) — само сообщение ещё ждёт решения.
       if (op.action !== 'taxTask') {
@@ -439,6 +442,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (op.kind === 'createConsultation' && final) setConsultations((xs) => xs.filter((k) => k.id !== op.consultation.id));
       // «Сделано» не принято — галочка возвращается.
       if (op.kind === 'completeTask' && final) setTasks((xs) => xs.map((t) => (t.id === op.id ? { ...t, done: !op.done } : t)));
+      if (op.kind === 'completeTasks' && final) setTasks((xs) => xs.map((t) => (op.ids.includes(t.id) ? { ...t, done: !op.done } : t)));
       // Ответ не записался: вопрос возвращается, если он всё ещё открыт (уже отвечен в Telegram — не возвращаем).
       if (op.kind === 'answerQuestion' && final) {
         const q = answering.current.get(op.requestId);
@@ -716,6 +720,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     send({ kind: 'completeTask', requestId: newRequestId(), id, done }, done ? 'Задача сделана' : 'Задача снова в работе');
   }, [send]);
 
+  /** «Сделано» пачкой: tasks.completeMany по 20 (флаг completeMany), иначе — по одной. Не отметившиеся — назад. */
+  const completeTasks = useCallback((ids: string[], done: boolean) => {
+    if (!hasFeature('completeMany')) { for (const id of ids) toggleTask(id, done); return; }
+    for (let i = 0; i < ids.length; i += 20) {
+      const part = ids.slice(i, i + 20);
+      send({ kind: 'completeTasks', requestId: newRequestId(), ids: part, done }, done ? `Сделано: ${part.length}` : `Снова в работе: ${part.length}`, (_ch, result) => {
+        const bad = (result.failed ?? []).map((f) => f.id);
+        if (!bad.length) return;
+        setTasks((xs) => xs.map((t) => (bad.includes(t.id) ? { ...t, done: !done } : t)));
+        setNotices((ns) => [...ns, { id: `ct-${Date.now()}`, text: `Не отметились: ${bad.length} — ${(result.failed ?? [])[0]?.message ?? ''}`, info: true }]);
+      });
+    }
+  }, [send, toggleTask]);
+
   /** «Запись изменилась в таблице»: оставить своё (отправить поверх новой версии) или взять из таблицы. */
   const resolveConflict = useCallback((keep: 'mine' | 'theirs') => {
     const cf = conflict;
@@ -875,10 +893,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<Store>(() => ({
     loaded, online, syncedAt, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, consultations, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, addConsultation, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance,
   }), [loaded, online, syncedAt, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, consultations, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, addConsultation, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

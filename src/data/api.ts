@@ -51,6 +51,8 @@ export type WriteOp =
   /** consultations.create: id = requestId — сервер (v5.87) даёт записи тот же id. */
   | { kind: 'createConsultation'; requestId: string; consultation: Consultation }
   | { kind: 'completeTask'; requestId: string; id: string; done: boolean }
+  /** tasks.completeMany (v5.89): до 20 задач одним запросом; ошибка одной — в failed, остальные сделаны. */
+  | { kind: 'completeTasks'; requestId: string; ids: string[]; done: boolean }
   | { kind: 'answerQuestion'; requestId: string; id: string; text: string }
   /** inbox.decide: принять (платёж — записать с суммой), сделать задачей, отклонить. */
   | { kind: 'decideInbox'; requestId: string; id: string; action: InboxAction; amount?: number };

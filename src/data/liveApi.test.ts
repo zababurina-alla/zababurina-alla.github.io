@@ -466,6 +466,14 @@ describe('живой адаптер: чтение', () => {
     expect(att.map((a) => [a.clientId, a.level, a.factors.length])).toEqual([['C-2', 'high', 2], ['C-3', 'low', 0]]);
   });
 
+  it('tasks.completeMany: сделанные — изменения, не отметившиеся — в failed', async () => {
+    const t = { id: 'T-1', version: 2, clientId: null, text: 'а', due: null, type: 'docs', priority: 'medium', done: true };
+    const s = server(ok({ results: [{ id: 'T-1', ok: true, task: t }, { id: 'T-2', ok: false, error: { code: 'NOT_FOUND', message: 'Задачи уже нет' }, current: null }], updated: 1, failed: 1 }, 30));
+    const r = await new LiveApi(URL_, auth(), s.fetchImpl).write({ kind: 'completeTasks', requestId: 'R3', ids: ['T-1', 'T-2'], done: true });
+    expect(s.sent[0]).toMatchObject({ action: 'tasks.completeMany', requestId: 'R3', payload: { items: [{ id: 'T-1' }, { id: 'T-2' }], done: true } });
+    expect(r.ok && [r.changes.map((c) => c.id), r.failed]).toEqual([['T-1'], [{ id: 'T-2', code: 'NOT_FOUND', message: 'Задачи уже нет' }]]);
+  });
+
   it('«Не писать клиенту»: снято / снимать нечего / уже ушло (CONFLICT с sentAt); requestId — свой на нажатие', async () => {
     const s = server(ok({ id: 'D-1', cancelled: true }), ok({ id: 'D-1', cancelled: false }), fail('CONFLICT', 'Уже отправлено', {}, { id: 'D-1', sentAt: '2026-10-16T02:10:00+03:00' }));
     const api = new LiveApi(URL_, auth(), s.fetchImpl);

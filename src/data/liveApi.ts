@@ -185,6 +185,21 @@ export class LiveApi implements CabinetApi {
           if (env.data.next) changes.push(up('deadline', env.data.next, env.cursor));
           return { ok: true, changes, cursor: env.cursor, notifyAt: env.data.notifyAt };
         }
+        case 'completeTasks': {
+          const env = await this.rpc<{ results?: unknown[] }>('tasks.completeMany', { items: op.ids.map((id) => ({ id })), done: op.done }, o);
+          const changes: Change[] = [];
+          const failed: NonNullable<Extract<WriteResult, { ok: true }>['failed']> = [];
+          for (const raw of env.data.results ?? []) {
+            const r = (raw ?? {}) as { id?: unknown; ok?: unknown; task?: Task | null; error?: { code?: unknown; message?: unknown } };
+            const id = typeof r.id === 'string' ? r.id : r.task?.id ?? '';
+            if (!id) continue;
+            if (r.ok === false || r.error) {
+              const code = String(r.error?.code ?? '');
+              failed.push({ id, code: SITE_CODES.has(code) ? code as ErrorCode : 'SERVER', message: String(r.error?.message ?? 'Не отметилась') });
+            } else if (r.task) changes.push(up('task', r.task, env.cursor));
+          }
+          return { ok: true, changes, cursor: env.cursor, failed };
+        }
         case 'closeDeadlines': {
           // Ответ { results[], closed, failed } (форма подтверждена сервером 15.10): по каждому сроку
           // { id, ok:true, closed, next, notifyAt } или { id, ok:false, error: { code, message, … }, current }.
