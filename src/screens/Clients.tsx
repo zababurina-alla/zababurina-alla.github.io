@@ -83,7 +83,7 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
       </header>
 
       <section className="panel reveal" aria-label="Список клиентов">
-        <div className="toolbar">
+        <div className="toolbar clients__bar">
           <label className="search-input search-input--lg">
             <Icon name="search" size={22} />
             <span className="visually-hidden">Поиск клиента</span>
@@ -91,6 +91,18 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
               placeholder="Фамилия, КВЕД, телефон, банк ключа, отчёт…" spellCheck={false} autoComplete="off" />
             {q ? <span className="search-input__count num" role="status">{found.length} из {total}</span> : <kbd className="kbd">/</kbd>}
           </label>
+          {/* Отбор (владелец 16.10: «фильтры в две строки, справа пустая полоса»): две ровные строки во всю ширину —
+              поиск + «Без платежа 30 · 60 · 90», тип клиента + «Без телефона». Каждый блок растягивается, пустых полос нет. */}
+          <div className="seg seg--fill clients__nopay" role="group" aria-label="Без платежа">
+            <span className="clients__nopay-label" aria-hidden="true"><Icon name="payments" size={16} /><span>Без платежа<span className="clients__nopay-unit">, дн.</span></span></span>
+            {NO_PAY_DAYS.map((n) => (
+              <button key={n} type="button" className="seg__opt" aria-pressed={noPay === n} onClick={() => { setNoPay((v) => (v === n ? null : n)); play('tick'); }}
+                aria-label={`Без платежа больше ${n} дней: ${unpaid(n)}`}
+                title={n === 90 ? 'Ни одного полученного платежа за 90 дней (столько держит снимок)' : `Последний полученный платёж — больше ${n} дней назад`}>
+                {n}<span className="clients__nopay-days"> дн.</span><span className="chip__n num">{unpaid(n)}</span>
+              </button>
+            ))}
+          </div>
           <Tabs label="Тип клиента" value={kind} onChange={(k) => { setKind(k); play('tick'); }} items={[
             { id: 'all', label: 'Все', count: count('all') },
             { id: 'fop1', label: '1 гр.', count: count('fop1') },
@@ -103,14 +115,6 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
               <Icon name="call" size={16} />Без телефона<span className="chip__n num">{phoneless}</span>
             </button>
           )}
-          <div className="chips clients__nopay" role="group" aria-label="Без платежа">
-            {NO_PAY_DAYS.map((n) => (
-              <button key={n} type="button" className="chip" aria-pressed={noPay === n} onClick={() => { setNoPay((v) => (v === n ? null : n)); play('tick'); }}
-                title={n === 90 ? 'Ни одного полученного платежа за 90 дней (столько держит снимок)' : `Последний полученный платёж — больше ${n} дней назад`}>
-                <Icon name="payments" size={16} />Без платежа {n} дн.<span className="chip__n num">{unpaid(n)}</span>
-              </button>
-            ))}
-          </div>
         </div>
 
         <div ref={table} className="ctable" role="table" aria-label="Клиенты">

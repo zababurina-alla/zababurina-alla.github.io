@@ -1,7 +1,8 @@
 // Колонка КВЕД на «Клиентах» — одной строкой (владелец, 16.10: «КВЕДы столбиком — плохое решение»):
 // ⭐ главный КВЕД (по нему считается ЄП — поле kvedMain из «⭐ Расчёт ЄП по: …») + чип «+N».
 // Чип по наведению (мышь) или нажатию (палец, клавиатура) показывает все коды с названиями. Список — поверх страницы
-// (портал, position: fixed), чтобы лист таблицы его не обрезал; закрывается Esc, щелчком мимо, прокруткой.
+// (портал, position: fixed), чтобы лист таблицы его не обрезал; закрывается Esc, щелчком мимо, прокруткой страницы
+// (свою прокрутку список крутит сам и до страницы её не пропускает — overscroll-behavior: contain).
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Client } from '../data/types';
@@ -51,16 +52,19 @@ function KvedMore({ main, isMain, note, others }: { main: Kved; isMain: boolean;
     if (!open) return;
     const away = (e: PointerEvent) => { if (!btn.current?.contains(e.target as Node) && !pop.current?.contains(e.target as Node)) setOpen(false); };
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { setOpen(false); btn.current?.focus(); } };
-    const shut = () => setOpen(false);
+    // Прокрутка самого списка его не закрывает (владелец 16.10: «полоса есть, колесом не крутится» — первый же
+    // сдвиг списка ловился как прокрутка страницы и закрывал его). Закрывает только прокрутка страницы или таблицы.
+    const shut = (e: Event) => { if (!pop.current?.contains(e.target as Node)) setOpen(false); };
+    const resize = () => setOpen(false);
     document.addEventListener('pointerdown', away);
     document.addEventListener('keydown', esc);
     window.addEventListener('scroll', shut, { capture: true, passive: true });
-    window.addEventListener('resize', shut);
+    window.addEventListener('resize', resize);
     return () => {
       document.removeEventListener('pointerdown', away);
       document.removeEventListener('keydown', esc);
       window.removeEventListener('scroll', shut, { capture: true });
-      window.removeEventListener('resize', shut);
+      window.removeEventListener('resize', resize);
     };
   }, [open]);
 

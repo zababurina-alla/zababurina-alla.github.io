@@ -282,7 +282,17 @@
 
   .paylist__cancel {
     grid-column: 2;
+    grid-row: 2;
     justify-self: end;
+  }
+
+  /* «Отменить» — во второй строке, рядом со способом, а не третьей строкой (сверка колонок: строка была 135 px) */
+  .paylist__row:has(> .paylist__cancel) > .paylist__how {
+    grid-column: 1;
+  }
+
+  .paylist__row:has(> .pill) > .paylist__cancel {
+    grid-row: 3;
   }
 
   /* На касании «Отменить» видна всегда — без пустого места: строка короче на мыши не станет */

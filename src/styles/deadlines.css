@@ -548,6 +548,11 @@
   flex: none;
 }
 
+/* «Выбрать несколько» — высотой с соседний переключатель «По дням / По виду / По клиенту» (46 px) */
+.dl-tools__select {
+  min-height: calc(2.5rem + 6px);
+}
+
 .dl-tools__by .seg__opt {
   white-space: nowrap;
 }
@@ -878,4 +883,79 @@
 
 .dtable__row.is-ghost .dtable__tools {
   visibility: hidden;
+}
+
+/* Сверка колонок (16.10): на широком экране с мышью название срока — одной строкой с многоточием, кнопки строки —
+   справа в той же строке. Раньше невидимые до наведения кнопки держали под названием пустую строку, а у длинного
+   названия переносились — строка росла до 117 px. Меню «Действия» открыто — переносы снова можно. */
+@media (hover: hover) and (pointer: fine) and (min-width: 40rem) {
+  .dtable__line {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .dtable__line > .ttext {
+    flex: 0 1 auto;
+    min-width: 0;
+    align-items: center;
+  }
+
+  .dtable__line > .ttext > span:not(.icon) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dtable__line > .tag {
+    flex: none;
+  }
+
+  /* Кнопки строки не держат место: появляются при наведении поверх правого края строки, на подложке цвета строки */
+  .dtable__line {
+    position: relative;
+  }
+
+  .dtable__line > .dtable__tools {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    z-index: 1;
+    flex-wrap: nowrap;
+    margin: 0;
+    padding-left: var(--space-6);
+    background: linear-gradient(to right, transparent, var(--surface-sunk) var(--space-5));
+    transform: translateY(-50%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-fast) ease;
+  }
+
+  .dtable__row:hover .dtable__line > .dtable__tools,
+  .dtable__row:focus-within .dtable__line > .dtable__tools {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .dtable__line > .dtable__tools > .icon-btn,
+  .dtable__line > .dtable__tools > .dactions__toggle {
+    opacity: 1;
+  }
+
+  .dtable__line:has(.dactions) {
+    flex-wrap: wrap;
+  }
+
+  .dtable__line:has(.dactions) > .dtable__tools {
+    position: static;
+    flex-wrap: wrap;
+    flex-basis: 100%;
+    padding-left: 0;
+    background: none;
+    transform: none;
+    opacity: 1;
+    pointer-events: auto;
+  }
 }

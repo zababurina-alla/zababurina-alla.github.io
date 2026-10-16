@@ -1259,18 +1259,84 @@
 }
 
 /* «Клиенты»: «Без платежа 30 / 60 / 90 дн.» — те же фишки, что «Без телефона» */
-.clients__nopay {
-  flex: none;
+/* «Клиенты», отбор (владелец 16.10: «фильтры в две строки, справа большая пустая полоса»): две ровные строки во всю
+   ширину — поиск + «Без платежа», тип клиента + «Без телефона». Каждый блок растягивается до края строки, высота
+   у всех 46 px. Не помещается — блок уходит строкой ниже и снова растягивается: рваных переносов нет. */
+.clients__bar > .search-input--lg {
+  flex: 3 1 22rem;
 }
 
-.clients__nopay > .chip {
+.clients__nopay {
+  flex: 1 0 auto;
+  align-self: stretch;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.clients__nopay-unit {
+  display: none;
+}
+
+.clients__nopay-label {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  flex: none;
+  padding: 0 var(--space-2);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
 }
 
-.clients__nopay > .chip:not([aria-pressed='true']) > .icon {
-  color: var(--ink-2);
+.clients__nopay > .seg__opt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: var(--radius-sm);
+}
+
+.clients__nopay > .seg__opt[aria-pressed='true'] .chip__n {
+  color: inherit;
+  opacity: 0.75;
+}
+
+.clients__bar > .tabs {
+  flex: 1 1 auto;
+}
+
+.clients__bar > .tabs > .tabs__tab {
+  flex: 1 1 auto;
+  justify-content: center;
+}
+
+.clients__bar > .clients__nophone {
+  min-height: calc(2.5rem + 6px);
+}
+
+@media (max-width: 479px) {
+  .clients__bar > .clients__nophone,
+  .clients__nopay {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+
+  .clients__nopay-label > .icon {
+    display: none;
+  }
+
+  .clients__nopay > .seg__opt {
+    padding: 0 var(--space-1);
+  }
+
+  .clients__nopay-unit {
+    display: inline;
+  }
+
+  .clients__nopay-days {
+    display: none;
+  }
 }
 
 /* «Входящие», шапка диалога: «Ответить в Telegram» — справа; на телефоне только значок */

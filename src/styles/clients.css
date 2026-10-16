@@ -263,6 +263,39 @@
   }
 }
 
+/* Планшет и ноутбук 1024 (лист 560–759 px): ключ и ближайший срок — второй колонкой справа от имени, а не под ним.
+   Раньше всё стояло в левой половине, справа — полоса шириной 480 px (автопроверка вёрстки, 16.10) */
+@container (min-width: 560px) and (max-width: 759px) {
+  .ctable__row {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) 6.5rem; /* КВЕД — постоянной ширины: вторая колонка у всех строк с одной линии */
+    align-items: start;
+  }
+
+  .ctable__row > :nth-child(1) {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+
+  .ctable__row > .ctable__kved {
+    grid-column: 3;
+    justify-self: end;
+  }
+
+  .ctable__row > :nth-child(4),
+  .ctable__row > :nth-child(5) {
+    grid-column: 2;
+    padding-left: 0;
+  }
+
+  .ctable__row > :nth-child(4) {
+    grid-row: 1;
+  }
+
+  .ctable__row > :nth-child(5) {
+    grid-row: 2;
+  }
+}
+
 /* ═════════ Карточка клиента ═════════ */
 .cp {
   display: grid;
@@ -746,6 +779,8 @@
   width: min(var(--win-s) + 4rem, calc(100vw - 16px));
   max-height: min(60vh, 26rem);
   overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
   padding: var(--space-2);
   border-radius: var(--radius-lg);
   background: var(--surface);
@@ -840,5 +875,112 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+}
+
+/* ═════════ Карточка: «Ссылка для бота» и «Выписка» (техника 16.10, оформление) ═════════ */
+/* Ссылка: поле и «Копировать» в одну строку, пояснение ниже; QR (когда техника подключит генератор) — справа */
+.botlink {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+/* Ссылки ещё нет — кнопка «Ссылка для бота» по левому краю, а не во всю колонку */
+.botlink > button.btn:first-child {
+  justify-self: start;
+}
+
+.botlink > .input {
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+
+.botlink > .sub,
+.botlink > .field__error {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+/* Место под QR: белая плашка 168 px — код читается телефоном в обеих темах */
+.botlink__qr {
+  grid-column: 1 / -1;
+  justify-self: start;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: #FFFFFF;
+  box-shadow: inset 0 0 0 1px var(--line), var(--shadow-1);
+  color: #0D1218;
+}
+
+.botlink__qr > svg,
+.botlink__qr > img,
+.botlink__qr > canvas {
+  width: 168px;
+  height: 168px;
+  image-rendering: pixelated;
+}
+
+.botlink__qr > .sub {
+  color: #586272;
+  font-size: var(--text-xs);
+}
+
+/* Выписка: кнопки строкой; «Отправить клиенту» — превью подписи как сообщение в Telegram */
+.statement__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.statement > .sub,
+.statement > .field__error {
+  margin: 0;
+}
+
+.statement__send {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunk);
+  box-shadow: inset 0 0 0 1px var(--line);
+  animation: warn-in var(--dur-pop) var(--spring-pop);
+}
+
+.statement__send > .sub {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+/* Подпись к PDF — пузырём «от нас» (как исходящее в Telegram: справа хвостик) */
+.statement__quote {
+  flex-basis: 100%;
+  margin: 0 0 var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-xl) var(--radius-xl) 6px var(--radius-xl);
+  background: var(--accent-soft);
+  color: var(--ink);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Телефон: поле ссылки — во всю строку, «Копировать» — под ним (раньше поле сжималось до «https:») */
+@media (max-width: 32rem) {
+  .botlink {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .botlink > .btn {
+    justify-self: start;
   }
 }
