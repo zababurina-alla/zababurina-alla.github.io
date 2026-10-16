@@ -124,6 +124,9 @@ interface Store {
     preview: ((clientId: string) => Promise<StatementPreview>) | null;
     send: ((clientId: string) => Promise<StatementResult>) | null;
   };
+  /** Архив сроков клиента (флаг archive) и «Требуют внимания» (флаг attention) — чтение; null — сервер ещё не умеет. */
+  archive: CabinetApi['listArchive'] | null;
+  attention: CabinetApi['attention'] | null;
   /** «Ссылка для бота» (clients.botLink). null — нет флага botLink. */
   botLink: ((clientId: string) => Promise<BotLinkResult>) | null;
   /** «Не писать клиенту» после закрытия срока: срок остаётся закрытым. null — на этом сервере ещё нельзя
@@ -778,6 +781,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const createDeadline = hasFeature('deadlinesCreate') && canWrite('deadlines') ? createDeadlineNow : null;
   const botLinkNow = useCallback((clientId: string) => api.clientBotLink(clientId), []);
   const botLink = hasFeature('botLink') ? botLinkNow : null;
+  const archive = useMemo(() => (hasFeature('archive') ? (id: string, offset?: number, limit?: number) => api.listArchive(id, offset, limit) : null), []);
+  const attention = useMemo(() => (hasFeature('attention') ? (limit?: number) => api.attention(limit) : null), []);
   const sendStatementNow = useCallback(async (clientId: string) => {
     const r = await api.sendStatement(clientId, newRequestId());
     if (r.sent) void syncNow();
@@ -870,10 +875,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<Store>(() => ({
     loaded, online, syncedAt, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, consultations, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, addConsultation, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, addConsultation, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance,
   }), [loaded, online, syncedAt, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, consultations, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, addConsultation, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, addConsultation, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

@@ -27,6 +27,7 @@ import { ConsultationsTab } from './Consultations';
 import { TemplateDialog } from './TemplateDialog';
 import { BotLink } from './BotLink';
 import { StatementBlock } from './Statement';
+import { ArchiveBlock } from './ArchiveBlock';
 import { roMessage } from '../ui/readonly';
 import { TASK_TEMPLATES } from '../lib/taskTemplates';
 import { addDays } from '../lib/dates';
@@ -347,6 +348,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                 <li key={a.id} className="feed__item"><span className="feed__icon"><Icon name="clock" size={16} /></span><span className="feed__text"><TableText text={a.text} /><span className="sub">{fmtDate(a.when.slice(0, 10))}, {a.when.slice(11)}, {a.source}</span></span></li>
               ))}</ul>
             ) : <Empty pic="tasks" title="Изменений пока не было">Журнал по клиентам ведётся с 15.10.2026 — правки с сайта, через бота и в таблице появятся здесь.</Empty>)}
+            {tab === 'history' && <ArchiveBlock key={`ar-${c.id}`} clientId={c.id} />}
           </div>
         </div>
       )}

@@ -3,7 +3,7 @@
 // — версии записей и ошибка CONFLICT; — журнал изменений с курсором; — повтор того же requestId не создаёт дубль.
 // Рычаги отладки (обрыв связи, отказ, правка извне) — для кнопок в режиме отладки.
 import { ACTIVITY, CLIENTS, CONSULTATIONS, DEADLINES, INBOX, KVEDS, PAYMENTS, QUESTIONS, RATES, TASKS } from './fake';
-import type { ApplyTemplateResult, BotLinkResult, CabinetApi, StatementPdf, StatementPreview, StatementResult, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, TemplatePreview, ClientCard, Entity, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
+import type { ApplyTemplateResult, ArchivePage, AttentionItem, BotLinkResult, CabinetApi, StatementPdf, StatementPreview, StatementResult, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, TemplatePreview, ClientCard, Entity, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Consultation, Deadline, InboxItem, KvedItem, Payment, Question, Rates, Task } from './types';
 import { fold } from '../lib/search';
 import { TODAY, addDays, endOfMonth, fmtDate, fmtDue } from '../lib/dates';
@@ -441,6 +441,37 @@ class FakeServer implements CabinetApi {
     const p = await this.statementPreview(clientId);
     if (!p.preview) return { sent: false, reason: 'noBot', message: p.message ?? 'У клиента нет бота' };
     return this.remindClient({ clientId, kind: 'custom', text: p.preview }, requestId);
+  }
+
+  async listArchive(clientId: string, offset = 0, limit = 50): Promise<ArchivePage> {
+    await wait(READ_MS * 2);
+    if (!this.online) throw new Error('NETWORK');
+    // Учебный архив: прошлые кварталы и месяцы ЄП/ЄСВ — выдуманные, новые первыми.
+    const all = Array.from({ length: 14 }, (_, i) => {
+      const m = 9 - i; const y = m > 0 ? 2026 : 2025; const mm = ((m + 11) % 12) + 1;
+      const iso = `${y}-${String(mm).padStart(2, '0')}-20`;
+      return { id: i < 10 ? `A-${clientId}-${i}` : null, what: `ЄП за ${mm}.${y}`, periodicity: 'month' as const, due: iso, periodEnd: null,
+        status: 'done' as const, closedAt: i < 12 ? iso : null, archivedAt: iso };
+    });
+    return { items: all.slice(offset, offset + limit), total: all.length, more: offset + limit < all.length };
+  }
+
+  async attention(limit = 10): Promise<AttentionItem[]> {
+    await wait(READ_MS * 3);
+    if (!this.online) throw new Error('NETWORK');
+    const out: AttentionItem[] = [];
+    for (const c of this.clients.values()) {
+      const factors: AttentionItem['factors'] = [];
+      const late = [...this.deadlines.values()].filter((d) => d.clientId === c.id && d.status !== 'done' && d.due && d.due < TODAY).length;
+      if (late) factors.push({ label: `Просрочек: ${late}`, weight: 30 * late });
+      if (!c.phone.trim()) factors.push({ label: 'Нет контактов', weight: 20 });
+      if (!c.keyUntil) factors.push({ label: 'Ключ не указан', weight: 15 });
+      else if (c.keyUntil < TODAY) factors.push({ label: 'Ключ просрочен', weight: 35 });
+      else if (c.keyUntil <= addDays(TODAY, 30)) factors.push({ label: 'Ключ ≤30 дн.', weight: 20 });
+      const score = Math.min(100, factors.reduce((s, f) => s + f.weight, 0));
+      if (score > 0) out.push({ clientId: c.id, name: c.name, score, level: score >= 60 ? 'high' : score >= 30 ? 'mid' : 'low', factors });
+    }
+    return out.sort((a, b) => b.score - a.score).slice(0, limit);
   }
 
   async cancelNotify(deadlineId: string, requestId: string): Promise<CancelNotifyResult> {

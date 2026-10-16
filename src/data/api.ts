@@ -115,6 +115,13 @@ export interface StatementPreview { preview: string | null; reason: 'noBot' | 't
 /** clients.sendStatement отправка — как RemindResult (лимит 12 ч на клиента — общий с напоминаниями). */
 export type StatementResult = RemindResult;
 
+/** deadlines.listArchive: «🗄 Архив сроков» клиента, новые первыми; только просмотр (version нет, у старых строк id null). */
+export interface ArchivedDeadline { id: string | null; what: string; periodicity: Deadline['periodicity']; due: string | null; periodEnd: string | null;
+  status: Deadline['status']; closedAt: string | null; archivedAt: string | null }
+export interface ArchivePage { items: ArchivedDeadline[]; total: number; more: boolean }
+/** reports.attention: клиенты по баллу риска (как бот «внимание»): high ≥ 60, mid ≥ 30; factors с weight 0 — пометки. */
+export interface AttentionItem { clientId: string; name: string; score: number; level: 'high' | 'mid' | 'low'; factors: { label: string; weight: number }[] }
+
 /** deadlines.cancelNotify: сообщение клиенту о закрытии снято (срок остаётся закрытым); снимать было нечего;
  *  уже забрано на отправку (sentAt — примерно когда ушло). */
 export type CancelNotifyResult = { status: 'cancelled' } | { status: 'nothing' } | { status: 'sent'; sentAt: string | null };
@@ -154,6 +161,10 @@ export interface CabinetApi {
   applyTemplate(clientId: string, template: DeadlineTemplate | undefined, requestId: string): Promise<ApplyTemplateResult>;
   /** Без requestId (токен — ключ входа, в листы не пишется). Ошибки — ApiError. */
   clientBotLink(clientId: string): Promise<BotLinkResult>;
+  /** Чтение, по кнопке «Показать архив» — не на каждый показ карточки. */
+  listArchive(clientId: string, offset?: number, limit?: number): Promise<ArchivePage>;
+  /** Чтение трёх листов — не чаще раза в несколько минут. */
+  attention(limit?: number): Promise<AttentionItem[]>;
   /** Без requestId, собирается несколько секунд. В PDF есть логин клиента (не пароль) — как в меню таблицы. */
   statementPdf(clientId: string): Promise<StatementPdf>;
   statementPreview(clientId: string): Promise<StatementPreview>;

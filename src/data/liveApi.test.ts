@@ -449,6 +449,23 @@ describe('живой адаптер: чтение', () => {
     expect(snap.clients.map((c) => [c.incomeKopecks, c.incomeBasis, c.bank, c.lang])).toEqual([[12345600, 'quarterTurnover', 'Монобанк', 'uk'], [null, null, null, null]]);
   });
 
+  it('архив сроков: id у старых строк null, obligation вместо what, страницы; «внимание» — уровень и причины', async () => {
+    const s = server(
+      ok({ clientId: 'C-1', items: [
+        { id: 'D-7', what: 'ЄП за вересень', periodicity: 'month', due: '2026-10-20', periodEnd: '2026-09-30', status: 'done', closedAt: '2026-10-14', archivedAt: '2026-10-15' },
+        { id: null, obligation: 'Декларація 2024', periodicity: 'year', due: '2025-03-01', status: 'done', closedAt: null, archivedAt: '2025-03-10' },
+      ], total: 120, more: true }),
+      ok({ items: [{ clientId: 'C-2', name: 'Б', score: 75, level: 'high', factors: [{ label: 'Ключ просрочен', weight: 40 }, { label: 'Архивный — риск снижен', weight: 0 }] }, { clientId: 'C-3', name: 'В', score: 10, level: '??', factors: null }] }),
+    );
+    const api = new LiveApi(URL_, auth(), s.fetchImpl);
+    const page = await api.listArchive('C-1', 50, 50);
+    expect(s.sent[0]).toMatchObject({ action: 'deadlines.listArchive', payload: { clientId: 'C-1', offset: 50, limit: 50 } });
+    expect(page.items.map((d) => [d.id, d.what, d.closedAt])).toEqual([['D-7', 'ЄП за вересень', '2026-10-14'], [null, 'Декларація 2024', null]]);
+    expect([page.total, page.more]).toEqual([120, true]);
+    const att = await api.attention(10);
+    expect(att.map((a) => [a.clientId, a.level, a.factors.length])).toEqual([['C-2', 'high', 2], ['C-3', 'low', 0]]);
+  });
+
   it('«Не писать клиенту»: снято / снимать нечего / уже ушло (CONFLICT с sentAt); requestId — свой на нажатие', async () => {
     const s = server(ok({ id: 'D-1', cancelled: true }), ok({ id: 'D-1', cancelled: false }), fail('CONFLICT', 'Уже отправлено', {}, { id: 'D-1', sentAt: '2026-10-16T02:10:00+03:00' }));
     const api = new LiveApi(URL_, auth(), s.fetchImpl);

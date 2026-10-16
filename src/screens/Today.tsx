@@ -22,6 +22,7 @@ import { DayGroups } from './DayGroups';
 import { QuestionsPanel } from './Questions';
 import { Hint } from '../ui/Hint';
 import { navigate } from '../router';
+import { AttentionPanel } from './Attention';
 
 type Filter = 'week' | 'month' | 'overdue' | 'burning' | 'soon';
 
@@ -210,6 +211,7 @@ export function Today() {
             </section>
           )}
           <QuestionsPanel />
+          <AttentionPanel />
 
           {todayTasks.length > 0 && (
             <section className="panel reveal" aria-labelledby="t-tasks">
