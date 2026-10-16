@@ -146,6 +146,7 @@ interface Store {
   dismissNotice: (id: string) => void;
   toggleTask: (id: string, done: boolean) => void;
   completeTasks: (ids: string[], done: boolean) => void;
+  updateDeadlines: (ids: string[], patch: DeadlinePatch, label: string) => void;
   resolveConflict: (keep: 'mine' | 'theirs') => void;
   retry: (requestId: string) => void;
   discard: (requestId: string) => void;
@@ -165,7 +166,7 @@ const Ctx = createContext<Store | null>(null);
 const AREA_OF: Record<WriteOp['kind'], WriteArea> = {
   createConsultation: 'consultations',
   closeDeadline: 'deadlines', closeDeadlines: 'deadlines', updateTask: 'tasks', deleteTask: 'tasks', reopenDeadline: 'deadlines', addPayment: 'payments', cancelPayment: 'payments',
-  updateDeadline: 'deadlines', addClient: 'clients', updateClient: 'clients', createTask: 'tasks', completeTask: 'tasks', completeTasks: 'tasks', answerQuestion: 'questions', decideInbox: 'inbox',
+  updateDeadline: 'deadlines', addClient: 'clients', updateClient: 'clients', createTask: 'tasks', completeTask: 'tasks', completeTasks: 'tasks', updateDeadlines: 'deadlines', answerQuestion: 'questions', decideInbox: 'inbox',
 };
 
 function upsert<T extends { id: string }>(xs: T[], rec: T): T[] {
@@ -350,6 +351,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setTasks((xs) => xs.filter((t) => t.id !== op.id));
     } else if (op.kind === 'completeTask') {
       setTasks((xs) => xs.map((t) => (t.id === op.id ? { ...t, done: op.done } : t)));
+    } else if (op.kind === 'updateDeadlines') {
+      const ids = op.items.map((i) => i.id);
+      const { note: _n, ...patch } = op.patch;
+      void _n;
+      setDeadlines((xs) => xs.map((d) => (ids.includes(d.id) ? { ...d, ...patch } : d)));
     } else if (op.kind === 'completeTasks') {
       setTasks((xs) => xs.map((t) => (op.ids.includes(t.id) ? { ...t, done: op.done } : t)));
     } else if (op.kind === 'decideInbox') {
@@ -774,6 +780,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     send({ kind: 'updateDeadline', requestId: newRequestId(), id, baseVersion: d.version, patch }, label);
   }, [deadlines, undated, send]);
 
+  /** «В работе» / «Ожидание» / дата для нескольких сроков: deadlines.updateMany по 20 (флаг updateMany), иначе по одному.
+   *  Не изменившиеся — такими, какие они в таблице (current), и названы в уведомлении. */
+  const updateDeadlines = useCallback((ids: string[], patch: DeadlinePatch, label: string) => {
+    const picked = deadlines.filter((d) => ids.includes(d.id));
+    if (!hasFeature('updateMany')) { for (const d of picked) updateDeadline(d.id, patch, label); return; }
+    for (let i = 0; i < picked.length; i += 20) {
+      const part = picked.slice(i, i + 20);
+      send({ kind: 'updateDeadlines', requestId: newRequestId(), items: part.map((d) => ({ id: d.id, baseVersion: d.version })), patch }, `${label}: ${part.length}`, (_ch, result) => {
+        const failed = result.failed ?? [];
+        if (!failed.length) return;
+        for (const f of failed) { const cur = f.current ?? part.find((d) => d.id === f.id); if (cur) putOpen(cur); }
+        setNotices((ns) => [...ns, { id: `um-${Date.now()}`, text: `Не изменились: ${failed.length} — ${failed[0]?.message ?? ''}`, info: true }]);
+      });
+    }
+  }, [deadlines, send, updateDeadline, putOpen]);
+
   const renewKey = useCallback((clientId: string, keyUntil: string, keyFrom: string | null, keyIssuer: string | null) => {
     const c = clients.find((x) => x.id === clientId);
     if (!c) return;
@@ -893,10 +915,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<Store>(() => ({
     loaded, online, syncedAt, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, consultations, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, updateDeadlines, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance,
   }), [loaded, online, syncedAt, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, consultations, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, updateDeadlines, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

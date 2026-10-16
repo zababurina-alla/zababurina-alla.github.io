@@ -248,6 +248,11 @@ export function Deadlines() {
               <button type="button" className="link" onClick={() => setChosen(new Set(items.map((d) => d.id)))}>Выбрать все в списке ({items.length})</button>
               {pickedNow.length > 0 && <button type="button" className="link" onClick={() => setChosen(new Set())}>Снять</button>}
               <span className="dsel-bar__grow" />
+              {/* Как меню таблицы «Выделенное → В работе / Ожидание» (deadlines.updateMany) */}
+              <button type="button" className="btn btn--secondary btn--sm" disabled={!pickedNow.length} {...roAttrs('deadlines')}
+                onClick={() => { if (!canWrite('deadlines')) { toast({ text: roMessage('deadlines'), tone: 'info' }); return; } store.updateDeadlines(pickedNow.map((d) => d.id), { status: 'inProgress' }, 'В работе'); stopSelecting(); }}>В работе</button>
+              <button type="button" className="btn btn--secondary btn--sm" disabled={!pickedNow.length} {...roAttrs('deadlines')}
+                onClick={() => { if (!canWrite('deadlines')) { toast({ text: roMessage('deadlines'), tone: 'info' }); return; } store.updateDeadlines(pickedNow.map((d) => d.id), { status: 'waiting' }, 'Ожидание'); stopSelecting(); }}>Ожидание</button>
               <button type="button" className="btn btn--ghost btn--sm" onClick={stopSelecting}>Отмена</button>
               <button type="button" className={`btn btn--sm ${confirming ? 'btn--danger' : 'btn--primary'}`} disabled={!pickedNow.length} onClick={closePicked}>
                 {confirming ? `Да, закрыть ${pickedNow.length}` : `Закрыть ${pickedNow.length || ''}`.trim()}

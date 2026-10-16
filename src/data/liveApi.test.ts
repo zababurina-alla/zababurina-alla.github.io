@@ -466,6 +466,13 @@ describe('живой адаптер: чтение', () => {
     expect(att.map((a) => [a.clientId, a.level, a.factors.length])).toEqual([['C-2', 'high', 2], ['C-3', 'low', 0]]);
   });
 
+  it('deadlines.updateMany: изменённые — изменения; CONFLICT одного — в failed с current', async () => {
+    const s = server(ok({ results: [{ id: 'D-1', ok: true, deadline: dl('D-1') }, { id: 'D-2', ok: false, error: { code: 'CONFLICT', message: 'Срок изменился' }, current: dl('D-2') }], updated: 1, failed: 1 }, 31));
+    const r = await new LiveApi(URL_, auth(), s.fetchImpl).write({ kind: 'updateDeadlines', requestId: 'R6', items: [{ id: 'D-1', baseVersion: 3 }, { id: 'D-2', baseVersion: 2 }], patch: { status: 'waiting' } });
+    expect(s.sent[0]).toMatchObject({ action: 'deadlines.updateMany', requestId: 'R6', payload: { items: [{ id: 'D-1', baseVersion: 3 }, { id: 'D-2', baseVersion: 2 }], patch: { status: 'waiting' } } });
+    expect(r.ok && [r.changes.map((c) => c.id), r.failed?.map((f) => [f.id, f.code, f.current?.id])]).toEqual([['D-1'], [['D-2', 'CONFLICT', 'D-2']]]);
+  });
+
   it('tasks.completeMany: сделанные — изменения, не отметившиеся — в failed', async () => {
     const t = { id: 'T-1', version: 2, clientId: null, text: 'а', due: null, type: 'docs', priority: 'medium', done: true };
     const s = server(ok({ results: [{ id: 'T-1', ok: true, task: t }, { id: 'T-2', ok: false, error: { code: 'NOT_FOUND', message: 'Задачи уже нет' }, current: null }], updated: 1, failed: 1 }, 30));

@@ -205,6 +205,16 @@ class FakeServer implements CabinetApi {
         changes.push(this.act(`Добавлен клиент ${c.name}. Создано сроков: ${made.length}`, o, 'сайт'));
         return { ok: true, changes, cursor: this.cursor };
       }
+      case 'updateDeadlines': {
+        const changes: Change[] = [];
+        const failed: NonNullable<Extract<WriteResult, { ok: true }>['failed']> = [];
+        for (const it of op.items) {
+          const r = this.apply({ kind: 'updateDeadline', requestId: `${o}#${it.id}`, id: it.id, baseVersion: it.baseVersion, patch: op.patch });
+          if (r.ok) changes.push(...r.changes);
+          else failed.push({ id: it.id, code: r.code, message: r.message, ...(r.current && 'periodicity' in r.current ? { current: r.current } : {}) });
+        }
+        return { ok: true, changes, cursor: this.cursor, failed };
+      }
       case 'completeTasks': {
         const changes: Change[] = [];
         const failed: NonNullable<Extract<WriteResult, { ok: true }>['failed']> = [];

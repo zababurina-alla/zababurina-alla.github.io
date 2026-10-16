@@ -185,6 +185,23 @@ export class LiveApi implements CabinetApi {
           if (env.data.next) changes.push(up('deadline', env.data.next, env.cursor));
           return { ok: true, changes, cursor: env.cursor, notifyAt: env.data.notifyAt };
         }
+        case 'updateDeadlines': {
+          const env = await this.rpc<{ results?: unknown[] }>('deadlines.updateMany', { items: op.items, patch: op.patch }, o);
+          const changes: Change[] = [];
+          const failed: NonNullable<Extract<WriteResult, { ok: true }>['failed']> = [];
+          for (const raw of env.data.results ?? []) {
+            const r = (raw ?? {}) as { id?: unknown; ok?: unknown; deadline?: Deadline | null; error?: { code?: unknown; message?: unknown }; current?: unknown };
+            const id = typeof r.id === 'string' ? r.id : r.deadline?.id ?? '';
+            if (!id) continue;
+            if (r.ok === false || r.error) {
+              const code = String(r.error?.code ?? '');
+              const item: (typeof failed)[number] = { id, code: SITE_CODES.has(code) ? code as ErrorCode : 'SERVER', message: String(r.error?.message ?? 'Не изменился') };
+              if (r.current && typeof r.current === 'object' && 'periodicity' in r.current) item.current = normRecord('deadline', r.current) as Deadline;
+              failed.push(item);
+            } else if (r.deadline) changes.push(up('deadline', r.deadline, env.cursor));
+          }
+          return { ok: true, changes, cursor: env.cursor, failed };
+        }
         case 'completeTasks': {
           const env = await this.rpc<{ results?: unknown[] }>('tasks.completeMany', { items: op.ids.map((id) => ({ id })), done: op.done }, o);
           const changes: Change[] = [];

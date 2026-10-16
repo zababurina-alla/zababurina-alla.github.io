@@ -47,6 +47,8 @@ export type WriteOp =
   | { kind: 'updateClient'; requestId: string; id: string; baseVersion: number; patch: Partial<Pick<Client, 'phone' | 'email' | 'keyIssuer' | 'keyFrom' | 'keyUntil'>> }
   /** deadlines.update (контракт 8.3): дата, статус (кроме done — закрытие только close), заметка. */
   | { kind: 'updateDeadline'; requestId: string; id: string; baseVersion: number; patch: DeadlinePatch }
+  /** deadlines.updateMany (v5.89): до 20 сроков, один patch; ошибка одного — в failed (с current), остальные изменены. */
+  | { kind: 'updateDeadlines'; requestId: string; items: { id: string; baseVersion: number }[]; patch: DeadlinePatch }
   | { kind: 'createTask'; requestId: string; task: Task }
   /** consultations.create: id = requestId — сервер (v5.87) даёт записи тот же id. */
   | { kind: 'createConsultation'; requestId: string; consultation: Consultation }
