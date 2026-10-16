@@ -147,7 +147,7 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
                 <span role="cell" className="ta-r ctable__sum">{month ? <Money text={formatMoney(month)} /> : <span className="nil" title={c.monthly.map((m) => m.note).filter(Boolean).join('; ') || undefined}>не посчитано</span>}</span>
                 <span role="cell" className="ctable__key">
                   {keyDays === null || !keySt
-                    ? <span className="ctable__state"><Icon name="inactive" size={18} className="urgency--grey" /><span className="nil">ключа нет</span></span>
+                    ? <span className="ctable__state"><Icon name="inactive" size={18} className="urgency--grey" /><span className="nil">{c.keyIssuer.trim() ? 'срок не указан' : 'ключа нет'}</span></span>
                     : <span className="ctable__state"><Icon name={URGENCY_ICON[keySt]} size={18} className={`urgency--${keySt}`} />
                       <span className="ctable__state-text">{keyDays <= 30 ? <span className={`due--${keySt}`}>{daysLabel(keyDays).replace('через ', 'ещё ')}</span> : null}<span className="sub num">до {fmtDate(c.keyUntil ?? '')}</span></span></span>}
                 </span>

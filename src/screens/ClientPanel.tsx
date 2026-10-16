@@ -33,6 +33,7 @@ import { roMessage } from '../ui/readonly';
 import { TASK_TEMPLATES } from '../lib/taskTemplates';
 import { addDays } from '../lib/dates';
 import { useToast } from '../ui/toast';
+import { noKeyText } from './Other';
 
 type Tab = 'overview' | 'deadlines' | 'payments' | 'consultations' | 'history';
 
@@ -299,7 +300,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                   </ul>
                 </section>
                 <section className="cp__block cp__facts">
-                  <div><h3 className="cp__h">Ключ ЭЦП</h3>{keyDays === null ? <p className="cp__key"><Icon name="inactive" size={18} className="urgency--grey" /><span className="nil">ключа нет в таблице</span></p>
+                  <div><h3 className="cp__h">Ключ ЭЦП</h3>{keyDays === null ? <p className="cp__key"><Icon name="inactive" size={18} className="urgency--grey" /><span className="nil">{noKeyText(c)}</span></p>
                     : <p className="cp__key"><Icon name={URGENCY_ICON[statusByDays(keyDays)]} size={18} className={`urgency--${statusByDays(keyDays)}`} /><span className="num">до {fmtDate(c.keyUntil ?? '')}</span><span className={`due--${statusByDays(keyDays)}`}>{daysLabel(keyDays)}</span></p>}{c.keyFrom && <p className="sub">выпущен {fmtDate(c.keyFrom)}</p>}<KeyRenew c={c} />
                     {keyDays !== null && keyDays <= 30 && (
                       <button type="button" className="btn btn--secondary btn--sm cp__remind" onClick={() => setRemindKey(true)} {...roAttrs('remind')}>Напомнить про ключ</button>
