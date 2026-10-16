@@ -126,7 +126,7 @@ interface Store {
     preview: ((clientId: string) => Promise<StatementPreview>) | null;
     send: ((clientId: string) => Promise<StatementResult>) | null;
   };
-  /** «🗓 Месяц» (флаг month): чтение и галочка; галочка — только при записи задач (лист ведёт мама, как задачи). */
+  /** «🗓 Месяц» (флаг month): чтение; галочка — флаг monthWrite и запись задач (лист ведёт мама, как задачи). */
   month: { get: CabinetApi['monthGet']; set: CabinetApi['monthSet'] | null } | null;
   /** Архив сроков клиента (флаг archive) и «Требуют внимания» (флаг attention) — чтение; null — сервер ещё не умеет. */
   archive: CabinetApi['listArchive'] | null;
@@ -838,7 +838,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const archive = useMemo(() => (hasFeature('archive') ? (id: string, offset?: number, limit?: number) => api.listArchive(id, offset, limit) : null), []);
   const attention = useMemo(() => (hasFeature('attention') ? (limit?: number) => api.attention(limit) : null), []);
   const month = useMemo(() => (hasFeature('month')
-    ? { get: () => api.monthGet(), set: canWrite('tasks') ? (id: string, item: MonthCheck, done: boolean) => api.monthSet(id, item, done) : null } : null), []);
+    // Галочка пишет в лист «🗓 Месяц» — отдельным флагом monthWrite: просмотр (month) включается без проверки записи.
+    ? { get: () => api.monthGet(), set: hasFeature('monthWrite') && canWrite('tasks') ? (id: string, item: MonthCheck, done: boolean) => api.monthSet(id, item, done) : null } : null), []);
   const sendStatementNow = useCallback(async (clientId: string) => {
     const r = await api.sendStatement(clientId, newRequestId());
     if (r.sent) void syncNow();

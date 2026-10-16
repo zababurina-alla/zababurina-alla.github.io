@@ -45,6 +45,13 @@ describe('config.json', () => {
     expect([canWrite('remind'), hasFeature('remindPreview')]).toEqual([true, true]);
   });
 
+  it('живой config.json после приёмки-3 (16.10): включено только показ — Месяц, Внимание, недели, калькулятор, микрофон; записи нового — нет', async () => {
+    await loadRuntimeConfig(fetchJson({ apiUrl: 'https://x/exec', writes: ['tasks', 'deadlines', 'payments'], features: ['inbox', 'cancelNotify', 'month', 'attention', 'weekLoad', 'epCalc', 'voice'] }));
+    const on = ['inbox', 'cancelNotify', 'month', 'attention', 'weekLoad', 'epCalc', 'voice'] as const;
+    const off = ['monthWrite', 'archive', 'kvedEdit', 'deadlinesCreate', 'applyTemplate', 'botLink', 'statementPdf', 'sendStatement', 'completeMany', 'updateMany'] as const;
+    expect([on.filter((f) => !hasFeature(f)), off.filter((f) => hasFeature(f)), canWrite('clients')]).toEqual([[], [], false]);
+  });
+
   it('живой config.json сегодня (features inbox, cancelNotify): новое без приёмки выключено — калькулятор, недели, микрофон, правка КВЕД, Месяц, Внимание, архив', async () => {
     await loadRuntimeConfig(fetchJson({ apiUrl: 'https://x/exec', writes: ['tasks', 'deadlines', 'payments'], features: ['inbox', 'cancelNotify'] }));
     const off = ['epCalc', 'weekLoad', 'voice', 'kvedEdit', 'month', 'attention', 'archive', 'deadlinesCreate', 'applyTemplate', 'botLink', 'statementPdf', 'sendStatement', 'completeMany', 'updateMany'] as const;

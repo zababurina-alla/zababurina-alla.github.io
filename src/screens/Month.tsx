@@ -8,7 +8,6 @@ import type { MonthCheck, MonthItem } from '../data/api';
 import { Icon } from '../ui/Icon';
 import { Empty } from '../ui/Empty';
 import { useToast } from '../ui/toast';
-import { roMessage } from '../ui/readonly';
 import { useUi } from '../app/ui-context';
 
 export const MONTH_LABEL: Record<MonthCheck, string> = {
@@ -48,7 +47,7 @@ export function Month() {
 
   async function toggle(it: MonthItem, k: MonthCheck) {
     if (!month || !it.clientId) return;
-    if (!month.set) { toast({ text: roMessage('tasks'), tone: 'info' }); return; }
+    if (!month.set) { toast({ text: 'Галочки «Месяца» пока ставьте в таблице — на сайте появится само', tone: 'info' }); return; }
     const key = `${it.clientId}|${k}`;
     const done = !it.checks[k];
     const put = (fn: (m: MonthItem) => MonthItem) => setSheet((s) => (s ? { ...s, items: s.items.map((m) => (m.clientId === it.clientId ? fn(m) : m)) } : s));
