@@ -126,6 +126,12 @@ export interface ArchivePage { items: ArchivedDeadline[]; total: number; more: b
 /** reports.attention: клиенты по баллу риска (как бот «внимание»): high ≥ 60, mid ≥ 30; factors с weight 0 — пометки. */
 export interface AttentionItem { clientId: string; name: string; score: number; level: 'high' | 'mid' | 'low'; factors: { label: string; weight: number }[] }
 
+/** Лист «🗓 Месяц» (v5.90): чек-лист по клиентам со штатом, только текущий месяц. */
+export const MONTH_CHECKS = ['advance', 'advanceTax', 'salary', 'salaryTax', 'timesheet', 'payroll', 'report'] as const;
+export type MonthCheck = typeof MONTH_CHECKS[number];
+export interface MonthItem { clientId: string | null; name: string; period: string; status: string | null; comment: string | null; percent: number; checks: Record<MonthCheck, boolean> }
+export interface MonthSheet { period: string | null; items: MonthItem[] }
+
 /** deadlines.cancelNotify: сообщение клиенту о закрытии снято (срок остаётся закрытым); снимать было нечего;
  *  уже забрано на отправку (sentAt — примерно когда ушло). */
 export type CancelNotifyResult = { status: 'cancelled' } | { status: 'nothing' } | { status: 'sent'; sentAt: string | null };
@@ -169,6 +175,9 @@ export interface CabinetApi {
   listArchive(clientId: string, offset?: number, limit?: number): Promise<ArchivePage>;
   /** Чтение трёх листов — не чаще раза в несколько минут. */
   attention(limit?: number): Promise<AttentionItem[]>;
+  /** «🗓 Месяц»: чтение и галочка (без requestId — ставит значение, повтор безопасен). */
+  monthGet(): Promise<MonthSheet>;
+  monthSet(clientId: string, item: MonthCheck, done: boolean): Promise<MonthItem>;
   /** Без requestId, собирается несколько секунд. В PDF есть логин клиента (не пароль) — как в меню таблицы. */
   statementPdf(clientId: string): Promise<StatementPdf>;
   statementPreview(clientId: string): Promise<StatementPreview>;

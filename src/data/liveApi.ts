@@ -2,8 +2,8 @@
 // (docs/api-contract.md v2.1). Экраны и очередь записей не знают, с кем говорят.
 import { ApiError, call } from './transport';
 import type { Envelope } from './transport';
-import type { ApplyTemplateResult, ArchivePage, AttentionItem, BotLinkResult, CabinetApi, StatementPdf, StatementPreview, StatementResult, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
-import { RETRYABLE } from './api';
+import type { ApplyTemplateResult, ArchivePage, AttentionItem, MonthCheck, MonthItem, MonthSheet, BotLinkResult, CabinetApi, StatementPdf, StatementPreview, StatementResult, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
+import { MONTH_CHECKS, RETRYABLE } from './api';
 import type { Activity, Client, Consultation, Deadline, InboxItem, InboxType, KvedItem, Payment, Question, RateGroup, Rates, Task } from './types';
 import { INBOX_TYPES } from './types';
 
@@ -473,6 +473,24 @@ export class LiveApi implements CabinetApi {
       return { clientId: text(r.clientId), name: text(r.name), score: num(r.score) ?? 0, level,
         factors: Array.isArray(r.factors) ? r.factors.map((f) => { const g = f as Record<string, unknown>; return { label: text(g.label), weight: num(g.weight) ?? 0 }; }) : [] };
     });
+  }
+
+  private monthItem(x: unknown): MonthItem {
+    const r = (x ?? {}) as Record<string, unknown>;
+    const c = (r.checks ?? {}) as Record<string, unknown>;
+    const checks = Object.fromEntries(MONTH_CHECKS.map((k) => [k, c[k] === true])) as Record<MonthCheck, boolean>;
+    return { clientId: text(r.clientId) || null, name: text(r.name), period: text(r.period), status: text(r.status) || null,
+      comment: text(r.comment) || null, percent: num(r.percent) ?? 0, checks };
+  }
+
+  async monthGet(): Promise<MonthSheet> {
+    const env = await this.rpc<{ period?: unknown; items?: unknown[] }>('month.get', {});
+    return { period: text(env.data.period) || null, items: (env.data.items ?? []).map((x) => this.monthItem(x)) };
+  }
+
+  async monthSet(clientId: string, item: MonthCheck, done: boolean): Promise<MonthItem> {
+    const env = await this.rpc<{ item?: unknown }>('month.set', { clientId, item, done });
+    return this.monthItem(env.data.item);
   }
 
   /** «Не писать клиенту»: снять сообщение о закрытии срока, пока оно ждёт 2 мин. С requestId, мимо очереди —

@@ -1,7 +1,7 @@
 // Ключи ЭЦП, Справочник, Задачи и «Ещё» (телефон). Короче основных экранов, но рабочие.
 import { useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { canWrite } from '../config';
+import { canWrite, hasFeature } from '../config';
 import { useStore } from '../data/store';
 import { TODAY, addDays, daysBetween, daysLabel, fmtDate, plural, statusByDays } from '../lib/dates';
 import { play } from '../lib/sound';
@@ -344,7 +344,7 @@ export function More() {
     <div className="page">
       <header className="page__head"><h1 className="page__title">Ещё</h1></header>
       <nav className="panel more" aria-label="Другие разделы">
-        {MORE.map(([href, icon, label, hint]) => (
+        {[...MORE, ...(hasFeature('month') ? [['#/month', 'month', 'Месяц', 'чек-лист по штату: зарплата, налоги, табель'] as [string, IconName, string, string]] : [])].map(([href, icon, label, hint]) => (
           <a key={href} href={href} className="more__item">
             <Icon name={icon} tile="accent" />
             <span className="more__text"><strong>{label}</strong><span className="sub">{hint}</span></span>

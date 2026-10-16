@@ -473,6 +473,20 @@ describe('живой адаптер: чтение', () => {
     expect(r.ok && [r.changes.map((c) => c.id), r.failed?.map((f) => [f.id, f.code, f.current?.id])]).toEqual([['D-1'], [['D-2', 'CONFLICT', 'D-2']]]);
   });
 
+  it('«Месяц»: month.get — 7 галочек (нет — false), клиент null у тёзок; month.set ставит значение без requestId', async () => {
+    const row = { clientId: 'C-4', name: 'ТОВ', period: 'жовтень 2026', status: null, comment: 'Чекаю табель', percent: 29, checks: { advance: true, advanceTax: true } };
+    const s = server(
+      ok({ period: 'жовтень 2026', items: [row, { ...row, clientId: null, name: 'Тёзка', checks: null }] }),
+      ok({ item: { ...row, percent: 43, checks: { ...row.checks, salary: true } } }),
+    );
+    const api = new LiveApi(URL_, auth(), s.fetchImpl);
+    const m = await api.monthGet();
+    expect([m.period, m.items.map((i) => [i.clientId, Object.values(i.checks).filter(Boolean).length])]).toEqual(['жовтень 2026', [['C-4', 2], [null, 0]]]);
+    const r = await api.monthSet('C-4', 'salary', true);
+    expect(s.sent[1]).toEqual({ v: 1, action: 'month.set', payload: { clientId: 'C-4', item: 'salary', done: true }, session: 'S1' });
+    expect([r.percent, r.checks.salary, r.checks.report]).toEqual([43, true, false]);
+  });
+
   it('tasks.completeMany: сделанные — изменения, не отметившиеся — в failed', async () => {
     const t = { id: 'T-1', version: 2, clientId: null, text: 'а', due: null, type: 'docs', priority: 'medium', done: true };
     const s = server(ok({ results: [{ id: 'T-1', ok: true, task: t }, { id: 'T-2', ok: false, error: { code: 'NOT_FOUND', message: 'Задачи уже нет' }, current: null }], updated: 1, failed: 1 }, 30));

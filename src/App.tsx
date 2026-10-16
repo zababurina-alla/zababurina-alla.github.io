@@ -13,6 +13,7 @@ import { Deadlines } from './screens/Deadlines';
 import { Payments } from './screens/Payments';
 import { PaymentDialog } from './screens/PaymentDialog';
 import { NewDeadlineDialog } from './screens/NewDeadlineDialog';
+import { Month } from './screens/Month';
 import { AddClientDialog } from './screens/AddClientDialog';
 import { Keys, More, Reference, Tasks } from './screens/Other';
 import { IconGallery } from './screens/IconGallery';
@@ -87,6 +88,7 @@ function Screens() {
         {route.name === 'today-voice' && <TodayVoice />}
         {route.name === 'inbox' && (hasFeature('inbox') ? <Inbox /> : <Today />)}
         {route.name === 'help' && <Help />}
+        {route.name === 'month' && <Month />}
         </ScreenBoundary>}
       </Shell>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />

@@ -3,7 +3,7 @@
 // — версии записей и ошибка CONFLICT; — журнал изменений с курсором; — повтор того же requestId не создаёт дубль.
 // Рычаги отладки (обрыв связи, отказ, правка извне) — для кнопок в режиме отладки.
 import { ACTIVITY, CLIENTS, CONSULTATIONS, DEADLINES, INBOX, KVEDS, PAYMENTS, QUESTIONS, RATES, TASKS } from './fake';
-import type { ApplyTemplateResult, ArchivePage, AttentionItem, BotLinkResult, CabinetApi, StatementPdf, StatementPreview, StatementResult, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, TemplatePreview, ClientCard, Entity, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
+import type { ApplyTemplateResult, ArchivePage, AttentionItem, MonthCheck, MonthItem, MonthSheet, BotLinkResult, CabinetApi, StatementPdf, StatementPreview, StatementResult, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, TemplatePreview, ClientCard, Entity, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Consultation, Deadline, InboxItem, KvedItem, Payment, Question, Rates, Task } from './types';
 import { fold } from '../lib/search';
 import { TODAY, addDays, endOfMonth, fmtDate, fmtDue } from '../lib/dates';
@@ -494,6 +494,28 @@ class FakeServer implements CabinetApi {
       if (score > 0) out.push({ clientId: c.id, name: c.name, score, level: score >= 60 ? 'high' : score >= 30 ? 'mid' : 'low', factors });
     }
     return out.sort((a, b) => b.score - a.score).slice(0, limit);
+  }
+
+  private month: MonthItem[] = [...this.clients.values()].filter((c) => c.employer).map((c, i) => {
+    const checks = { advance: true, advanceTax: true, salary: i > 0, salaryTax: false, timesheet: i > 1, payroll: false, report: false };
+    return { clientId: c.id, name: c.name, period: 'жовтень 2026', status: null, comment: i === 0 ? 'Чекаю табель' : null,
+      percent: Math.round((Object.values(checks).filter(Boolean).length / 7) * 100), checks };
+  });
+  async monthGet(): Promise<MonthSheet> {
+    await wait(READ_MS * 2);
+    if (!this.online) throw new Error('NETWORK');
+    return { period: 'жовтень 2026', items: this.month.map((m) => ({ ...m, checks: { ...m.checks } })) };
+  }
+  async monthSet(clientId: string, item: MonthCheck, done: boolean): Promise<MonthItem> {
+    await wait(READ_MS);
+    if (!this.online) throw new Error('NETWORK');
+    const i = this.month.findIndex((m) => m.clientId === clientId);
+    const cur = this.month[i];
+    if (!cur) throw new Error('NOT_FOUND');
+    const checks = { ...cur.checks, [item]: done };
+    const next: MonthItem = { ...cur, checks, percent: Math.round((Object.values(checks).filter(Boolean).length / 7) * 100) };
+    this.month[i] = next;
+    return { ...next, checks: { ...checks } };
   }
 
   async cancelNotify(deadlineId: string, requestId: string): Promise<CancelNotifyResult> {
