@@ -317,7 +317,9 @@
   .ctable__row *,
   .paylist__row *,
   .tasks__text *,
-  .mini__text * {
+  .mini__text *,
+  .chat__name,
+  .chat__snippet {
     overflow: visible !important;
     white-space: normal !important;
     text-overflow: clip !important;
@@ -349,6 +351,20 @@
   .chats__list,
   .dialog__tg {
     display: none !important;
+  }
+
+  /* Чат не открыт (узкий лист) — печатаем список чатов: кто и что написал (Н-1: был пустой лист с заголовком) */
+  .chats:not(.has-open) > .chats__list {
+    display: block !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+  }
+
+  .chats:not(.has-open) .chat {
+    break-inside: avoid;
+    border-bottom: 0.2mm solid #BBBBBB;
+    border-radius: 0;
+    background: none !important;
   }
 
   .dfeed {

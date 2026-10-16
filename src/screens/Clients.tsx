@@ -14,6 +14,7 @@ import { search } from '../lib/search';
 import { play } from '../lib/sound';
 import { Icon } from '../ui/Icon';
 import { Avatar, Money, Tabs, reducedMotion } from '../ui/kit';
+import { clientPhoto } from '../ui/photo';
 import { Empty } from '../ui/Empty';
 import { useUi } from '../app/ui-context';
 import { roAttrs } from '../ui/readonly';
@@ -137,7 +138,7 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
             return (
               <div key={c.id} className="ctable__row" role="row" style={{ '--i': i } as React.CSSProperties}>
                 <span role="cell" className="ctable__client">
-                  <Avatar name={c.name} clientId={c.id} />
+                  <Avatar name={c.name} clientId={c.id} photo={clientPhoto(c)} />
                   <span className="ctable__who">
                     {/* Вся строка нажимается через растянутую зону этой кнопки (::after) — для диктора это одна кнопка с именем */}
                     <button type="button" className="ctable__open" onClick={() => ui.openClient(c.id)}>

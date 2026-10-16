@@ -34,7 +34,7 @@ if (typeof window !== 'undefined' && window.matchMedia?.('(hover: hover) and (po
 
 // Прилипшие шапки (таблица «Клиентов», заголовки дней на «Сроках», «Платежах», «Задачах»): прилипла — класс is-stuck,
 // под ней тень (styles/fx.css). Проверка — раз за кадр при прокрутке; шапок на экране немного (до 30).
-const STICKY = '.ctable__head, .dgroup__title';
+const STICKY = '.ctable__head, .dgroup__title, .deadlines-grid > aside';
 let stuckRaf = 0;
 function markStuck() {
   stuckRaf = 0;

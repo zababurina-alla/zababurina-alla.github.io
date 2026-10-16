@@ -147,19 +147,38 @@ function SyncStatus() {
 }
 
 /** Кто вошёл. На выдуманных данных — честная пометка вместо пользователя. */
-export function Me() {
+// Профиль внизу меню (владелец 17.10: голая ссылка «Выйти» — «это премиум?»): аватар, имя и значок выхода.
+// Выход — в два нажатия: значок → красная «Выйти?» на 4 секунды; Esc, уход фокуса или время — отмена.
+export function Me({ tools }: { tools?: ReactNode } = {}) {
   const state = useAuth();
+  const [sure, setSure] = useState(false);
+  useEffect(() => {
+    if (!sure) return;
+    const t = window.setTimeout(() => setSure(false), 4000);
+    return () => window.clearTimeout(t);
+  }, [sure]);
   if (!auth || !state.user) {
-    return <span className="me"><span className="avatar avatar--sm" aria-hidden="true">Д</span><span className="me__text">Выдуманные данные</span></span>;
+    return (
+      <span className="me">
+        <span className="avatar avatar--sm" aria-hidden="true">Д</span>
+        <span className="me__who"><span className="me__text">Выдуманные данные</span><span className="me__sub">учебный режим</span></span>
+        {tools && <span className="me__tools">{tools}</span>}
+      </span>
+    );
   }
   const initials = state.user.name.split(/\s+/).map((w) => w[0] ?? '').join('').slice(0, 2).toUpperCase();
   return (
     <span className="me">
       <span className="avatar avatar--sm" aria-hidden="true">{initials}</span>
-      <span className="me__who">
-        <span className="me__text">{state.user.name}</span>
-        <button type="button" className="linklike me__out" onClick={() => auth?.signOut()}>Выйти</button>
-      </span>
+      <span className="me__who"><span className="me__text">{state.user.name}</span></span>
+      {tools && <span className="me__tools">{tools}</span>}
+      {sure ? (
+        <button type="button" className="btn btn--danger btn--sm me__out" autoFocus onClick={() => auth?.signOut()}
+          onBlur={() => setSure(false)} onKeyDown={(e) => { if (e.key === 'Escape') setSure(false); }}>Выйти?</button>
+      ) : (
+        <button type="button" className="icon-btn me__out" aria-label="Выйти из кабинета" title="Выйти из кабинета"
+          onClick={() => setSure(true)}><Icon name="logout" /></button>
+      )}
     </span>
   );
 }
@@ -251,13 +270,13 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
         </nav>
         <div className="rail__foot">
           <ClosedCounter />
-          <div className="rail__tools">
+          {/* Профиль одной карточкой: кто вошёл, тема и звук значками, выход — меню целиком на 800 px (Р-4) */}
+          <Me tools={<>
             <button type="button" className="icon-btn" onClick={toggleTheme} aria-label={themeLabel} title={themeLabel}>
               <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
             </button>
             <SoundSettings />
-            <Me />
-          </div>
+          </>} />
         </div>
       </aside>
 

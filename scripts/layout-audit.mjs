@@ -165,6 +165,15 @@ if (CHECKS) {
       lines.push(`кнопки под краем окна ${w}×${h}: чатов ${n}, с кнопками под краем ${chatsWith}, кнопок под краем ${below}`);
       await ctx2.close();
     }
+    // ── Меню целиком в окне ноутбука: ничего не уходит под нижний край (Р-4: 816 → 792 из 776 px) ──
+    for (const [w, h] of [[1280, 800], [1024, 768]]) {
+      const c3 = await browser.newContext({ viewport: { width: w, height: h - 24 } }); // 24 px — рамка окна браузера
+      const p3 = await c3.newPage();
+      await open(p3, '#/today');
+      const m = await p3.evaluate(() => { const r = document.querySelector('.rail'); return r && getComputedStyle(r).display !== 'none' ? [r.scrollHeight, r.clientHeight] : null; });
+      lines.push(m ? `меню ${w}×${h}: высота ${m[0]} из ${m[1]} px, под краем ${Math.max(0, m[0] - m[1])} px` : `меню ${w}×${h}: свёрнуто (телефонная шапка)`);
+      await c3.close();
+    }
     // ── Два уведомления подряд: закрыть два срока (между нажатиями — дольше защиты от двойного нажатия 1,2 с) ──
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 } });
     const page = await ctx.newPage();

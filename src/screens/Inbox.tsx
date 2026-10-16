@@ -18,6 +18,7 @@ import { formatMoney, parseMoney } from '../lib/money';
 import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
 import { Avatar } from '../ui/kit';
+import { clientPhoto } from '../ui/photo';
 import { Empty } from '../ui/Empty';
 import { roAttrs } from '../ui/readonly';
 import { shortName } from '../ui/names';
@@ -210,7 +211,7 @@ function Dialog({ chat, visible }: { chat: Thread; visible: boolean }) {
     <section className="dialog" aria-label={`Переписка: ${chat.name}`}>
       <header className="dialog__head">
         <a href="#/inbox" className="icon-btn dialog__back" aria-label="Назад к чатам"><Icon name="chevronLeft" /></a>
-        <Avatar name={chat.name} {...(chat.clientId ? { clientId: chat.clientId } : {})} />
+        <Avatar name={chat.name} {...(chat.clientId ? { clientId: chat.clientId } : {})} photo={clientPhoto(chat.clientId ? store.client(chat.clientId) : null)} />
         <div className="dialog__who">
           {chat.clientId
             ? <button type="button" className="linklike dialog__name" onClick={() => ui.openClient(chat.clientId ?? '')} title="Открыть карточку клиента">{chat.name}</button>
@@ -220,7 +221,7 @@ function Dialog({ chat, visible }: { chat: Thread; visible: boolean }) {
         <a className="btn btn--secondary btn--sm dialog__tg" href={tg ?? 'https://web.telegram.org/'} target="_blank" rel="noopener noreferrer"
           aria-label={tg ? 'Ответить в Telegram' : 'Открыть Telegram'}
           title={tg ? 'Откроет чат с клиентом в Telegram по телефону из карточки' : 'Телефона клиента нет в таблице — откроется Telegram'}>
-          <Icon name="reply" size={16} /><span className="dialog__tg-text">{tg ? 'Ответить в Telegram' : 'Открыть Telegram'}</span></a>
+          <Icon name="reply" size={16} /><span className="dialog__tg-text">{tg ? 'Ответить' : 'Открыть'}<span className="dialog__tg-more">{tg ? ' в Telegram' : ' Telegram'}</span></span></a>
       </header>
       <ol ref={feed} className="dfeed" key={chat.key}>
         {days.map((g) => (
@@ -293,7 +294,7 @@ export function Inbox() {
               {chats.map((c) => (
                 <li key={c.key}>
                   <a href={`#/inbox/${encodeURIComponent(c.key)}`} className={`chat${c.unread ? ' has-unread' : ''}`} aria-current={shown?.key === c.key ? 'true' : undefined}>
-                    <Avatar name={c.name} {...(c.clientId ? { clientId: c.clientId } : {})} />
+                    <Avatar name={c.name} {...(c.clientId ? { clientId: c.clientId } : {})} photo={clientPhoto(c.clientId ? store.client(c.clientId) : null)} />
                     <span className="chat__top"><strong className="chat__name">{c.clientId ? shortName(c.name) : c.name}</strong><span className="chat__time num">{listTime(c.last.at)}</span></span>
                     <span className="chat__bottom">
                       <span className="chat__snippet">{c.last.file && <Icon name="attach" size={14} />}{voiceText(c.last) !== null ? <><Icon name="mic" size={14} />{voiceText(c.last) || 'Голосовое'}</> : c.last.snippet}</span>
