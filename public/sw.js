@@ -50,7 +50,8 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return; // Google, таблица — мимо
-  if (req.mode === 'navigate' || url.pathname.endsWith('/config.json') || url.pathname.endsWith('/manifest.webmanifest')) {
+  if (req.mode === 'navigate' || url.pathname.endsWith('/config.json') || url.pathname.endsWith('/manifest.webmanifest')
+    || url.pathname.endsWith('/theme-boot.js')) {
     e.respondWith(networkFirst(req));
     return;
   }
