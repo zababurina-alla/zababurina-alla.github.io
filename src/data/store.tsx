@@ -654,9 +654,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const addConsultation = useCallback((k: { clientId: string; topic: string; minutes: number | null; note: string }) => {
     const requestId = newRequestId();
-    // Временный id = requestId: ответ сервера (новая строка со своим id) заменит его в onApplied.
+    // Временный id = requestId. Сервер v5.87 даёт консультации тот же id — ответ просто заменяет строку; если бы дал свой,
+    // временную убираем (иначе на экране две одинаковые).
     send({ kind: 'createConsultation', requestId, consultation: { ...k, id: requestId, version: 0, at: null } }, `Консультация: ${k.topic}`,
-      () => setConsultations((xs) => xs.filter((x) => x.id !== requestId)));
+      (changes) => {
+        if (!changes.some((ch) => ch.entity === 'consultation' && ch.id === requestId)) setConsultations((xs) => xs.filter((x) => x.id !== requestId));
+      });
   }, [send]);
 
   /** tasks.update / tasks.delete (п. 14). До ответа — задача уже изменена/убрана на экране; отказ возвращает её. */

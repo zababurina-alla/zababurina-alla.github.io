@@ -48,7 +48,7 @@ export type WriteOp =
   /** deadlines.update (контракт 8.3): дата, статус (кроме done — закрытие только close), заметка. */
   | { kind: 'updateDeadline'; requestId: string; id: string; baseVersion: number; patch: DeadlinePatch }
   | { kind: 'createTask'; requestId: string; task: Task }
-  /** consultations.create: id — временный (= requestId), сервер выдаёт свой. */
+  /** consultations.create: id = requestId — сервер (v5.87) даёт записи тот же id. */
   | { kind: 'createConsultation'; requestId: string; consultation: Consultation }
   | { kind: 'completeTask'; requestId: string; id: string; done: boolean }
   | { kind: 'answerQuestion'; requestId: string; id: string; text: string }

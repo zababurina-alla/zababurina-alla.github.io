@@ -211,12 +211,12 @@ class FakeServer implements CabinetApi {
         return { ok: true, changes: [this.record('task', 'upsert', t.id, o, t)], cursor: this.cursor };
       }
       case 'createConsultation': {
-        // Как consultations.create: тема 1–300, минуты — целое 1–1440, заметка до 1000; id выдаёт сервер.
+        // Как consultations.create (v5.87): тема 1–300, минуты — целое 1–1440, заметка до 1000; id = requestId.
         const k = op.consultation;
         if (!this.clients.has(k.clientId)) return { ok: false, code: 'VALIDATION', message: 'Клиента нет в таблице' };
         if (!k.topic.trim() || k.topic.length > 300) return { ok: false, code: 'VALIDATION', message: 'Тема — от 1 до 300 знаков' };
         if (k.minutes !== null && (!Number.isInteger(k.minutes) || k.minutes < 1 || k.minutes > 1440)) return { ok: false, code: 'VALIDATION', message: 'Минуты — целое число от 1 до 1440' };
-        const rec: Consultation = { ...k, id: `K-${this.cursor + 1}`, version: 1, at: now() };
+        const rec: Consultation = { ...k, id: o, version: 1, at: now() };
         this.consultations.set(rec.id, rec);
         return { ok: true, changes: [this.record('consultation', 'upsert', rec.id, o, rec)], cursor: this.cursor };
       }
