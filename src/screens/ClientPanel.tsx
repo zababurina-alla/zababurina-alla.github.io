@@ -244,7 +244,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                 <section className="cp__block">
                   <h3 className="cp__h">Задачи по клиенту</h3>
                   {/* Шаблоны задач — как меню таблицы «✨ Шаблоны задач»: одно нажатие, срок и важность — как там. */}
-                  <p className="sub cp__tpl-label" id={`tpl-${c.id}`}>Быстрая задача — одно нажатие, срок поставится сам:</p>
+                  <p className="sub cp__tpl-label" id={`tpl-${c.id}`}><strong>Быстрая задача</strong> — одно нажатие, срок поставится сам</p>
                   <div className="cp__tpl" role="group" aria-labelledby={`tpl-${c.id}`}>
                     {TASK_TEMPLATES.map((t) => (
                       <button key={t.key} type="button" className="btn btn--ghost btn--sm" title={`${t.text} — до ${fmtDate(addDays(TODAY, t.daysAhead))}`}

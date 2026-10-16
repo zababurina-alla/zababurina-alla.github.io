@@ -4,7 +4,7 @@
 // Экран — как Telegram (владелец, 16.10): слева чаты по клиенту, справа диалог с пузырями; решения и «вы ответили» —
 // служебными строками в ленте. На узком экране список и диалог — два экрана (#/inbox и #/inbox/<чат>).
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, ReactNode, RefObject } from 'react';
 import { canWrite } from '../config';
 import { useStore } from '../data/store';
 import type { InboxItem, InboxStatus, InboxType } from '../data/types';
@@ -218,8 +218,9 @@ function Dialog({ chat, visible }: { chat: Thread; visible: boolean }) {
           <span className="sub">{chat.open ? `ждут решения: ${chat.open}` : 'всё решено'}{chat.clientId ? '' : ' · номера нет в таблице'}</span>
         </div>
         <a className="btn btn--secondary btn--sm dialog__tg" href={tg ?? 'https://web.telegram.org/'} target="_blank" rel="noopener noreferrer"
+          aria-label={tg ? 'Ответить в Telegram' : 'Открыть Telegram'}
           title={tg ? 'Откроет чат с клиентом в Telegram по телефону из карточки' : 'Телефона клиента нет в таблице — откроется Telegram'}>
-          <Icon name="reply" size={16} />{tg ? 'Ответить в Telegram' : 'Открыть Telegram'}</a>
+          <Icon name="reply" size={16} /><span className="dialog__tg-text">{tg ? 'Ответить в Telegram' : 'Открыть Telegram'}</span></a>
       </header>
       <ol ref={feed} className="dfeed" key={chat.key}>
         {days.map((g) => (
@@ -228,6 +229,8 @@ function Dialog({ chat, visible }: { chat: Thread; visible: boolean }) {
             <ol className="dfeed__items">{g.rows}</ol>
           </li>
         ))}
+        {/* Тихая отметка конца: видно, что ниже ничего нет (повторная приёмка 16.10, Г-7) */}
+        <li className="dfeed__end" aria-hidden="true">Это последнее сообщение</li>
       </ol>
     </section>
   );
@@ -247,8 +250,22 @@ function useWide(): boolean {
   return wide;
 }
 
+/** Блок чатов — от своего верха до низа окна: плашки и шапка над ним бывают разной высоты, а кнопки последнего
+ *  сообщения должны быть видны без прокрутки страницы (Г-7: низ ленты был на 846 px при окне 800). */
+function useFitToWindow(ref: RefObject<HTMLElement | null>, on: boolean): void {
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || !on) return;
+    const fit = () => el.style.setProperty('--chats-top', `${Math.round(el.getBoundingClientRect().top + window.scrollY)}px`);
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, [ref, on]);
+}
+
 export function Inbox() {
   const store = useStore();
+  const chatsRef = useRef<HTMLDivElement>(null);
   const route = useRoute();
   const readAt = useReadAt();
   const chats = groupThreads(store.inbox, readAt);
@@ -258,6 +275,7 @@ export function Inbox() {
   // Открытый чат — из адреса; на широком экране без адреса показан первый (на узком тогда виден только список).
   const open = chats.find((c) => c.key === want) ?? null;
   const shown = open ?? chats[0] ?? null;
+  useFitToWindow(chatsRef, wide && chats.length > 0);
   return (
     <div className="page">
       <header className="page__head">
@@ -269,7 +287,7 @@ export function Inbox() {
         </div>
       </header>
       {chats.length ? (
-        <div className={`panel chats${open ? ' has-open' : ''}`}>
+        <div ref={chatsRef} className={`panel chats${open ? ' has-open' : ''}`}>
           <nav className="chats__list" aria-label="Чаты с клиентами">
             <ul>
               {chats.map((c) => (

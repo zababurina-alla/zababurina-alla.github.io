@@ -29,6 +29,41 @@
     --dot-yellow: #B45309;
     --dot-green: #16A34A;
     --accent: #1E64CF;
+    /* Мягкие подложки — светлые и в тёмной теме: тёмная плашка «Вопрос по таблице» печаталась чёрным (Г-4) */
+    --accent-soft: #E6EEFB;
+    --wheat: #9A7432;
+    --wheat-ink: #7A5A22;
+    --wheat-soft: #F5EFE2;
+    --st-red-bg: #FEE2E2;
+    --st-orange-bg: #FFEDD5;
+    --st-yellow-bg: #FEF3C7;
+    --st-green-bg: #DCFCE7;
+    --st-grey-bg: #F3F4F6;
+    --line-strong: #BBBBBB;
+    --edge: transparent;
+  }
+
+  /* Ни один блок не листается на бумаге: полоса прокрутки печаталась под таблицей «Сроков» (Р-6) */
+  html,
+  body,
+  .shell,
+  .main,
+  .screen,
+  .page,
+  .panel {
+    overflow: visible !important;
+  }
+
+  /* Плашки — без заливки, тонкой рамкой: читается и на чёрно-белом принтере */
+  .hero,
+  .panel--wheat,
+  .pay-hero,
+  .dfeed {
+    background: none !important;
+  }
+
+  .panel--wheat {
+    box-shadow: inset 0 0 0 0.3mm #C9B48A !important;
   }
 
   html::after,
@@ -193,7 +228,12 @@
 
   .dgroups__head > .c-due,
   .dtable__head > .c-due {
-    width: 34mm;
+    width: 38mm;
+  }
+
+  /* «просрочено 24 дн.» — переносом, а не за край листа (Р-6) */
+  .dtable__when > span {
+    white-space: normal !important;
   }
 
   .dtable__head > .c-act {
@@ -287,6 +327,38 @@
   .today-main,
   .today-side {
     display: block;
+    columns: auto !important; /* лист 794 px попадал в экранные «две колонки» — задачи шли по слову в строке (Г-4) */
+  }
+
+  /* «Задачи»: поле новой задачи и выбор нескольких — не на бумагу */
+  .quick,
+  .tasks__select {
+    display: none !important;
+  }
+
+  .panel:has(.tasks .prio) .tasks__text,
+  .tasks__text {
+    padding-left: 0;
+  }
+
+  /* «Входящие» на бумаге — открытая переписка целиком, без списка чатов (Г-4: печатался только список с чёрной полосой) */
+  .chats {
+    display: block !important;
+  }
+
+  .chats__list,
+  .dialog__tg {
+    display: none !important;
+  }
+
+  .dfeed {
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0;
+  }
+
+  .dfeed__day {
+    position: static !important;
   }
 
   .today-grid > *,

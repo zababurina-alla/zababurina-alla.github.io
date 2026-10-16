@@ -321,8 +321,14 @@
 @container (min-width: 640px) and (max-width: 899px) {
   .dtable:not(.dtable--noclient) .dtable__head,
   .dtable:not(.dtable--noclient) .dtable__row {
-    grid-template-columns: 2.75rem minmax(8rem, 1fr) minmax(8rem, 1.2fr) 9.5rem;
+    /* срок — по содержимому: «просрочено 24 дн.» вылезал за 9,5rem (Р-2) */
+    grid-template-columns: 2.75rem minmax(7.5rem, 0.9fr) minmax(8rem, 1.3fr) max-content;
     gap: var(--space-2);
+  }
+
+  /* Имя без кружка с буквами — вся ширина колонки под фамилию и имя */
+  .dtable__client .avatar {
+    display: none;
   }
 }
 
@@ -922,11 +928,15 @@
     align-items: center;
   }
 
+  /* Название — до двух строк целиком: квартал и вид отчёта несут смысл (повторная приёмка 16.10, Р-2) */
   .dtable__line > .ttext > span:not(.icon) {
     min-width: 0;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: normal;
   }
 
   .dtable__line > .tag {

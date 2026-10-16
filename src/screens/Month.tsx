@@ -88,10 +88,11 @@ export function Month() {
                   {(it.status || it.comment) && <span className="sub">{[it.status, it.comment].filter(Boolean).join(' · ')}</span>}
                 </span>
                 {MONTH_CHECKS.map((k) => (
-                  <span key={k} role="cell">
+                  // Ячейка — подпись: на узком экране галочка с названием («Аванс»), нажимается вместе с текстом
+                  <label key={k} role="cell" data-label={MONTH_SHORT[k]}>
                     <input type="checkbox" className="mcheck__box" checked={it.checks[k]} disabled={!it.clientId || saving.has(`${it.clientId}|${k}`)}
                       aria-label={`${MONTH_LABEL[k]}: ${it.name}`} onChange={() => { void toggle(it, k); }} />
-                  </span>
+                  </label>
                 ))}
                 <span role="cell" className="ta-r num">{it.percent} %</span>
               </div>

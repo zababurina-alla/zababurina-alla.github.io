@@ -5,7 +5,8 @@
 //   колесо     — блоки с прокруткой, которые не крутятся колесом мыши;
 //   подписи    — кнопки, фишки, метки, заголовки колонок, у которых текст перенёсся или обрезан без многоточия.
 // Печать (--print): экраны на листе A4 — обрезанные подписи, пустая ширина справа в % (по строкам таблиц), листов.
-// Отдельно (--checks): лента чата крутится колесом (1280, 1024); два уведомления подряд — кнопки обоих нажимаются.
+// Отдельно (--checks): лента чата крутится колесом (1280, 1024); кнопки ленты не под краем окна (1280×800, 1024×768);
+// два уведомления подряд — кнопки обоих нажимаются.
 // Запуск: node scripts/layout-audit.mjs [адрес] [--json путь] [--only сегодня,клиенты] [--strict] [--print | --checks]
 //   адрес — по умолчанию учебный режим локального сайта http://localhost:5183/ (?demo=1 добавляется сам).
 //   --strict — код выхода 1, если хоть одно число больше нуля (для проверок перед сдачей).
@@ -31,6 +32,7 @@ const PRINT_SCREENS = [
   { name: 'карточка', hash: '#/clients', open: (p) => p.locator('.ctable__row .ctable__open').first().click() },
   { name: 'ключи', hash: '#/keys' },
   { name: 'месяц', hash: '#/month' },
+  { name: 'входящие', hash: '#/inbox' },
 ];
 
 /** На листе: обрезанные подписи и пустая ширина справа (медиана по строкам таблиц и списков). */
@@ -58,7 +60,46 @@ function measurePrint() {
   }
   rights.sort((a, b) => a - b);
   const median = rights.length ? rights[Math.floor(rights.length / 2)] : W;
-  return { clipped: clippedList.length, clippedList: clippedList.slice(0, 12), emptyPct: Math.max(0, Math.round((1 - median / W) * 100)), rows: rights.length };
+  // Интерфейс на бумаге: поля ввода, кнопки, тёмные плашки (светлота фона < 0,5), полоса прокрутки, лист шире страницы
+  const uiList = [];
+  // Кнопки-кнопки и поля ввода; имя клиента-ссылка и галочка «Месяца» — это данные, их печатать надо
+  for (const el of document.querySelectorAll('.btn, .icon-btn, .chip, .seg__opt, .tabs__tab, .check-btn, input:not([type=hidden]):not([type=checkbox]):not([type=radio]), textarea, select')) {
+    if (visible(el) && !el.closest('.visually-hidden')) uiList.push(`${label(el)} — ${/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) ? 'поле' : 'кнопка'}`);
+  }
+  const lum = (c) => { const m = c.match(/[\d.]+/g); if (!m || (m[3] !== undefined && Number(m[3]) < 0.5)) return 1; const [r, g, b] = m.map(Number); return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255; };
+  for (const el of document.querySelectorAll('body *')) {
+    if (!visible(el)) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < 60 || r.height < 24) continue;
+    if (lum(getComputedStyle(el).backgroundColor) < 0.5) uiList.push(`${label(el)} — тёмная плашка`);
+  }
+  const over = document.documentElement.scrollWidth - document.documentElement.clientWidth;
+  if (over > 1) uiList.push(`лист шире страницы на ${over} px`);
+  // Текст за правым краем листа («просрочено 24 д…» срезано краем, Р-6)
+  const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  let edge = 0;
+  for (let n = tw.nextNode(); n; n = tw.nextNode()) {
+    if (!n.textContent.trim() || !n.parentElement || !visible(n.parentElement)) continue;
+    const rg = document.createRange(); rg.selectNodeContents(n);
+    if ([...rg.getClientRects()].some((q) => q.width > 0 && q.right > W + 1)) edge++;
+  }
+  if (edge) uiList.push(`текст за краем листа: ${edge}`);
+  // По слову в строке на бумаге («Задачи на сегодня» столбиком, Г-4) — считается вместе с обрезанными
+  for (const el of document.querySelectorAll('body span, body strong, body p, body a, body li')) {
+    if (!visible(el) || el.children.length) continue;
+    const text = (el.textContent || '').trim().replace(/\s+/g, ' ');
+    const words = text.split(' ');
+    const width = el.getBoundingClientRect().width;
+    if (words.length < 2 || words.length > 5 || text.length > 30 || (words.length < 3 && width >= 90)) continue;
+    const rg = document.createRange(); rg.selectNodeContents(el);
+    const tops = new Set([...rg.getClientRects()].filter((q) => q.width > 1).map((q) => Math.round(q.top / 3)));
+    if (tops.size >= words.length) clippedList.push(`${label(el)} — по слову в строке`);
+  }
+  for (const el of document.querySelectorAll('body *')) {
+    const cs = getComputedStyle(el);
+    if (visible(el) && /(auto|scroll)/.test(cs.overflowX) && el.scrollWidth > el.clientWidth + 1) uiList.push(`${label(el)} — полоса прокрутки вбок`);
+  }
+  return { clipped: clippedList.length, clippedList: clippedList.slice(0, 12), emptyPct: Math.max(0, Math.round((1 - median / W) * 100)), rows: rights.length, ui: uiList.length, uiList: uiList.slice(0, 12) };
 }
 
 // Отдельные проверки (--checks): лента чата «Входящих» крутится колесом (1280 и 1024); два уведомления подряд —
@@ -101,6 +142,29 @@ if (CHECKS) {
       lines.push(`лента чата ${w}: чатов ${n}, с прокруткой ${scrollable}, не крутится колесом ${stuck}`);
       await ctx.close();
     }
+    // ── Кнопки под краем окна: лента долистана до конца, страница — тоже; кнопки внутри ниже окна — не нажать (Г-7) ──
+    for (const [w, h] of [[1280, 800], [1024, 768]]) {
+      const ctx2 = await browser.newContext({ viewport: { width: w, height: h } });
+      const page2 = await ctx2.newPage();
+      await open(page2, '#/inbox');
+      const n = await page2.locator('.chats__list .chat').count();
+      let below = 0, chatsWith = 0;
+      for (let i = 0; i < n; i++) {
+        await page2.locator('.chats__list .chat').nth(i).click();
+        await page2.waitForTimeout(900);
+        const k = await page2.evaluate(() => {
+          const f = document.querySelector('.dfeed');
+          if (!f) return 0;
+          // Как человек: крутит саму ленту до конца; страницу — нет (колесо в конце ленты до неё не доходит, contain)
+          window.scrollTo(0, 0);
+          f.scrollTop = f.scrollHeight;
+          return [...f.querySelectorAll('button, a[href]')].filter((b) => { const r = b.getBoundingClientRect(); return r.width > 0 && r.bottom > window.innerHeight + 1; }).length;
+        });
+        below += k; if (k) chatsWith++;
+      }
+      lines.push(`кнопки под краем окна ${w}×${h}: чатов ${n}, с кнопками под краем ${chatsWith}, кнопок под краем ${below}`);
+      await ctx2.close();
+    }
     // ── Два уведомления подряд: закрыть два срока (между нажатиями — дольше защиты от двойного нажатия 1,2 с) ──
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 } });
     const page = await ctx.newPage();
@@ -140,9 +204,9 @@ if (PRINT) {
   const browser = await chromium.launch();
   const out = [];
   try {
-    for (const theme of ['light', 'dark']) {
-      // Ширина листа A4 без полей: 210 − 2 × 12 мм = 186 мм ≈ 703 px
-      const ctx = await browser.newContext({ viewport: { width: 703, height: 1000 } });
+    // 703 px — лист A4 за вычетом полей 12 мм (как печатает Chrome по print.css); 794 px — весь лист, как мерил «Пользователь»
+    for (const [theme, pw] of [['light', 703], ['dark', 703], ['light', 794], ['dark', 794]]) {
+      const ctx = await browser.newContext({ viewport: { width: pw, height: 1000 } });
       const page = await ctx.newPage();
       for (const s of PRINT_SCREENS) {
         if (ONLY && !ONLY.includes(s.name)) continue;
@@ -158,7 +222,7 @@ if (PRINT) {
         const pdf = await page.pdf({ format: 'A4', preferCSSPageSize: true, printBackground: false });
         const sheets = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length;
         await page.emulateMedia({ media: 'screen' });
-        out.push({ screen: s.name, view: theme === 'light' ? 'свет' : 'тьма', clipped: m.clipped, emptyPct: m.emptyPct, rows: m.rows, sheets, details: m.clippedList });
+        out.push({ screen: s.name, view: `${pw} ${theme === 'light' ? 'свет' : 'тьма'}`, clipped: m.clipped, emptyPct: m.emptyPct, rows: m.rows, ui: m.ui, sheets, details: [...m.clippedList, ...m.uiList] });
       }
       await ctx.close();
     }
@@ -166,11 +230,11 @@ if (PRINT) {
     await browser.close();
   }
   const pad = (v, n) => String(v).padEnd(n);
-  console.log(`${pad('печать', 12)}${pad('тема', 7)}обрезано  пусто справа  строк  листов`);
-  for (const r of out) console.log(`${pad(r.screen, 12)}${pad(r.view, 7)}${pad(r.clipped, 10)}${pad(r.emptyPct + ' %', 13)}${pad(r.rows, 7)}${r.sheets}`);
-  console.log(`\nИтого: обрезано ${out.reduce((a, r) => a + r.clipped, 0)} · пусто справа больше 25 % — ${out.filter((r) => r.emptyPct > 25).length} экр.`);
+  console.log(`${pad('печать', 12)}${pad('лист', 11)}обрезано  интерфейс  пусто справа  строк  листов`);
+  for (const r of out) console.log(`${pad(r.screen, 12)}${pad(r.view, 11)}${pad(r.clipped, 10)}${pad(r.ui, 11)}${pad(r.emptyPct + ' %', 13)}${pad(r.rows, 7)}${r.sheets}`);
+  console.log(`\nИтого: обрезано ${out.reduce((a, r) => a + r.clipped, 0)} · интерфейс на бумаге ${out.reduce((a, r) => a + r.ui, 0)} · пусто справа больше 25 % — ${out.filter((r) => r.emptyPct > 25).length} экр.`);
   if (JSON_OUT) writeFileSync(JSON_OUT, JSON.stringify(out, null, 1));
-  if (STRICT && out.some((r) => r.clipped > 0 || r.emptyPct > 25)) process.exit(1);
+  if (STRICT && out.some((r) => r.clipped > 0 || r.ui > 0 || r.emptyPct > 25)) process.exit(1);
   process.exit(0);
 }
 
@@ -197,6 +261,7 @@ const SCREENS = [
   { name: 'ключи', hash: '#/keys', root: '.page' },
   { name: 'справочник', hash: '#/reference', root: '.page' },
   { name: 'помощь', hash: '#/help', root: '.page' },
+  { name: 'месяц', hash: '#/month', root: '.page' },
   { name: 'ещё', hash: '#/more', root: '.page' },
   { name: 'окно платежа', hash: '#/today', root: 'dialog[open] .modal__box', open: (p) => p.keyboard.press('Alt+n') },
   { name: 'новый клиент', hash: '#/clients', root: 'dialog[open] .modal__box', open: (p) => p.locator('button', { hasText: 'Добавить клиента' }).first().click() },
@@ -340,13 +405,54 @@ function measure(rootSel) {
     if (wrapped || clipped) { labels++; labelList.push(`${label(el)} — ${wrapped ? 'перенос' : 'обрезано'}`); }
   }
 
+  // Повторная приёмка 16.10 (что скрипт пропустил): имя в ячейке уже 80 px («Рома…» в «Платежах» 1024),
+  // короткое поле по слову в строке («Октябрь / 2026»), смысл срезан многоточием или line-clamp
+  // («Податковий розрахунок, III к…», «Закрыть просроченн…»). Превью сообщений и списки чатов режутся по замыслу.
+  const NAMES = '[data-client-name], .dtable__name, .paylist__who strong, .ctable__who strong, .mini__text strong, .attention__who strong, .mcheck__who .linklike';
+  for (const el of root.querySelectorAll(NAMES)) {
+    if (!visible(el)) continue;
+    const w = el.getBoundingClientRect().width;
+    if (w < 80 && (el.textContent || '').trim().length > 3) { labels++; labelList.push(`${label(el)} — имя уже 80 px (${Math.round(w)})`); }
+  }
+  const BY_DESIGN = '.chat__snippet, .chat__name, .chat__bottom, .palette__label, .palette__item, input, textarea, select, option, .visually-hidden, .kv-pop, .bubble';
+  for (const el of root.querySelectorAll('span, strong, b, em, p, a, button, li, h1, h2, h3, h4, [role=cell]')) {
+    if (!visible(el) || el.closest(BY_DESIGN)) continue;
+    const text = (el.textContent || '').trim().replace(/\s+/g, ' ');
+    if (!text) continue;
+    const cs = getComputedStyle(el);
+    // многоточие или line-clamp, которые на самом деле что-то спрятали
+    const ell = cs.textOverflow === 'ellipsis' && el.scrollWidth > el.clientWidth + 1;
+    const clamp = cs.webkitLineClamp && cs.webkitLineClamp !== 'none' && el.scrollHeight > el.clientHeight + 2;
+    if (ell || clamp) { labels++; labelList.push(`${label(el)} — ${ell ? 'многоточие' : 'срезано по строкам'}`); continue; }
+    // по слову в строке: короткий текст, строк столько же, сколько слов, — у трёх слов и больше
+    // или в поле уже 90 px («Октябрь / 2026» в 57 px); имя «Соловей / Тетяна» в две строки шириной 120 px — нормальный перенос
+    const words = text.split(' ');
+    const width = el.getBoundingClientRect().width;
+    if (el.children.length === 0 && words.length >= 2 && words.length <= 5 && text.length <= 30 && (words.length >= 3 || width < 90)) {
+      const rg = document.createRange(); rg.selectNodeContents(el);
+      const tops = new Set([...rg.getClientRects()].filter((q) => q.width > 1).map((q) => Math.round(q.top / 3)));
+      if (tops.size >= words.length) { labels++; labelList.push(`${label(el)} — по слову в строке (${Math.round(width)} px)`); }
+    }
+  }
+
+  // Вбок: страница или блок листаются по горизонтали («Месяц» 932 px на 1024 — 260 px вбок)
+  let sideways = 0;
+  const sidewaysList = [];
+  if (document.documentElement.scrollWidth > document.documentElement.clientWidth + 1) { sideways++; sidewaysList.push(`страница шире окна на ${document.documentElement.scrollWidth - document.documentElement.clientWidth} px`); }
+  for (const el of [root, ...root.querySelectorAll('*')]) {
+    const cs = getComputedStyle(el);
+    if (!visible(el) || !/(auto|scroll)/.test(cs.overflowX) || el.closest('.tabs, .chips')) continue;
+    const extra = el.scrollWidth - el.clientWidth;
+    if (extra > 1) { sideways++; sidewaysList.push(`${label(el)} — вбок на ${extra} px`); }
+  }
+
   // Блоки с прокруткой — пометить для проверки колесом снаружи
   const scrollers = [];
   for (const el of [root, ...root.querySelectorAll('*')]) {
     const cs = getComputedStyle(el);
     if (/(auto|scroll)/.test(cs.overflowY) && el.scrollHeight > el.clientHeight + 4 && visible(el)) { el.dataset.auditScroll = String(scrollers.length); scrollers.push(label(el)); }
   }
-  return { voids, voidList, uneven, unevenList: unevenList.slice(0, 12), labels, labelList: labelList.slice(0, 12), scrollers };
+  return { voids, voidList, uneven, unevenList: unevenList.slice(0, 12), labels, labelList: labelList.slice(0, 16), sideways, sidewaysList, scrollers };
 }
 
 const browser = await chromium.launch();
@@ -384,7 +490,7 @@ try {
           if (top < 1) { wheel++; wheelList.push(`${m.scrollers[i]}${top < 0 ? ' — закрылся от прокрутки' : ''}`); }
         } catch { /* блок пропал до прокрутки — пропускаем */ }
       }
-      results.push({ screen: s.name, view: `${v.w} ${v.theme === 'light' ? 'свет' : 'тьма'}`, missing: Boolean(m.missing), voids: m.voids ?? 0, uneven: m.uneven ?? 0, wheel, labels: m.labels ?? 0, details: { voids: m.voidList, uneven: m.unevenList, wheel: wheelList, labels: m.labelList } });
+      results.push({ screen: s.name, view: `${v.w} ${v.theme === 'light' ? 'свет' : 'тьма'}`, missing: Boolean(m.missing), voids: m.voids ?? 0, uneven: m.uneven ?? 0, wheel, labels: m.labels ?? 0, sideways: m.sideways ?? 0, details: { voids: m.voidList, uneven: m.unevenList, wheel: wheelList, labels: m.labelList, sideways: m.sidewaysList } });
     }
     await ctx.close();
   }
@@ -393,9 +499,9 @@ try {
 }
 
 const pad = (s, n) => String(s).padEnd(n);
-console.log(`${pad('экран', 16)}${pad('вид', 12)}пустоты  высоты  колесо  подписи`);
-for (const r of results) console.log(`${pad(r.screen, 16)}${pad(r.view, 12)}${r.missing ? 'нет корня — окно не открылось' : `${pad(r.voids, 9)}${pad(r.uneven, 8)}${pad(r.wheel, 8)}${r.labels}`}`);
+console.log(`${pad('экран', 16)}${pad('вид', 12)}пустоты  высоты  колесо  подписи  вбок`);
+for (const r of results) console.log(`${pad(r.screen, 16)}${pad(r.view, 12)}${r.missing ? 'нет корня — окно не открылось' : `${pad(r.voids, 9)}${pad(r.uneven, 8)}${pad(r.wheel, 8)}${pad(r.labels, 9)}${r.sideways}`}`);
 const sum = (k) => results.reduce((a, r) => a + (r[k] || 0), 0);
-console.log(`\nИтого: пустоты ${sum('voids')} · высоты ${sum('uneven')} · колесо ${sum('wheel')} · подписи ${sum('labels')} · не открылось ${results.filter((r) => r.missing).length}`);
+console.log(`\nИтого: пустоты ${sum('voids')} · высоты ${sum('uneven')} · колесо ${sum('wheel')} · подписи ${sum('labels')} · вбок ${sum('sideways')} · не открылось ${results.filter((r) => r.missing).length}`);
 if (JSON_OUT) writeFileSync(JSON_OUT, JSON.stringify(results, null, 1));
-if (STRICT && sum('voids') + sum('uneven') + sum('wheel') + sum('labels') + results.filter((r) => r.missing).length > 0) process.exit(1);
+if (STRICT && sum('voids') + sum('uneven') + sum('wheel') + sum('labels') + sum('sideways') + results.filter((r) => r.missing).length > 0) process.exit(1);

@@ -311,14 +311,20 @@
     padding: var(--space-2) var(--space-3);
   }
 
-  .paylist__row > *,
-  .paylist__row:has(> .pill) > .paylist__how,
-  .paylist__row:has(> .paylist__cancel) > .paylist__how,
-  .paylist__row > .pill,
-  .paylist__row:has(> .pill) > .paylist__cancel {
+  /* Вес выше телефонного «.paylist__row > :nth-child(3)» (0,2,0): тот растягивал третью ячейку на всю строку,
+     и имя сжималось до 57–60 px (повторная приёмка 16.10, Р-1) */
+  .paylist > .paylist__row > *,
+  .paylist > .paylist__row:has(> .pill) > .paylist__how,
+  .paylist > .paylist__row:has(> .paylist__cancel) > .paylist__how,
+  .paylist > .paylist__row > .pill,
+  .paylist > .paylist__row:has(> .pill) > .paylist__cancel {
     grid-row: 1;
     grid-column: auto;
     padding-left: 0;
+  }
+
+  .paylist__who .sub {
+    white-space: nowrap; /* «Октябрь 2026», «III квартал 2026» — одной строкой, не по слову */
   }
 
   .paylist__row > :nth-child(3):empty {
