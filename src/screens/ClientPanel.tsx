@@ -24,6 +24,8 @@ import { QuestionAnswer } from './Questions';
 import { DeadlineTable } from './DeadlineTable';
 import { useRoute } from '../router';
 import { ConsultationsTab } from './Consultations';
+import { TemplateDialog } from './TemplateDialog';
+import { roMessage } from '../ui/readonly';
 import { TASK_TEMPLATES } from '../lib/taskTemplates';
 import { addDays } from '../lib/dates';
 import { useToast } from '../ui/toast';
@@ -176,6 +178,12 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
   const history = cardNow?.history ?? [];
   const keyDays = c?.keyUntil ? daysBetween(TODAY, c.keyUntil) : null;
   const [remindKey, setRemindKey] = useState(false);
+  const [tplOpen, setTplOpen] = useState(false);
+  const openTemplates = () => {
+    if (!canWrite('deadlines')) { toast({ text: roMessage('deadlines'), tone: 'info' }); return; }
+    if (!store.templates) { toast({ text: 'Шаблон сроков пока применяйте в таблице: меню «📋 Шаблоны сроков» — на сайте появится само', tone: 'info' }); return; }
+    setTplOpen(true);
+  };
 
   return (
     <Modal open={Boolean(id)} onClose={onClose} kind="panel" labelledBy="cp-name">
@@ -301,7 +309,17 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                 </section>
               </>
             )}
-            {tab === 'deadlines' && <DeadlineTable items={own} showClient={false} empty="Открытых сроков нет" />}
+            {tab === 'deadlines' && (
+              <>
+                <div className="cp__tools">
+                  <button type="button" className="btn btn--secondary btn--sm" onClick={() => ui.openNewDeadline(c.id)} {...roAttrs('deadlines')}><Icon name="plus" size={16} />Новый срок</button>
+                  <button type="button" className="btn btn--ghost btn--sm" onClick={openTemplates} {...roAttrs('deadlines')}
+                    title="Добавить сроки по шаблону системы налогообложения — только те, которых у клиента нет"><Icon name="sync" size={16} />Сроки по шаблону</button>
+                </div>
+                <TemplateDialog open={tplOpen} clientId={c.id} onClose={() => setTplOpen(false)} />
+                <DeadlineTable items={own} showClient={false} empty="Открытых сроков нет" />
+              </>
+            )}
             {tab === 'payments' && (pays.length ? (
               <ul className="plist">{pays.map((p) => (
                 <li key={p.id} className="plist__row"><span><strong className="display"><Money text={formatPayMoney(p.kopecks)} /></strong><span className="sub">{p.period}, {METHOD_LABEL[p.method]}</span></span><span className="num sub">{p.date ? fmtDate(p.date) : <span className="nil">без даты</span>}</span></li>

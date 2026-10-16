@@ -365,6 +365,45 @@ describe('живой адаптер: чтение', () => {
     expect(snap.clients.map((c) => [c.kvedMain, c.kvedMainNote])).toEqual([['56.10', 'max ставка'], [null, null], [null, null]]);
   });
 
+  it('deadlines.create v5.88: создан; CONFLICT с открытым сроком; VALIDATION с полем; нет связи — бросает (повтор тем же requestId)', async () => {
+    const dl = { id: 'R7', version: 1, clientId: 'C-1', what: 'ЄП за IV квартал', periodicity: 'quarter', due: '2027-02-09', periodEnd: '2026-12-31', status: 'new', closedAt: null };
+    const s = server(
+      ok({ deadline: dl }, 9),
+      fail('CONFLICT', 'Уже есть открытый срок', { field: 'obligation' }, { ...dl, id: 'D-3' }),
+      fail('VALIDATION', 'Дата — ГГГГ-ММ-ДД', { field: 'due' }),
+    );
+    const api = new LiveApi(URL_, auth(), s.fetchImpl);
+    const input = { clientId: 'C-1', obligation: 'ЄП за IV квартал', due: '2027-02-09', periodicity: 'quarter' as const, note: '' };
+    expect(await api.createDeadline(input, 'R7')).toEqual({ ok: true, deadline: dl });
+    expect(s.sent[0]).toMatchObject({ action: 'deadlines.create', requestId: 'R7', payload: { deadline: { id: 'R7', clientId: 'C-1', obligation: 'ЄП за IV квартал', due: '2027-02-09', periodicity: 'quarter' } } });
+    expect(Object.keys((s.sent[0] as unknown as { payload: { deadline: object } }).payload.deadline)).not.toContain('note');
+    const c = await api.createDeadline(input, 'R8');
+    expect(!c.ok && [c.code, c.field, c.current?.id]).toEqual(['CONFLICT', 'obligation', 'D-3']);
+    const v = await api.createDeadline({ ...input, due: '9.2.27' }, 'R9');
+    expect(!v.ok && [v.code, v.field, v.current]).toEqual(['VALIDATION', 'due', null]);
+    const down = new LiveApi(URL_, auth(), (async () => { throw new TypeError('Failed to fetch'); }) as unknown as typeof fetch);
+    await expect(down.createDeadline(input, 'R10')).rejects.toBeTruthy();
+  });
+
+  it('deadlines.applyTemplate: пробный прогон без requestId; запись с ним; «нет системы» — VALIDATION template', async () => {
+    const added = { id: 'D-9', version: 1, clientId: 'C-1', what: 'ЄП за IV квартал', periodicity: 'quarter', due: '2027-02-19', periodEnd: '2026-12-31', status: 'new', closedAt: null };
+    const s = server(
+      ok({ template: 'FOP3', wouldAdd: [{ obligation: 'ЄП за IV квартал', periodicity: 'quarter', due: '2027-02-19' }], skipped: ['ЄСВ за IV квартал'] }),
+      ok({ template: 'FOP3', added: [added], skipped: ['ЄСВ за IV квартал'] }, 12),
+      fail('VALIDATION', 'У клиента не указана система — выберите шаблон', { field: 'template' }),
+    );
+    const api = new LiveApi(URL_, auth(), s.fetchImpl);
+    expect(await api.previewTemplate('C-1')).toEqual({ template: 'FOP3', wouldAdd: [{ obligation: 'ЄП за IV квартал', periodicity: 'quarter', due: '2027-02-19' }], skipped: ['ЄСВ за IV квартал'] });
+    expect(s.sent[0]).toMatchObject({ action: 'deadlines.applyTemplate', payload: { clientId: 'C-1', dryRun: true } });
+    expect(s.sent[0]?.requestId).toBeUndefined();
+    const r = await api.applyTemplate('C-1', undefined, 'R4');
+    expect(s.sent[1]).toMatchObject({ action: 'deadlines.applyTemplate', requestId: 'R4', payload: { clientId: 'C-1' } });
+    expect(Object.keys((s.sent[1] as unknown as { payload: object }).payload)).toEqual(['clientId']);
+    expect(r.ok && [r.template, r.added.map((d) => d.id), r.skipped]).toEqual(['FOP3', ['D-9'], ['ЄСВ за IV квартал']]);
+    expect(await api.previewTemplate('C-2', 'EXCISE')).toEqual({ ok: false, code: 'VALIDATION', message: 'У клиента не указана система — выберите шаблон', field: 'template' });
+    expect(s.sent[2]).toMatchObject({ payload: { clientId: 'C-2', template: 'EXCISE', dryRun: true } });
+  });
+
   it('«Не писать клиенту»: снято / снимать нечего / уже ушло (CONFLICT с sentAt); requestId — свой на нажатие', async () => {
     const s = server(ok({ id: 'D-1', cancelled: true }), ok({ id: 'D-1', cancelled: false }), fail('CONFLICT', 'Уже отправлено', {}, { id: 'D-1', sentAt: '2026-10-16T02:10:00+03:00' }));
     const api = new LiveApi(URL_, auth(), s.fetchImpl);

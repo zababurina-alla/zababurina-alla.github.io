@@ -24,6 +24,7 @@ import { DayGroups } from './DayGroups';
 import type { GroupBy } from './DayGroups';
 import { OBLIGATION_ICON } from '../ui/obligationIcon';
 import { useRoute } from '../router';
+import { useUi } from '../app/ui-context';
 
 type Range = 'month' | 'overdue' | 'week' | 'all';
 const RANK: Record<Status, number> = { red: 4, orange: 3, yellow: 2, green: 1, grey: 0 };
@@ -98,6 +99,7 @@ function clientGroup(kind: ClientKind | null): ClientGroup {
 
 export function Deadlines() {
   const store = useStore();
+  const ui = useUi();
   const scope = useRef<HTMLDivElement>(null);
   const route = useRoute();
   // № 10: «Закрыто сегодня» в меню ведёт сюда (#/deadlines/closed) — к своему блоку, с короткой подсветкой.
@@ -184,7 +186,10 @@ export function Deadlines() {
           <h1 className="page__title">Сроки <em>{overdue ? `${overdue} ${plural(overdue, 'просрочен', 'просрочены', 'просрочено')}` : 'без просрочек'}</em></h1>
           <p className="page__sub">Закрыть можно, когда отчётный период закончился, — система проверит сама и создаст следующий срок.</p>
         </div>
-        <button type="button" className="btn btn--secondary" onClick={printWeek}><Icon name="pdf" />Распечатать неделю</button>
+        <div className="page__actions">
+          <button type="button" className="btn btn--secondary" onClick={printWeek}><Icon name="pdf" />Распечатать неделю</button>
+          <button type="button" className="btn btn--primary" onClick={() => ui.openNewDeadline()} {...roAttrs('deadlines')}><Icon name="plus" />Новый срок</button>
+        </div>
       </header>
       <p className="print-only print-head">Сроки на неделю · {fmtDayMonth(TODAY)} — {fmtDayMonth(addDays(TODAY, 7))} {TODAY.slice(0, 4)} · просрочено и горит</p>
 

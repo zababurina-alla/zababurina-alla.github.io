@@ -12,6 +12,7 @@ import { ClientPanel } from './screens/ClientPanel';
 import { Deadlines } from './screens/Deadlines';
 import { Payments } from './screens/Payments';
 import { PaymentDialog } from './screens/PaymentDialog';
+import { NewDeadlineDialog } from './screens/NewDeadlineDialog';
 import { AddClientDialog } from './screens/AddClientDialog';
 import { Keys, More, Reference, Tasks } from './screens/Other';
 import { IconGallery } from './screens/IconGallery';
@@ -35,6 +36,7 @@ function Screens() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [payFor, setPayFor] = useState<{ open: boolean; clientId: string | null }>({ open: false, clientId: null });
   const [addOpen, setAddOpen] = useState(false);
+  const [newDl, setNewDl] = useState<{ open: boolean; clientId: string | null }>({ open: false, clientId: null });
   const [clientId, setClientId] = useState<string | null>(null);
 
   const toast = useToast();
@@ -48,6 +50,11 @@ function Screens() {
       setAddOpen(true);
     },
     openPalette: () => setPaletteOpen(true),
+    openNewDeadline: (id) => {
+      if (!canWrite('deadlines')) { toast({ text: roMessage('deadlines') }); return; }
+      if (!store.createDeadline) { toast({ text: 'Новый срок пока добавляйте в таблице: меню «➕ Новый срок» — на сайте появится само', tone: 'info' }); return; }
+      setNewDl({ open: true, clientId: id ?? null });
+    },
     // Строка → карточка: инициалы из строки перелетают в заголовок карточки, панель выезжает (View Transitions).
     openClient: (id) => {
       const src = [...document.querySelectorAll<HTMLElement>(`[data-client-avatar="${id}"]`)].find((el) => el.getBoundingClientRect().height > 0);
@@ -57,7 +64,7 @@ function Screens() {
         setClientId(id);
       }, src ? 'card' : 'panel');
     },
-  }), [toast]);
+  }), [toast, store.createDeadline]);
 
   return (
     <UiCtx.Provider value={ui}>
@@ -89,6 +96,7 @@ function Screens() {
       <ScreenBoundary key={clientId ?? ''} what="карточку клиента"><ClientPanel id={clientId} onClose={() => setClientId(null)} /></ScreenBoundary>
       <PaymentDialog open={payFor.open} clientId={payFor.clientId} onClose={() => setPayFor((p) => ({ ...p, open: false }))} />
       <AddClientDialog open={addOpen} onClose={() => setAddOpen(false)} />
+      <NewDeadlineDialog open={newDl.open} clientId={newDl.clientId} onClose={() => setNewDl((d) => ({ ...d, open: false }))} />
     </UiCtx.Provider>
   );
 }

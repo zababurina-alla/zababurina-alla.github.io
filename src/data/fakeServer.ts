@@ -3,7 +3,7 @@
 // — версии записей и ошибка CONFLICT; — журнал изменений с курсором; — повтор того же requestId не создаёт дубль.
 // Рычаги отладки (обрыв связи, отказ, правка извне) — для кнопок в режиме отладки.
 import { ACTIVITY, CLIENTS, CONSULTATIONS, DEADLINES, INBOX, KVEDS, PAYMENTS, QUESTIONS, RATES, TASKS } from './fake';
-import type { CabinetApi, CancelNotifyResult, Change, ClientCard, Entity, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
+import type { ApplyTemplateResult, CabinetApi, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, TemplatePreview, ClientCard, Entity, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Consultation, Deadline, InboxItem, KvedItem, Payment, Question, Rates, Task } from './types';
 import { fold } from '../lib/search';
 import { TODAY, addDays, endOfMonth, fmtDate, fmtDue } from '../lib/dates';
@@ -337,6 +337,80 @@ class FakeServer implements CabinetApi {
     const d = req.deadlineId ? this.deadlines.get(req.deadlineId) : undefined;
     const hi = `Добрий день${c ? `, ${c.name.split(' ')[1] ?? ''}` : ''}!`;
     return { preview: d ? `${hi} 📅 Нагадую: ${d.what} — до ${fmtDate(d.due ?? TODAY)}.` : `${hi} 🔐 Ключ ЕЦП діє до ${fmtDate(c?.keyUntil ?? TODAY)} — час продовжити.`, lang: 'uk', reason: null, message: null };
+  }
+
+  private created = new Map<string, CreateDeadlineResult>();
+  /** Как deadlines.create v5.88: обязательство 1–300, дата YYYY-MM-DD; тот же открытый срок у клиента — CONFLICT с ним
+   *  (регистр, ё и пробелы не важны); periodEnd — как у сроков таблицы (здесь — конец прошлого месяца/квартала/года). */
+  async createDeadline(d: NewDeadline, requestId: string): Promise<CreateDeadlineResult> {
+    await wait(READ_MS * 2);
+    if (!this.online) throw new Error('NETWORK');
+    const again = this.created.get(requestId);
+    if (again) return again;
+    const norm = (s: string) => fold(s).replace(/\s+/g, ' ');
+    const fail = (code: 'VALIDATION' | 'CONFLICT', field: string, message: string, current: Deadline | null = null): CreateDeadlineResult =>
+      ({ ok: false, code, message, field, current });
+    if (!this.clients.has(d.clientId)) return fail('VALIDATION', 'clientId', 'Клиента нет в таблице');
+    if (!d.obligation.trim() || d.obligation.length > 300) return fail('VALIDATION', 'obligation', 'Что сдать — от 1 до 300 знаков');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d.due)) return fail('VALIDATION', 'due', 'Дата — в виде ГГГГ-ММ-ДД');
+    const same = [...this.deadlines.values()].find((x) => x.clientId === d.clientId && x.status !== 'done' && norm(x.what) === norm(d.obligation));
+    if (same) return fail('CONFLICT', 'obligation', 'У клиента уже есть открытый срок с этим обязательством', { ...same });
+    const pe = d.periodicity === 'once' ? null : endOfMonth(addDays(`${d.due.slice(0, 7)}-01`, -1));
+    const rec: Deadline = { id: requestId, version: 1, clientId: d.clientId, what: d.obligation.trim(), periodicity: d.periodicity, due: d.due, periodEnd: pe, status: 'new', closedAt: null };
+    this.deadlines.set(rec.id, rec);
+    this.record('deadline', 'upsert', rec.id, requestId, rec);
+    this.act(`Новый срок: ${rec.what} — ${short(this.clients.get(d.clientId)?.name ?? '')}`, requestId, 'сайт');
+    const res: CreateDeadlineResult = { ok: true, deadline: { ...rec } };
+    this.created.set(requestId, res);
+    return res;
+  }
+
+  /** Шаблон по типу клиента и его обязательства (упрощённо — как сервер: добавляет только то, чего у клиента нет). */
+  private templateOf(c: Client, template?: DeadlineTemplate): DeadlineTemplate | null {
+    if (template) return template;
+    const byKind: Partial<Record<NonNullable<Client['kind']>, DeadlineTemplate>> = { fop1: 'FOP1', fop2: 'FOP2', fop3: 'FOP3', fopGeneral: 'FOP_GENERAL', tov3: 'TOV_SIMPLE', tovGeneral: 'TOV_GENERAL', person: 'INDIVIDUAL', nonresident: 'NONRESIDENT' };
+    return c.kind ? byKind[c.kind] ?? null : null;
+  }
+  private plan(c: Client, t: DeadlineTemplate) {
+    const all: { obligation: string; periodicity: Deadline['periodicity']; due: string }[] = t === 'FOP3' || t === 'TOV_SIMPLE'
+      ? [{ obligation: 'Декларація платника ЄП, IV квартал', periodicity: 'quarter', due: '2027-02-09' }, { obligation: 'ЄП за IV квартал', periodicity: 'quarter', due: '2027-02-19' }, { obligation: 'ЄСВ за IV квартал', periodicity: 'quarter', due: '2027-01-20' }]
+      : t === 'FOP1' || t === 'FOP2'
+        ? [{ obligation: 'ЄП за листопад', periodicity: 'month', due: '2026-11-20' }, { obligation: 'ЄСВ за IV квартал', periodicity: 'quarter', due: '2027-01-20' }, { obligation: 'Декларація платника ЄП за 2026 рік', periodicity: 'year', due: '2027-03-01' }]
+        : [{ obligation: 'Податковий розрахунок, IV квартал', periodicity: 'quarter', due: '2027-02-09' }, { obligation: 'ЄСВ за IV квартал', periodicity: 'quarter', due: '2027-01-20' }];
+    const have = new Set([...this.deadlines.values()].filter((d) => d.clientId === c.id && d.status !== 'done').map((d) => fold(d.what)));
+    return { wouldAdd: all.filter((x) => !have.has(fold(x.obligation))), skipped: all.filter((x) => have.has(fold(x.obligation))).map((x) => x.obligation) };
+  }
+  async previewTemplate(clientId: string, template?: DeadlineTemplate): Promise<TemplatePreview | { ok: false; code: 'VALIDATION'; message: string; field: string }> {
+    await wait(READ_MS);
+    if (!this.online) throw new Error('NETWORK');
+    const c = this.clients.get(clientId);
+    if (!c) return { ok: false, code: 'VALIDATION', message: 'Клиента нет в таблице', field: 'clientId' };
+    const t = this.templateOf(c, template);
+    if (!t) return { ok: false, code: 'VALIDATION', message: 'У клиента не указана система — выберите шаблон', field: 'template' };
+    return { template: t, ...this.plan(c, t) };
+  }
+  private applied = new Map<string, ApplyTemplateResult>();
+  async applyTemplate(clientId: string, template: DeadlineTemplate | undefined, requestId: string): Promise<ApplyTemplateResult> {
+    await wait(READ_MS * 2);
+    if (!this.online) throw new Error('NETWORK');
+    const again = this.applied.get(requestId);
+    if (again) return again;
+    const c = this.clients.get(clientId);
+    if (!c) return { ok: false, code: 'VALIDATION', message: 'Клиента нет в таблице', field: 'clientId' };
+    const t = this.templateOf(c, template);
+    if (!t) return { ok: false, code: 'VALIDATION', message: 'У клиента не указана система — выберите шаблон', field: 'template' };
+    const { wouldAdd, skipped } = this.plan(c, t);
+    const added = wouldAdd.map((x): Deadline => {
+      const id = `D-${++this.cursor}`;
+      const d: Deadline = { id, version: 1, clientId, what: x.obligation, periodicity: x.periodicity, due: x.due, periodEnd: null, status: 'new', closedAt: null };
+      this.deadlines.set(id, d);
+      this.log.push({ cursor: this.cursor, entity: 'deadline', op: 'upsert', id, origin: requestId, record: d });
+      return { ...d };
+    });
+    if (added.length) this.act(`Шаблон ${t}: добавлено сроков ${added.length} — ${short(c.name)}`, requestId, 'сайт');
+    const res: ApplyTemplateResult = { ok: true, template: t, added, skipped };
+    this.applied.set(requestId, res);
+    return res;
   }
 
   async cancelNotify(deadlineId: string, requestId: string): Promise<CancelNotifyResult> {
