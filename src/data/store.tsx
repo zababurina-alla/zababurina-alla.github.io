@@ -90,6 +90,8 @@ interface Store {
   addClient: (c: Omit<Client, 'id' | 'version'>, onSaved?: (created: Deadline[], client: Client) => void) => Client;
   /** baseVersion — версия, которую мама видела, когда начала править (бриф, п. 6: конфликт). */
   updatePhone: (clientId: string, phone: string, baseVersion: number) => void;
+  /** КВЕД клиента целиком (clients.update patch.kved); главный — выберет сервер по max ставке. */
+  updateKved: (clientId: string, codes: string[], baseVersion: number) => void;
   /** Почта клиента (clients.update { email }). */
   updateEmail: (clientId: string, email: string, baseVersion: number) => void;
   addTask: (t: Omit<Task, 'id' | 'version' | 'done'>) => void;
@@ -338,7 +340,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     } else if (op.kind === 'addClient') {
       setClients((xs) => upsert(xs, op.client));
     } else if (op.kind === 'updateClient') {
-      setClients((xs) => xs.map((c) => (c.id === op.id ? { ...c, ...op.patch } : c)));
+      // КВЕД приходит кодами: названия — те, что уже были у клиента (новые — пусто, подставит справочник).
+      const { kved, ...rest } = op.patch;
+      setClients((xs) => xs.map((c) => (c.id === op.id
+        ? { ...c, ...rest, ...(kved ? { kved: kved.map((code) => ({ code, title: c.kved.find((k) => k.code === code)?.title ?? '' })) } : {}) }
+        : c)));
     } else if (op.kind === 'updateDeadline') {
       const { note: _note, ...patch } = op.patch;
       void _note;
@@ -684,6 +690,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (before) clientsBefore.current.set(requestId, before);
     send({ kind: 'updateClient', requestId, id: clientId, baseVersion, patch }, label, () => clientsBefore.current.delete(requestId));
   }, [clients, send]);
+  const updateKved = useCallback((clientId: string, codes: string[], baseVersion: number) => {
+    const before = clients.find((c) => c.id === clientId);
+    const requestId = newRequestId();
+    if (before) clientsBefore.current.set(requestId, before);
+    send({ kind: 'updateClient', requestId, id: clientId, baseVersion, patch: { kved: codes } }, 'КВЕД клиента', () => clientsBefore.current.delete(requestId));
+  }, [clients, send]);
   const updatePhone = useCallback((clientId: string, phone: string, baseVersion: number) => {
     updateContact(clientId, { phone }, baseVersion, 'Телефон клиента');
   }, [updateContact]);
@@ -919,10 +931,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<Store>(() => ({
     loaded, online, syncedAt, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, consultations, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, updateDeadlines, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention, month,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateKved, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, updateDeadlines, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention, month,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance,
   }), [loaded, online, syncedAt, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, consultations, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, updateDeadlines, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention, month,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateKved, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, updateDeadlines, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention, month,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

@@ -28,7 +28,7 @@ import { TemplateDialog } from './TemplateDialog';
 import { BotLink } from './BotLink';
 import { StatementBlock } from './Statement';
 import { ArchiveBlock } from './ArchiveBlock';
-import { useKvedTitles } from '../data/reference';
+import { KvedEdit } from './KvedEdit';
 import { roMessage } from '../ui/readonly';
 import { TASK_TEMPLATES } from '../lib/taskTemplates';
 import { addDays } from '../lib/dates';
@@ -183,7 +183,6 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
   const keyDays = c?.keyUntil ? daysBetween(TODAY, c.keyUntil) : null;
   const [remindKey, setRemindKey] = useState(false);
   const [tplOpen, setTplOpen] = useState(false);
-  const kvedTitles = useKvedTitles();
   const openTemplates = () => {
     if (!canWrite('deadlines')) { toast({ text: roMessage('deadlines'), tone: 'info' }); return; }
     if (!store.templates) { toast({ text: 'Шаблон сроков пока применяйте в таблице: меню «📋 Шаблоны сроков» — на сайте появится само', tone: 'info' }); return; }
@@ -317,7 +316,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                 <StatementBlock key={`st-${c.id}`} clientId={c.id} />
                 <section className="cp__block">
                   <h3 className="cp__h">КВЕД</h3>
-                  {c.kved.length ? <ul className="kved">{c.kved.map((k) => <li key={k.code}><span className="num kved__code">{k.code}</span>{k.title || kvedTitles.get(k.code) || <span className="nil">название не указано</span>}</li>)}</ul> : <p className="nil">КВЕД в таблице не указан</p>}
+                  <KvedEdit key={`kv-${c.id}`} c={c} />
                 </section>
               </>
             )}

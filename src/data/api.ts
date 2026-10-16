@@ -44,7 +44,7 @@ export type WriteOp =
   | { kind: 'addPayment'; requestId: string; payment: Payment }
   | { kind: 'cancelPayment'; requestId: string; id: string; baseVersion: number }
   | { kind: 'addClient'; requestId: string; client: Client }
-  | { kind: 'updateClient'; requestId: string; id: string; baseVersion: number; patch: Partial<Pick<Client, 'phone' | 'email' | 'keyIssuer' | 'keyFrom' | 'keyUntil'>> }
+  | { kind: 'updateClient'; requestId: string; id: string; baseVersion: number; patch: ClientPatch }
   /** deadlines.update (контракт 8.3): дата, статус (кроме done — закрытие только close), заметка. */
   | { kind: 'updateDeadline'; requestId: string; id: string; baseVersion: number; patch: DeadlinePatch }
   /** deadlines.updateMany (v5.89): до 20 сроков, один patch; ошибка одного — в failed (с current), остальные изменены. */
@@ -80,6 +80,9 @@ export type WriteResult =
 
 /** tasks.update: что поменять; null очищает срок или клиента. Сделанную задачу сервер править не даёт. */
 export interface TaskPatch { text?: string; due?: string | null; type?: TaskType; priority?: Priority; clientId?: string | null }
+
+/** clients.update: контакты, ключ; kved — весь список кодов «NN.NN» (заменяет; главный сервер выбирает сам). */
+export type ClientPatch = Partial<Pick<Client, 'phone' | 'email' | 'keyIssuer' | 'keyFrom' | 'keyUntil'>> & { kved?: string[] };
 
 export interface DeadlinePatch { due?: string; status?: Exclude<DeadlineStatus, 'done'>; note?: string }
 

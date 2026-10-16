@@ -331,7 +331,11 @@ class FakeServer implements CabinetApi {
         const c = this.clients.get(op.id);
         if (!c) return { ok: false, code: 'NOT_FOUND', message: 'Клиента нет в таблице' };
         if (c.version !== op.baseVersion) return { ok: false, code: 'CONFLICT', message: 'Карточка изменилась в таблице', current: { ...c } };
-        const upd = { ...c, ...op.patch, version: this.cursor + 1 };
+        // КВЕД — коды; названия из справочника; главный — как сервер: по наибольшей ставке (здесь — первый с названием из
+        // справочника, где выше группа ЄП; упрощённо — первый код списка).
+        const { kved, ...rest } = op.patch;
+        const kvedList = kved?.map((code) => ({ code, title: c.kved.find((k) => k.code === code)?.title ?? KVEDS.find((k) => k.code === code)?.title ?? '' }));
+        const upd: Client = { ...c, ...rest, ...(kvedList ? { kved: kvedList, kvedMain: kvedList[0]?.code ?? null, kvedMainNote: kvedList.length > 1 ? 'max ставка' : null } : {}), version: this.cursor + 1 };
         this.clients.set(c.id, upd);
         return { ok: true, changes: [this.record('client', 'upsert', c.id, o, upd), this.act(`Изменена карточка: ${short(c.name)}`, o, 'сайт')], cursor: this.cursor };
       }
