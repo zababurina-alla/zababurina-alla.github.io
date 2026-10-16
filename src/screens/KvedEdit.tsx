@@ -54,7 +54,8 @@ export function KvedEdit({ c }: { c: Client }) {
           {code && !edit.includes(code) && <span className="sub">{title(code) || 'в листе «📑 КВЕДы» такого кода нет — проверьте'}</span>}
         </form>
         {error && <p className="field__error" role="alert">{error}</p>}
-        <p className="sub">Главный КВЕД (по нему ЄП) таблица выберет сама — по наибольшей ставке.</p>
+        {/* Главный по ставке — только у ФОП 1–2 группы; у 3 группы и других ЄП от оборота, главного нет (сервер 16.10) */}
+        {(c.kind === 'fop1' || c.kind === 'fop2') && <p className="sub">Главный КВЕД (по нему ЄП) таблица выберет сама — по наибольшей ставке.</p>}
         <div className="kved-edit__actions">
           <button type="button" className="btn btn--primary btn--sm" onClick={save}>Сохранить</button>
           <button type="button" className="btn btn--ghost btn--sm" onClick={() => { setEdit(null); setError(''); }}>Отмена</button>
