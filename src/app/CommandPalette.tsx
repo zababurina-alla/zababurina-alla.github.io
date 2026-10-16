@@ -35,7 +35,7 @@ function rememberRecent(id: string): void {
 
 /** «ромашко ключ» — в строке клиента сразу нужное поле (пароль не показываем: только «Показать» в карточке). */
 function fieldHint(c: Client, f: ClientField): string {
-  if (f === 'key') return c.keyUntil ? `ключ до ${fmtDate(c.keyUntil)}` : 'ключа нет в таблице';
+  if (f === 'key') return c.keyUntil ? `ключ до ${fmtDate(c.keyUntil)}` : c.keyIssuer.trim() ? 'срок ключа не указан' : 'ключа нет в таблице';
   if (f === 'phone') return c.phone || 'телефона нет в таблице';
   if (f === 'password') return 'пароль — в карточке, «Показать»';
   if (f === 'kved') return c.kved.length ? `КВЕД ${c.kved.map((k) => k.code).join(', ')}` : 'КВЕД не указан';

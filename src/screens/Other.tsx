@@ -35,6 +35,12 @@ const KEY_GROUPS: { st: Status; title: string }[] = [
   { st: 'green', title: 'В порядке' },
 ];
 
+/** Даты ключа нет: банк / АЦСК в карточке есть — «срок ключа не указан» (ключ, видимо, есть, а даты в таблице нет;
+ *  приёмка «Пользователя» С-8, 16.10); нет и его — «ключа нет в таблице». */
+export function noKeyText(c: Pick<Client, 'keyIssuer'>): string {
+  return c.keyIssuer.trim() ? 'срок ключа не указан' : 'ключа нет в таблице';
+}
+
 function KeyRow({ c }: { c: Client }) {
   const ui = useUi();
   const days = c.keyUntil ? daysBetween(TODAY, c.keyUntil) : null;
@@ -46,7 +52,7 @@ function KeyRow({ c }: { c: Client }) {
         <Avatar name={c.name} />
         <span className="keys__who"><strong>{c.name}</strong><span className="sub">{c.keyIssuer ? <TableText text={c.keyIssuer} size={16} tidy /> : <span className="nil">где выпущен — не указано</span>}</span></span>
         {days === null
-          ? <span className="keys__when"><span className="nil">ключа нет в таблице</span></span>
+          ? <span className="keys__when"><span className="nil">{noKeyText(c)}</span></span>
           : <span className="keys__when"><span className={`due--${st}`}>{daysLabel(days).replace('через ', 'ещё ')}</span><span className="sub num">до {fmtDate(c.keyUntil ?? '')}</span></span>}
       </button>
     </li>
@@ -84,7 +90,7 @@ export function Keys() {
         })}
         {noKey.length > 0 && (
           <div className="dgroup">
-            <h2 className="dgroup__title"><span>Ключа нет в таблице</span><span className="dgroup__count num">{noKey.length}</span></h2>
+            <h2 className="dgroup__title"><span>Срок ключа не указан</span><span className="dgroup__count num">{noKey.length}</span></h2>
             <ul className="keys">{noKey.map((c) => <KeyRow key={c.id} c={c} />)}</ul>
           </div>
         )}
