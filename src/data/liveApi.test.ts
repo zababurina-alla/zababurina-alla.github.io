@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { LiveApi } from './liveApi';
+import { LiveApi, pause } from './liveApi';
 import type { SessionProvider } from './liveApi';
 import { ApiError, call } from './transport';
 import type { Deadline, Payment } from './types';
@@ -121,7 +121,25 @@ describe('живой адаптер: записи', () => {
   it('ночное обслуживание: код и retryAt доходят до очереди', async () => {
     const s = server(fail('MAINTENANCE', 'Ночное обслуживание', { retryable: true, retryAt: '2026-10-15T04:30:00+03:00' }));
     const r = await new LiveApi(URL_, auth(), s.fetchImpl).write({ kind: 'completeTask', requestId: 'R7', id: 'T-1', done: true });
-    expect(r).toEqual({ ok: false, code: 'MAINTENANCE', message: 'Ночное обслуживание', retryAt: '2026-10-15T04:30:00+03:00' });
+    expect(r).toEqual({ ok: false, code: 'MAINTENANCE', message: 'Ночное обслуживание', retryAt: '2026-10-15T04:30:00+03:00', retryable: true });
+  });
+
+  it('BUSY у запроса мимо очереди — ещё 2 раза тем же requestId (3 и 6 с); третий BUSY — ошибка', async () => {
+    const waits: number[] = [];
+    const sleep = pause.sleep;
+    pause.sleep = async (ms) => { waits.push(ms); };
+    try {
+      const dl = { id: 'R9', version: 1, clientId: 'C-1', what: 'Тест', periodicity: 'once', due: '2027-01-10', periodEnd: null, status: 'new', closedAt: null };
+      const busy = () => fail('BUSY', 'Сервер занят', { retryable: true });
+      const s = server(busy(), busy(), ok({ deadline: dl }));
+      const r = await new LiveApi(URL_, auth(), s.fetchImpl).createDeadline({ clientId: 'C-1', obligation: 'Тест', due: '2027-01-10', periodicity: 'once', note: '' }, 'R9');
+      expect([r.ok, s.sent.map((x) => x.requestId), waits.map((w) => Math.floor(w / 1000))]).toEqual([true, ['R9', 'R9', 'R9'], [3, 6]]);
+      const s2 = server(busy(), busy(), busy());
+      await expect(new LiveApi(URL_, auth(), s2.fetchImpl).monthGet()).rejects.toMatchObject({ code: 'BUSY' });
+      expect(s2.sent).toHaveLength(3);
+    } finally {
+      pause.sleep = sleep;
+    }
   });
 
   it('незнакомый код сервера → SERVER (кнопка «Повторить»)', async () => {

@@ -146,13 +146,16 @@ export class Outbox {
       void this.kick();
       return;
     }
-    if (RETRYABLE.has(result.code)) {
+    // Сбой листа (SERVER), который сервер назвал повторяемым, — ещё 2 раза тем же requestId, потом «не сохранилось».
+    const serverRetry = result.code === 'SERVER' && result.retryable === true && next.attempts < 3;
+    if (RETRYABLE.has(result.code) || serverRetry) {
       next.state = 'queued';
       next.error = result.message;
       await this.storage.set(next.op.requestId, next);
       if (result.code === 'NETWORK') this.emit({ type: 'offline', item: next });
       this.emit({ type: 'changed' });
-      const backoff = BACKOFF_MS[Math.min(next.attempts - 1, BACKOFF_MS.length - 1)] ?? 30000;
+      // + до 1 с случайно: пачка записей не бьёт в занятый сервер одновременно (краш-тест 17.10).
+      const backoff = (serverRetry ? 5000 : BACKOFF_MS[Math.min(next.attempts - 1, BACKOFF_MS.length - 1)] ?? 30000) + Math.floor(Math.random() * 1000);
       // Ночное обслуживание: ждать retryAt от сервера. Не дольше 10 мин — на случай, если часы браузера и сервера разошлись.
       const until = result.retryAt ? Date.parse(result.retryAt) - Date.now() : NaN;
       const pause = Number.isFinite(until) ? Math.min(Math.max(until, backoff), MAX_WAIT_MS) : backoff;

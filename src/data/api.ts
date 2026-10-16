@@ -74,7 +74,7 @@ export type WriteResult =
       failed?: { id: string; code: ErrorCode; message: string; current?: Deadline }[];
       /** closeMany: какой следующий срок создан для какого закрытого (у следующего квартала другое название). */
       nextOf?: Record<string, string | null> }
-  | { ok: false; code: ErrorCode; message: string; current?: Client | Deadline | Payment | Question | InboxItem | Task;
+  | { ok: false; code: ErrorCode; message: string; retryable?: boolean; current?: Client | Deadline | Payment | Question | InboxItem | Task;
       /** MAINTENANCE: когда ночные задачи закончатся (флаг сервера, не часы) — раньше не повторять. */
       retryAt?: string };
 

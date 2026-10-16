@@ -26,10 +26,13 @@ export class ApiError extends Error {
   readonly retryAt: string | undefined;
   readonly field: string | null;
   readonly current: unknown;
+  /** Сервер сам сказал «можно повторить» (SERVER при сбое листа, BUSY) — очередь повторит тем же requestId. */
+  readonly retryable: boolean;
   constructor(err: ServerError, current?: unknown) {
     super(err.message);
     this.name = 'ApiError';
     this.code = err.code;
+    this.retryable = err.retryable === true;
     this.retryAt = err.retryAt;
     this.field = err.field ?? null;
     this.current = current ?? null;

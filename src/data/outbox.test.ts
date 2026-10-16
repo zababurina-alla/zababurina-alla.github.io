@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Outbox } from './outbox';
 import type { OutboxEvent, OutboxItem } from './outbox';
 import type { CabinetApi, WriteOp, WriteResult } from './api';
@@ -23,6 +23,24 @@ function apiWith(write: (o: WriteOp) => Promise<WriteResult>): CabinetApi {
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 describe('очередь записей', () => {
+  // Паузы повтора со случайной добавкой до 1 с — в тестах без неё, чтобы считать время точно.
+  beforeEach(() => { vi.spyOn(Math, 'random').mockReturnValue(0); });
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('SERVER, который сервер назвал повторяемым, — ещё 2 раза через 5 с тем же requestId, потом «не сохранилось»', async () => {
+    vi.useFakeTimers();
+    const seen: string[] = [];
+    const store = memStorage();
+    const ob = new Outbox(apiWith(async (o) => { seen.push(o.requestId); return { ok: false, code: 'SERVER', message: 'Лист занят', retryable: true }; }), store, () => undefined);
+    await ob.enqueue(op('s'), 'S');
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(seen).toEqual(['s', 's', 's']);
+    expect(store.m.get('s')?.state).toBe('failed');
+    vi.useRealTimers();
+  });
+
   it('окно «Отменить»: запись ждёт 10 с, другие её не ждут; отмена в окне — не уходит, после окна — false', async () => {
     vi.useFakeTimers();
     const sent: string[] = [];

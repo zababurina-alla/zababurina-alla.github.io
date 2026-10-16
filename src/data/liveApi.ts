@@ -7,6 +7,9 @@ import { MONTH_CHECKS, RETRYABLE } from './api';
 import type { Activity, Client, Consultation, Deadline, InboxItem, InboxType, KvedItem, Payment, Question, RateGroup, Rates, Task } from './types';
 import { INBOX_TYPES } from './types';
 
+/** Пауза перед повтором — отдельно, чтобы тесты не ждали секунды. */
+export const pause = { sleep: (ms: number) => new Promise<void>((r) => setTimeout(r, ms)) };
+
 /** Откуда брать сеанс и как тихо войти заново (auth.ts). */
 export interface SessionProvider {
   session(): string | null;
@@ -134,15 +137,24 @@ export class LiveApi implements CabinetApi {
   constructor(private readonly url: string, private readonly auth: SessionProvider, private readonly fetchImpl: typeof fetch = fetch) {}
 
   /** Запрос с сеансом. Сеанс истёк — один тихий вход и повтор тем же requestId (контракт, раздел 3, п. 5). */
-  private async rpc<T>(action: string, payload: unknown, requestId?: string): Promise<Envelope<T>> {
+  private async rpc<T>(action: string, payload: unknown, requestId?: string, busyRetries = 0): Promise<Envelope<T>> {
     const once = (session: string | null) => call<T>({
       url: this.url, action, payload, session, fetchImpl: this.fetchImpl, ...(requestId ? { requestId } : {}),
     });
-    try {
-      return await once(this.auth.session());
-    } catch (e) {
-      if (!(e instanceof ApiError) || (e.code !== 'AUTH_EXPIRED' && e.code !== 'AUTH_REQUIRED')) throw e;
-      return once(await this.auth.refresh());
+    for (let attempt = 0; ; attempt++) {
+      try {
+        try {
+          return await once(this.auth.session());
+        } catch (e) {
+          if (!(e instanceof ApiError) || (e.code !== 'AUTH_EXPIRED' && e.code !== 'AUTH_REQUIRED')) throw e;
+          return await once(await this.auth.refresh());
+        }
+      } catch (e) {
+        // Запросы мимо очереди (новый срок, шаблон, «Месяц», ссылка, PDF, чтения): сервер занят (BUSY) — ещё раз через
+        // 3 и 6 с (+ до 1 с случайно), тем же requestId — сервер не задвоит (краш-тест «Качества» 17.10, сервер).
+        if (!(e instanceof ApiError) || e.code !== 'BUSY' || attempt >= busyRetries) throw e;
+        await pause.sleep((attempt === 0 ? 3000 : 6000) + Math.random() * 1000);
+      }
     }
   }
 
@@ -333,6 +345,7 @@ export class LiveApi implements CabinetApi {
       const code: ErrorCode = SITE_CODES.has(e.code) ? e.code as ErrorCode : 'SERVER';
       const res: WriteResult = { ok: false, code, message: e.message };
       if (e.retryAt) res.retryAt = e.retryAt;
+      if (e.retryable) res.retryable = true;
       if (e.current && typeof e.current === 'object') {
         res.current = 'kind' in e.current ? normClient(e.current) : e.current as Deadline | Payment | Question | InboxItem | Task;
       }
@@ -375,7 +388,7 @@ export class LiveApi implements CabinetApi {
     const deadline: Record<string, unknown> = { id: requestId, clientId: d.clientId, obligation: d.obligation, due: d.due, periodicity: d.periodicity };
     if (d.note) deadline.note = d.note;
     try {
-      const env = await this.rpc<{ deadline: unknown }>('deadlines.create', { deadline }, requestId);
+      const env = await this.rpc<{ deadline: unknown }>('deadlines.create', { deadline }, requestId, 2);
       return { ok: true, deadline: normRecord('deadline', env.data.deadline) as Deadline };
     } catch (e) {
       const code = e instanceof ApiError && SITE_CODES.has(e.code) ? e.code as ErrorCode : null;
@@ -396,7 +409,7 @@ export class LiveApi implements CabinetApi {
 
   async previewTemplate(clientId: string, template?: DeadlineTemplate) {
     try {
-      const env = await this.rpc<{ template?: unknown; wouldAdd?: unknown[]; skipped?: unknown[] }>('deadlines.applyTemplate', { clientId, ...(template ? { template } : {}), dryRun: true });
+      const env = await this.rpc<{ template?: unknown; wouldAdd?: unknown[]; skipped?: unknown[] }>('deadlines.applyTemplate', { clientId, ...(template ? { template } : {}), dryRun: true }, undefined, 2);
       const d = env.data;
       return {
         template: text(d.template) as DeadlineTemplate,
@@ -410,7 +423,7 @@ export class LiveApi implements CabinetApi {
 
   async applyTemplate(clientId: string, template: DeadlineTemplate | undefined, requestId: string): Promise<ApplyTemplateResult> {
     try {
-      const env = await this.rpc<{ template?: unknown; added?: unknown[]; skipped?: unknown[] }>('deadlines.applyTemplate', { clientId, ...(template ? { template } : {}) }, requestId);
+      const env = await this.rpc<{ template?: unknown; added?: unknown[]; skipped?: unknown[] }>('deadlines.applyTemplate', { clientId, ...(template ? { template } : {}) }, requestId, 2);
       const d = env.data;
       return { ok: true, template: text(d.template) as DeadlineTemplate, added: (d.added ?? []).map((x) => normRecord('deadline', x) as Deadline), skipped: (d.skipped ?? []).map(text) };
     } catch (e) {
@@ -419,13 +432,13 @@ export class LiveApi implements CabinetApi {
   }
 
   async clientBotLink(clientId: string): Promise<BotLinkResult> {
-    const env = await this.rpc<{ connected?: unknown; link?: unknown; expiresAt?: unknown }>('clients.botLink', { clientId });
+    const env = await this.rpc<{ connected?: unknown; link?: unknown; expiresAt?: unknown }>('clients.botLink', { clientId }, undefined, 2);
     const d = env.data;
     return { connected: d.connected === true, link: text(d.link) || null, expiresAt: text(d.expiresAt) || null };
   }
 
   async statementPdf(clientId: string): Promise<StatementPdf> {
-    const env = await this.rpc<{ url?: unknown; fileName?: unknown }>('clients.statementPdf', { clientId });
+    const env = await this.rpc<{ url?: unknown; fileName?: unknown }>('clients.statementPdf', { clientId }, undefined, 2);
     const url = text(env.data.url);
     if (!/^https:\/\//.test(url)) throw new ApiError({ code: 'SERVER', message: 'Таблица не дала ссылку на выписку — попробуйте ещё раз' });
     return { url, fileName: text(env.data.fileName) };
@@ -457,7 +470,7 @@ export class LiveApi implements CabinetApi {
   }
 
   async listArchive(clientId: string, offset = 0, limit = 50): Promise<ArchivePage> {
-    const env = await this.rpc<{ items?: unknown[]; total?: unknown; more?: unknown }>('deadlines.listArchive', { clientId, offset, limit });
+    const env = await this.rpc<{ items?: unknown[]; total?: unknown; more?: unknown }>('deadlines.listArchive', { clientId, offset, limit }, undefined, 2);
     const per = (x: unknown): Deadline['periodicity'] => (x === 'month' || x === 'quarter' || x === 'year' ? x : 'once');
     const st = (x: unknown): ArchivedDeadline['status'] => (x === 'inProgress' || x === 'waiting' || x === 'postponed' || x === 'new' || x === 'archived' ? x : 'done');
     const items = (env.data.items ?? []).map((x) => {
@@ -469,7 +482,7 @@ export class LiveApi implements CabinetApi {
   }
 
   async attention(limit = 10): Promise<AttentionItem[]> {
-    const env = await this.rpc<{ items?: unknown[] }>('reports.attention', { limit });
+    const env = await this.rpc<{ items?: unknown[] }>('reports.attention', { limit }, undefined, 2);
     return (env.data.items ?? []).map((x) => {
       const r = x as Record<string, unknown>;
       const level = r.level === 'high' || r.level === 'mid' ? r.level : 'low';
@@ -487,12 +500,12 @@ export class LiveApi implements CabinetApi {
   }
 
   async monthGet(): Promise<MonthSheet> {
-    const env = await this.rpc<{ period?: unknown; items?: unknown[] }>('month.get', {});
+    const env = await this.rpc<{ period?: unknown; items?: unknown[] }>('month.get', {}, undefined, 2);
     return { period: text(env.data.period) || null, items: (env.data.items ?? []).map((x) => this.monthItem(x)) };
   }
 
   async monthSet(clientId: string, item: MonthCheck, done: boolean): Promise<MonthItem> {
-    const env = await this.rpc<{ item?: unknown }>('month.set', { clientId, item, done });
+    const env = await this.rpc<{ item?: unknown }>('month.set', { clientId, item, done }, undefined, 2);
     return this.monthItem(env.data.item);
   }
 
@@ -500,7 +513,7 @@ export class LiveApi implements CabinetApi {
    *  через 2 мин действие уже бессмысленно, а ответ нужен сразу. */
   async cancelNotify(deadlineId: string, requestId: string): Promise<CancelNotifyResult> {
     try {
-      const env = await this.rpc<{ cancelled?: unknown }>('deadlines.cancelNotify', { id: deadlineId }, requestId);
+      const env = await this.rpc<{ cancelled?: unknown }>('deadlines.cancelNotify', { id: deadlineId }, requestId, 2);
       return env.data.cancelled === true ? { status: 'cancelled' } : { status: 'nothing' };
     } catch (e) {
       if (e instanceof ApiError && e.code === 'CONFLICT') {
@@ -523,7 +536,7 @@ export class LiveApi implements CabinetApi {
 
   /** Карточка целиком: чтение, без requestId. Пустые клетки нормализуются, как в снимке. */
   async clientCard(id: string): Promise<ClientCard> {
-    const env = await this.rpc<{ client: unknown; deadlines?: unknown[]; payments?: unknown[]; tasks?: unknown[]; history?: unknown[]; consultations?: unknown[] }>('clients.get', { id });
+    const env = await this.rpc<{ client: unknown; deadlines?: unknown[]; payments?: unknown[]; tasks?: unknown[]; history?: unknown[]; consultations?: unknown[] }>('clients.get', { id }, undefined, 2);
     const d = env.data;
     return {
       client: normClient(d.client),
