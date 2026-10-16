@@ -24,6 +24,7 @@ import { shortName } from '../ui/names';
 import { useUi } from '../app/ui-context';
 import { HOLD_MS } from '../data/store';
 import { useToast } from '../ui/toast';
+import { telegramLink } from '../lib/contact';
 
 /** accept — главная кнопка, как в боте: у платежа — «Записать», у остальных сервер ставит задачу своего вида. */
 export const INBOX_TYPE: Record<InboxType, { label: string; icon: IconName; accept: string }> = {
@@ -181,6 +182,10 @@ function Bubble({ it, i }: { it: InboxItem; i: number }) {
 
 function Dialog({ chat, visible }: { chat: Thread; visible: boolean }) {
   const ui = useUi();
+  const store = useStore();
+  // Ответить клиенту с сайта нельзя, пока сервер не дал inbox.reply — открываем его чат в Telegram по телефону из карточки
+  // (находка «Пользователя» № 22). Телефона нет — просто Telegram.
+  const tg = telegramLink(chat.clientId ? store.client(chat.clientId)?.phone : null);
   const feed = useRef<HTMLOListElement>(null);
   // Открыт и виден — прочитан до последнего сообщения (счётчик в списке гаснет), как в Telegram.
   useEffect(() => { if (visible) markRead(chat.key, chat.last.at); }, [visible, chat.key, chat.last.at]);
@@ -208,6 +213,9 @@ function Dialog({ chat, visible }: { chat: Thread; visible: boolean }) {
             : <strong className="dialog__name">{chat.name}</strong>}
           <span className="sub">{chat.open ? `ждут решения: ${chat.open}` : 'всё решено'}{chat.clientId ? '' : ' · номера нет в таблице'}</span>
         </div>
+        <a className="btn btn--secondary btn--sm dialog__tg" href={tg ?? 'https://web.telegram.org/'} target="_blank" rel="noopener noreferrer"
+          title={tg ? 'Откроет чат с клиентом в Telegram по телефону из карточки' : 'Телефона клиента нет в таблице — откроется Telegram'}>
+          <Icon name="reply" size={16} />{tg ? 'Ответить в Telegram' : 'Открыть Telegram'}</a>
       </header>
       <ol ref={feed} className="feed" key={chat.key}>
         {days.map((g) => (
@@ -250,7 +258,9 @@ export function Inbox() {
     <div className="page">
       <header className="page__head">
         <div>
-          <h1 className="page__title">Входящие <em>{fresh ? `${fresh} новых` : 'новых нет'}</em></h1>
+          {/* Одно число везде — «ждут решения» (статус «новое»): в меню, в заголовке и у чата (находка № 20).
+              Непрочитанное видно по жирному имени чата, отдельным числом не считается. */}
+          <h1 className="page__title">Входящие <em>{fresh ? `ждут решения: ${fresh}` : 'всё решено'}</em></h1>
           <p className="page__sub">Сообщения клиентов из Telegram. Решите здесь — в таблице появится само; решили в Telegram — здесь отметится.</p>
         </div>
       </header>
@@ -265,7 +275,7 @@ export function Inbox() {
                     <span className="chat__top"><strong className="chat__name">{c.clientId ? shortName(c.name) : c.name}</strong><span className="chat__time num">{listTime(c.last.at)}</span></span>
                     <span className="chat__bottom">
                       <span className="chat__snippet">{c.last.file && <Icon name="attach" size={14} />}{voiceText(c.last) !== null ? <><Icon name="mic" size={14} />{voiceText(c.last) || 'Голосовое'}</> : c.last.snippet}</span>
-                      {c.unread > 0 && <span className="chat__badge num" aria-label={`новых: ${c.unread}`}>{c.unread}</span>}
+                      {c.open > 0 && <span className="chat__badge num" title="Ждут решения" aria-label={`ждут решения: ${c.open}`}>{c.open}</span>}
                     </span>
                   </a>
                 </li>

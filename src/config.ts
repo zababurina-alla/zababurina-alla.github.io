@@ -5,8 +5,8 @@
 
 /** Разделы, запись в которых можно включать по одному (сервер готовит их по очереди). */
 // remind — напоминания клиентам (clients.remind): отдельно от сроков, включается своим «да» (координатор 15.10).
-export type WriteArea = 'payments' | 'tasks' | 'questions' | 'deadlines' | 'clients' | 'inbox' | 'remind';
-export const WRITE_AREAS: readonly WriteArea[] = ['payments', 'tasks', 'questions', 'deadlines', 'clients', 'inbox', 'remind'];
+export type WriteArea = 'payments' | 'tasks' | 'questions' | 'deadlines' | 'clients' | 'inbox' | 'remind' | 'consultations';
+export const WRITE_AREAS: readonly WriteArea[] = ['payments', 'tasks', 'questions', 'deadlines', 'clients', 'inbox', 'remind', 'consultations'];
 
 /** Возможности, которые включаются, когда их готов отдавать сервер. На выдуманных данных — все. */
 /** remindPreview — сервер умеет clients.remind { preview:true } (пробный, без отправки). Без флага не зовём:
@@ -104,8 +104,9 @@ export const BOT_URL = 'https://t.me/za_control_bot';
 /** Где это делать, пока раздел на сайте только для просмотра. */
 export const AREA_PLACE: Record<WriteArea, 'table' | 'telegram'> = {
   payments: 'table', tasks: 'table', questions: 'telegram', deadlines: 'table', clients: 'table', inbox: 'telegram', remind: 'telegram',
+  consultations: 'telegram',
 };
 
 export const AREA_LABEL: Record<WriteArea, string> = {
-  payments: 'платежи', tasks: 'задачи', questions: 'ответы на вопросы', deadlines: 'сроки', clients: 'клиенты', inbox: 'входящие', remind: 'напоминания клиентам',
+  payments: 'платежи', tasks: 'задачи', questions: 'ответы на вопросы', deadlines: 'сроки', clients: 'клиенты', inbox: 'входящие', remind: 'напоминания клиентам', consultations: 'консультации',
 };

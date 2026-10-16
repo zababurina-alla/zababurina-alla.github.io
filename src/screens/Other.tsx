@@ -189,6 +189,22 @@ export function Tasks() {
     if (!canWrite('tasks')) { toast({ text: roMessage('tasks'), tone: 'info' }); return; }
     setEditing(t.id);
   };
+  // «Сделано» пачкой (меню таблицы «Выделенное → Готово»): выбрать несколько открытых и отметить разом.
+  const [selecting, setSelecting] = useState(false);
+  const [chosen, setChosen] = useState<ReadonlySet<string>>(new Set());
+  const choose = (id: string) => setChosen((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const stopSelecting = () => { setSelecting(false); setChosen(new Set()); };
+  const doneMany = () => {
+    const ids = open.filter((t) => chosen.has(t.id)).map((t) => t.id);
+    if (!ids.length) return;
+    play('done');
+    for (const id of ids) store.toggleTask(id, true);
+    if (canWrite('tasks')) {
+      toast({ text: `Сделано: ${ids.length} ${plural(ids.length, 'задача', 'задачи', 'задач')}`,
+        action: { label: 'Отменить', run: () => { for (const id of ids) store.toggleTask(id, false); } } });
+    }
+    stopSelecting();
+  };
   const [showDone, setShowDone] = useState(false); // «Сделано» свёрнуто: их десятки (находка «Пользователя» № 29)
   // В снимке — все задачи листа: сделанных бывают сотни, на экране — 20 последних, остальное в таблице.
   const done = store.tasks.filter((t) => t.done);
@@ -235,6 +251,18 @@ export function Tasks() {
         )}
       </form>
       <section className="panel" aria-label="Список задач">
+        {open.length > 1 && (
+          <div className="tasks__select" role="group" aria-label="Несколько задач">
+            {selecting ? (
+              <>
+                <span className="sub" role="status">Отмечено: {chosen.size}</span>
+                <button type="button" className="btn btn--primary btn--sm" disabled={!chosen.size} onClick={doneMany} {...roAttrs('tasks')}>
+                  <Icon name="checkAll" size={16} />Сделано{chosen.size ? `: ${chosen.size}` : ''}</button>
+                <button type="button" className="btn btn--ghost btn--sm" onClick={stopSelecting}>Отмена</button>
+              </>
+            ) : <button type="button" className="link" onClick={() => setSelecting(true)}>Выбрать несколько</button>}
+          </div>
+        )}
         {store.tasks.length === 0 && <Empty pic="tasks" title="Задач пока нет">Напишите первую строкой выше.</Empty>}
         {groups.filter(([, xs]) => xs.length).map(([title, xs]) => (
           <div key={title} className={`dgroup${title === 'Просрочено' ? ' dgroup--overdue' : ''}${title === 'Сегодня' ? ' dgroup--today' : ''}`}>
@@ -249,8 +277,10 @@ export function Tasks() {
                 const st = t.due ? statusByDays(daysBetween(TODAY, t.due)) : null;
                 return (
                   <li key={t.id} className={`tasks__row${t.done ? ' is-done' : ''}${store.fresh.includes(t.id) ? ' is-fresh' : ''}`}>
-                    <button type="button" className="check-btn tasks__check" aria-pressed={t.done} aria-label={`Сделано: ${t.text}`}
-                      onClick={() => { if (!t.done) play('done'); store.toggleTask(t.id, !t.done); }}>
+                    <button type="button" className={`check-btn tasks__check${selecting && !t.done ? ' is-choosing' : ''}`}
+                      aria-pressed={selecting && !t.done ? chosen.has(t.id) : t.done}
+                      aria-label={selecting && !t.done ? `Выбрать: ${t.text}` : `Сделано: ${t.text}`}
+                      onClick={() => { if (selecting && !t.done) { choose(t.id); play('tick'); return; } if (!t.done) play('done'); store.toggleTask(t.id, !t.done); }}>
                       <span className="check-btn__ring" aria-hidden="true"><Icon name="check" size={16} /></span>
                     </button>
                     <span className="tasks__text">

@@ -18,12 +18,12 @@ describe('config.json', () => {
     expect(isLive()).toBe(true);
     expect([canWrite('payments'), canWrite('tasks'), canWrite('deadlines'), canWrite('questions'), canWrite('clients')]).toEqual([true, true, false, false, false]);
     // remind — свой раздел: включённые сроки его не включают (координатор 15.10)
-    expect(readOnlyAreas()).toEqual(['questions', 'deadlines', 'clients', 'remind']);
+    expect(readOnlyAreas()).toEqual(['questions', 'deadlines', 'clients', 'remind', 'consultations']);
   });
 
   it('writes: [] — только просмотр во всех разделах; нет writes — запись везде', async () => {
     await loadRuntimeConfig(fetchJson({ apiUrl: 'https://x/exec', writes: [] }));
-    expect(readOnlyAreas()).toHaveLength(6);
+    expect(readOnlyAreas()).toHaveLength(7);
     await loadRuntimeConfig(fetchJson({ apiUrl: 'https://x/exec' }));
     expect(readOnlyAreas()).toEqual([]);
   });

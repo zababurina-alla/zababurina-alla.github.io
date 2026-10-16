@@ -1,4 +1,4 @@
-// Карточка клиента — выезжает справа (на телефоне — во весь экран). Вкладки: обзор, сроки, платежи, история.
+// Карточка клиента — выезжает справа (на телефоне — во весь экран). Вкладки: обзор, сроки, платежи, консультации, история.
 import { useEffect, useRef, useState } from 'react';
 import { RemindDialog } from './RemindDialog';
 import { roAttrs } from '../ui/readonly';
@@ -23,8 +23,12 @@ import { TableText } from '../ui/TableText';
 import { QuestionAnswer } from './Questions';
 import { DeadlineTable } from './DeadlineTable';
 import { useRoute } from '../router';
+import { ConsultationsTab } from './Consultations';
+import { TASK_TEMPLATES } from '../lib/taskTemplates';
+import { addDays } from '../lib/dates';
+import { useToast } from '../ui/toast';
 
-type Tab = 'overview' | 'deadlines' | 'payments' | 'history';
+type Tab = 'overview' | 'deadlines' | 'payments' | 'consultations' | 'history';
 
 // Пароль показывается 30 с и исчезает; не хранится ни в памяти страницы дольше показа, ни в черновиках (бриф, 6б).
 const PASSWORD_SHOW_MS = 30_000;
@@ -131,6 +135,7 @@ function PhoneField({ clientId, phone, version }: { clientId: string; phone: str
 export function ClientPanel({ id, onClose }: { id: string | null; onClose: () => void }) {
   const store = useStore();
   const ui = useUi();
+  const toast = useToast();
   const [tab, setTab] = useState<Tab>('overview');
   // Сменили экран (нижнее меню, ссылка) — карточка закрывается, а не висит поверх другого раздела (находка № 26).
   const route = useRoute();
@@ -201,6 +206,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
             { id: 'overview', label: 'Обзор' },
             { id: 'deadlines', label: 'Сроки', count: own.length },
             { id: 'payments', label: 'Платежи', count: pays.length },
+            { id: 'consultations', label: 'Консультации', count: store.consultations.filter((k) => k.clientId === c.id).length },
             { id: 'history', label: 'История' },
           ]} />
 
@@ -222,9 +228,19 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                     ))}
                   </section>
                 )}
-                {tasks.length > 0 && (
-                  <section className="cp__block">
-                    <h3 className="cp__h">Задачи по клиенту</h3>
+                <section className="cp__block">
+                  <h3 className="cp__h">Задачи по клиенту</h3>
+                  {/* Шаблоны задач — как меню таблицы «✨ Шаблоны задач»: одно нажатие, срок и важность — как там. */}
+                  <div className="cp__tpl" role="group" aria-label="Быстрая задача по клиенту">
+                    {TASK_TEMPLATES.map((t) => (
+                      <button key={t.key} type="button" className="btn btn--ghost btn--sm" title={`${t.text} — до ${fmtDate(addDays(TODAY, t.daysAhead))}`}
+                        {...roAttrs('tasks')} onClick={() => {
+                          store.addTask({ clientId: c.id, text: t.text, due: addDays(TODAY, t.daysAhead), type: t.type, priority: t.priority });
+                          if (canWrite('tasks')) toast({ text: `Задача «${t.label}» — до ${fmtDate(addDays(TODAY, t.daysAhead))}` });
+                        }}><Icon name="plus" size={14} />{t.label}</button>
+                    ))}
+                  </div>
+                  {tasks.length > 0 && (
                     <ul className="tasks cp__tasks">
                       {tasks.map((t) => (
                         <li key={t.id} className="tasks__row">
@@ -237,8 +253,8 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                         </li>
                       ))}
                     </ul>
-                  </section>
-                )}
+                  )}
+                </section>
                 <section className="cp__block">
                   <h3 className="cp__h">Начисления</h3>
                   {c.monthly.length ? (
@@ -291,6 +307,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                 <li key={p.id} className="plist__row"><span><strong className="display"><Money text={formatPayMoney(p.kopecks)} /></strong><span className="sub">{p.period}, {METHOD_LABEL[p.method]}</span></span><span className="num sub">{p.date ? fmtDate(p.date) : <span className="nil">без даты</span>}</span></li>
               ))}</ul>
             ) : <Empty pic="wallet" title="Платежей пока нет" />)}
+            {tab === 'consultations' && <ConsultationsTab clientId={c.id} />}
             {tab === 'history' && !cardNow && (
               <div className="cp__loading" role="status" aria-label="Загружаем историю из таблицы">
                 <p className="sk-note"><Icon name="saving" />Загружаем историю из таблицы…</p>

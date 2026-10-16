@@ -2,9 +2,9 @@
 // — запись подтверждается с задержкой; — автоцикл создаёт следующий период; — проверка «период закончился»;
 // — версии записей и ошибка CONFLICT; — журнал изменений с курсором; — повтор того же requestId не создаёт дубль.
 // Рычаги отладки (обрыв связи, отказ, правка извне) — для кнопок в режиме отладки.
-import { ACTIVITY, CLIENTS, DEADLINES, INBOX, KVEDS, PAYMENTS, QUESTIONS, RATES, TASKS } from './fake';
+import { ACTIVITY, CLIENTS, CONSULTATIONS, DEADLINES, INBOX, KVEDS, PAYMENTS, QUESTIONS, RATES, TASKS } from './fake';
 import type { CabinetApi, CancelNotifyResult, Change, ClientCard, Entity, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
-import type { Activity, Client, Deadline, InboxItem, KvedItem, Payment, Question, Rates, Task } from './types';
+import type { Activity, Client, Consultation, Deadline, InboxItem, KvedItem, Payment, Question, Rates, Task } from './types';
 import { fold } from '../lib/search';
 import { TODAY, addDays, endOfMonth, fmtDate, fmtDue } from '../lib/dates';
 import { formatPayMoney } from '../lib/money';
@@ -48,6 +48,7 @@ class FakeServer implements CabinetApi {
   private activity: Activity[] = ACTIVITY.map((a) => ({ ...a }));
   private tasks = new Map<string, Task>(TASKS.map((t) => [t.id, { ...t }]));
   private inbox = new Map<string, InboxItem>(INBOX.map((i) => [i.id, { ...i }]));
+  private consultations = new Map<string, Consultation>(CONSULTATIONS.map((k) => [k.id, { ...k }]));
   private questions = new Map<string, Question>(QUESTIONS.map((q) => [q.id, { ...q, options: [...q.options] }]));
   private log: Change[] = [];
   private cursor = 100;
@@ -88,6 +89,7 @@ class FakeServer implements CabinetApi {
       tasks: [...this.tasks.values()].map((t) => ({ ...t })),
       questions: [...this.questions.values()].filter((q) => q.answer === null).map((q) => ({ ...q, options: [...q.options] })),
       inbox: [...this.inbox.values()].map((i) => ({ ...i })),
+      consultations: [...this.consultations.values()].map((k) => ({ ...k })),
       cursor: this.cursor,
     };
   }
@@ -207,6 +209,16 @@ class FakeServer implements CabinetApi {
         const t = { ...op.task, version: 1 };
         this.tasks.set(t.id, t);
         return { ok: true, changes: [this.record('task', 'upsert', t.id, o, t)], cursor: this.cursor };
+      }
+      case 'createConsultation': {
+        // Как consultations.create (v5.87): тема 1–300, минуты — целое 1–1440, заметка до 1000; id = requestId.
+        const k = op.consultation;
+        if (!this.clients.has(k.clientId)) return { ok: false, code: 'VALIDATION', message: 'Клиента нет в таблице' };
+        if (!k.topic.trim() || k.topic.length > 300) return { ok: false, code: 'VALIDATION', message: 'Тема — от 1 до 300 знаков' };
+        if (k.minutes !== null && (!Number.isInteger(k.minutes) || k.minutes < 1 || k.minutes > 1440)) return { ok: false, code: 'VALIDATION', message: 'Минуты — целое число от 1 до 1440' };
+        const rec: Consultation = { ...k, id: o, version: 1, at: now() };
+        this.consultations.set(rec.id, rec);
+        return { ok: true, changes: [this.record('consultation', 'upsert', rec.id, o, rec)], cursor: this.cursor };
       }
       case 'decideInbox': {
         // Как будет на сервере (inbox.decide): принять платёж — запись в «💰 Платежи»; задача — в «🧩 Задачи».
@@ -370,6 +382,7 @@ class FakeServer implements CabinetApi {
       tasks: [...this.tasks.values()].filter((t) => t.clientId === id).map((t) => ({ ...t })),
       // На сервере история — строки журнала с clientId; здесь — по фамилии в ленте выдуманных событий.
       history: this.activity.filter((a) => a.text.includes(surname)).map((a) => ({ ...a })),
+      consultations: [...this.consultations.values()].filter((k) => k.clientId === id).map((k) => ({ ...k })),
     };
   }
 

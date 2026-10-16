@@ -20,6 +20,11 @@ export interface Client {
   marks: ClientMark[];
   employer: boolean;
   kved: { code: string; title: string }[];
+  /** Главный КВЕД — по нему считается ЄП («⭐ Расчёт ЄП по: 56.10 (max ставка)» в карточке таблицы). null — не указан;
+   *  нет поля — сервер ещё не отдаёт. Порядок kved[] главным не считается. */
+  kvedMain?: string | null;
+  /** Пометка к главному из той же клетки, например «max ставка». */
+  kvedMainNote?: string | null;
   phone: string;
   /** [п. 17] Колонка F: банк / АЦСК, где выпущен ключ ЭЦП (одно поле вместо «банк» + «кем выдан»). */
   keyIssuer: string;
@@ -139,6 +144,19 @@ export interface InboxItem {
   decidedAt?: string | null;
   /** Когда мама ответила клиенту в Telegram (текст ответа сайту не нужен). Нет — неизвестно. */
   repliedAt?: string | null;
+}
+
+/** Лист «📞 Консультации» (API v5.87): разговор с клиентом — тема, сколько минут, заметка. */
+export interface Consultation {
+  id: string;
+  version: number;
+  clientId: string;
+  /** ISO; null — дата в таблице пустая. */
+  at: string | null;
+  topic: string;
+  /** Целое 1–1440; null — не указано. */
+  minutes: number | null;
+  note: string;
 }
 
 export interface Activity {
