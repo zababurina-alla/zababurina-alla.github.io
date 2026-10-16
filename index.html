@@ -2,6 +2,7 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; font-src 'self'; img-src 'self' data:; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://accounts.google.com/gsi/; frame-src https://accounts.google.com/gsi/; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex, nofollow" />
     <title>Бухгалтерия</title>
@@ -19,23 +20,14 @@
     <link rel="apple-touch-startup-image" href="./icons/splash-1179x2556.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
     <link rel="apple-touch-startup-image" href="./icons/splash-1170x2532.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
     <link rel="apple-touch-startup-image" href="./icons/splash-750x1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
-    <script>
-      // Тема до первой отрисовки, чтобы не мигало: выбор пользователя → настройка системы. ?theme= — для скриншотов.
-      (function () {
-        var t = new URLSearchParams(location.search).get('theme');
-        try { t = t || localStorage.getItem('sverka.theme'); } catch (e) {}
-        if (t !== 'dark' && t !== 'light') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        document.documentElement.dataset.theme = t;
-        // Цвет полосы браузера — по теме с первой отрисовки (п. 60; дальше его меняет lib/theme.ts). = META_COLOR.
-        document.querySelector('meta[name="theme-color"]').setAttribute('content', t === 'dark' ? '#07090C' : '#ECEEF1');
-      })();
-    </script>
-    <script type="module" crossorigin src="./assets/main-BPZfIGDb.js"></script>
+    <!-- Тема до первой отрисовки (public/theme-boot.js): отдельный файл — строгая CSP запрещает встроенные скрипты -->
+    <script src="./theme-boot.js"></script>
+    <script type="module" crossorigin src="./assets/main-voZNK3wv.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/jsx-runtime-BzCT6vt3.js">
     <link rel="stylesheet" crossorigin href="./assets/jsx-runtime-CNlpvGWA.css">
-    <link rel="stylesheet" crossorigin href="./assets/main-Bw-FlLmK.css">
+    <link rel="stylesheet" crossorigin href="./assets/main-CEe9-tzZ.css">
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"></div>
   </body>
 </html>
