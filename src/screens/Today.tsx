@@ -170,7 +170,7 @@ export function Today() {
   const tail: Record<string, ReactNode> = {
     tasks: todayTasks.length > 0 && (
       <section data-tail="tasks" className="panel reveal" aria-labelledby="t-tasks">
-        <header className="panel__head"><h2 id="t-tasks" className="panel__title">{tasksTitle}<span className="sub num">{tasksN}</span></h2><a className="link" href="#/tasks">Все задачи</a></header>
+        <header className="panel__head"><h2 id="t-tasks" className="panel__title">{tasksTitle}<span className="sub num">{tasksLate ? tasksN : todayTasks.length}</span></h2><a className="link" href="#/tasks">Все задачи</a></header>
         <ul className="tasks">
           {todayTasks.slice(0, 6).map((t) => {
             const c = t.clientId ? store.client(t.clientId) : undefined;

@@ -5,7 +5,8 @@
 //   колесо     — блоки с прокруткой, которые не крутятся колесом мыши;
 //   подписи    — кнопки, фишки, метки, заголовки колонок, у которых текст перенёсся или обрезан без многоточия.
 // Печать (--print): экраны на листе A4 — обрезанные подписи, пустая ширина справа в % (по строкам таблиц), листов.
-// Запуск: node scripts/layout-audit.mjs [адрес] [--json путь] [--only сегодня,клиенты] [--strict] [--print]
+// Отдельно (--checks): лента чата крутится колесом (1280, 1024); два уведомления подряд — кнопки обоих нажимаются.
+// Запуск: node scripts/layout-audit.mjs [адрес] [--json путь] [--only сегодня,клиенты] [--strict] [--print | --checks]
 //   адрес — по умолчанию учебный режим локального сайта http://localhost:5183/ (?demo=1 добавляется сам).
 //   --strict — код выхода 1, если хоть одно число больше нуля (для проверок перед сдачей).
 import { writeFileSync } from 'node:fs';
@@ -18,6 +19,7 @@ const ONLY = flag('--only')?.split(',');
 const JSON_OUT = flag('--json');
 const STRICT = args.includes('--strict');
 const PRINT = args.includes('--print');
+const CHECKS = args.includes('--checks');
 
 // Экраны, которые печатают (или могут): A4, поля 14 × 12 мм — как в print.css
 const PRINT_SCREENS = [
@@ -38,7 +40,7 @@ function measurePrint() {
   const label = (el) => (typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : el.tagName.toLowerCase()) + ' «' + (el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 30) + '»';
   const clippedList = [];
   for (const el of document.querySelectorAll('body *')) {
-    if (!visible(el) || el.children.length > 3 || !(el.textContent || '').trim()) continue;
+    if (!visible(el) || el.children.length > 3 || !(el.textContent || '').trim() || el.closest('.visually-hidden')) continue;
     const cs = getComputedStyle(el);
     if (cs.overflowX === 'visible' && cs.textOverflow !== 'ellipsis') continue;
     if (el.scrollWidth > el.clientWidth + 1) clippedList.push(`${label(el)} — ${cs.textOverflow === 'ellipsis' ? 'многоточие' : 'обрезано'}`);
@@ -57,6 +59,81 @@ function measurePrint() {
   rights.sort((a, b) => a - b);
   const median = rights.length ? rights[Math.floor(rights.length / 2)] : W;
   return { clipped: clippedList.length, clippedList: clippedList.slice(0, 12), emptyPct: Math.max(0, Math.round((1 - median / W) * 100)), rows: rights.length };
+}
+
+// Отдельные проверки (--checks): лента чата «Входящих» крутится колесом (1280 и 1024); два уведомления подряд —
+// у обоих кнопки нажимаются (центр кнопки не закрыт другим уведомлением), перекрытий нет (1280).
+if (CHECKS) {
+  const browser = await chromium.launch();
+  const lines = [];
+  const open = async (page, hash) => {
+    await page.goto('about:blank');
+    await page.goto(`${BASE}${BASE.includes('?') ? '&' : '?'}demo=1&theme=light`, { waitUntil: 'load' });
+    await page.waitForTimeout(1800);
+    await page.evaluate((h) => { location.hash = h; }, hash);
+    await page.waitForTimeout(1200);
+  };
+  try {
+    // ── Лента чата: каждый чат по очереди; прокручиваемая лента — крутим колесом над её серединой ──
+    for (const w of [1280, 1024]) {
+      const ctx = await browser.newContext({ viewport: { width: w, height: 640 } });
+      const page = await ctx.newPage();
+      await open(page, '#/inbox');
+      const n = await page.locator('.chats__list .chat').count();
+      let scrollable = 0, stuck = 0;
+      for (let i = 0; i < n; i++) {
+        await page.locator('.chats__list .chat').nth(i).click();
+        await page.waitForTimeout(1200); // лента открывается плавной прокруткой к новым — дождаться, пока доедет
+        const feed = page.locator('.dfeed').first();
+        if (!(await feed.count())) continue;
+        const can = await feed.evaluate((e) => e.scrollHeight > e.clientHeight + 4);
+        if (!can) continue;
+        scrollable++;
+        // Лента открывается внизу (новые сообщения) — крутим вверх, к старым; уже вверху — вниз
+        const top0 = await feed.evaluate((e) => e.scrollTop);
+        const b = await feed.boundingBox();
+        if (!b) continue;
+        await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+        await page.mouse.wheel(0, top0 > 0 ? -300 : 300);
+        await page.waitForTimeout(400);
+        if (Math.abs((await feed.evaluate((e) => e.scrollTop)) - top0) < 1) stuck++;
+      }
+      lines.push(`лента чата ${w}: чатов ${n}, с прокруткой ${scrollable}, не крутится колесом ${stuck}`);
+      await ctx.close();
+    }
+    // ── Два уведомления подряд: закрыть два срока (между нажатиями — дольше защиты от двойного нажатия 1,2 с) ──
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 } });
+    const page = await ctx.newPage();
+    // Сценарий приёмки С-1: закрыть срок и сразу ответить на вопрос — два разных уведомления
+    await open(page, '#/today');
+    await page.locator('.dtable__row .check-btn').first().click();
+    await page.waitForTimeout(1500);
+    await page.locator('.panel--wheat button', { hasText: /^Да$/ }).first().click();
+    await page.waitForTimeout(900);
+    const t = await page.evaluate(() => {
+      const toasts = [...document.querySelectorAll('.toasts > .toast:not(.is-leaving)')];
+      let buttons = 0, blocked = 0, overlaps = 0;
+      for (const toast of toasts) for (const btn of toast.querySelectorAll('button')) {
+        const r = btn.getBoundingClientRect();
+        if (!r.width) continue;
+        buttons++;
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        if (!hit || !btn.contains(hit)) blocked++;
+      }
+      const rs = toasts.map((x) => x.getBoundingClientRect());
+      for (let a = 0; a < rs.length; a++) for (let b = a + 1; b < rs.length; b++) {
+        const p = rs[a], q = rs[b];
+        if (p.left < q.right - 1 && q.left < p.right - 1 && p.top < q.bottom - 1 && q.top < p.bottom - 1) overlaps++;
+      }
+      return { toasts: toasts.length, buttons, blocked, overlaps };
+    });
+    lines.push(`уведомления 1280: на экране ${t.toasts}, кнопок ${t.buttons}, закрыто другим ${t.blocked}, перекрытий ${t.overlaps}`);
+    await ctx.close();
+  } finally {
+    await browser.close();
+  }
+  for (const l of lines) console.log(l);
+  process.exit(0);
 }
 
 if (PRINT) {
@@ -225,6 +302,8 @@ function measure(rootSel) {
   for (const box of [root, ...root.querySelectorAll('*')]) {
     const cs = getComputedStyle(box);
     if (!/flex|grid/.test(cs.display) || cs.flexDirection === 'column' || !visible(box)) continue;
+    // Столбики графика разной высоты по смыслу (поступления по дням, нагрузка по неделям)
+    if (box.closest('[role=img], [aria-hidden=true], .wload__weeks')) continue;
     const kids = [...box.children].filter((c) => visible(c) && cardish(c) && getComputedStyle(c).position !== 'absolute');
     if (kids.length < 2) continue;
     // Ряд — соседи, что перекрываются по вертикали; липкая колонка (календарь «Сроков») едет за прокруткой — не в счёт

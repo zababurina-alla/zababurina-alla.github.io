@@ -244,6 +244,11 @@
   pointer-events: none;
 }
 
+/* Столбик: новое — внизу, с полной тенью; прежние — тень тише, чтобы глаз шёл к последнему, а кнопки у всех живые */
+.toasts > .toast:not(:last-child):not(.toast--error) {
+  box-shadow: var(--shadow-2);
+}
+
 .toasts > .toast {
   transform: translateX(var(--dx, 0px));
   transition: transform var(--dur-pop) var(--spring-pop), opacity var(--dur-base) var(--ease-out);

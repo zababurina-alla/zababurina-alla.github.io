@@ -28,6 +28,15 @@
   }
 }
 
+@media (max-width: 479px) {
+  .dgroup__title {
+    gap: var(--space-2);
+    padding-inline: var(--space-4);
+    font-size: var(--text-md);
+    letter-spacing: -0.01em;
+  }
+}
+
 .dgroup__title > span:first-child::first-letter {
   text-transform: uppercase;
 }
@@ -552,7 +561,11 @@
 }
 
 .dl-tools__by {
-  flex: none;
+  flex: 1 0 auto; /* строка инструментов без пустого хвоста справа (автопроверка: 264 px на 1024) */
+}
+
+.dl-tools > .dfilters {
+  flex: 1 1 auto;
 }
 
 /* «Выбрать несколько» — высотой с соседний переключатель «По дням / По виду / По клиенту» (46 px) */

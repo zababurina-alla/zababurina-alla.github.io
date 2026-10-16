@@ -1252,6 +1252,11 @@
 
 /* ═════════ Новые места техники (16.10): оформление ═════════ */
 /* Карточка: быстрые задачи по шаблону — ряд мягких «таблеток» с плюсом */
+/* Фишки в окнах («сегодня / завтра / конец месяца / 20 число») тянутся по строке: перенос без пустого хвоста */
+.modal .field .chips > .chip {
+  flex: 1 1 auto;
+}
+
 .cp__tpl-label {
   margin: 0 0 calc(-1 * var(--space-1));
 }
@@ -1372,6 +1377,15 @@
   .clients__nopay {
     flex: 1 1 100%;
     justify-content: center;
+  }
+
+  .clients__nopay {
+    flex-wrap: wrap;
+  }
+
+  .clients__nopay-label {
+    flex-basis: 100%;
+    min-height: 1.75rem;
   }
 
   .clients__nopay-label > .icon {

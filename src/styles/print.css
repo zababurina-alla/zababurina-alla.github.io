@@ -120,18 +120,18 @@
     text-align: left;
   }
 
-  .dgroup {
+  .dgroups > .dgroup {
     display: table-row-group;
   }
 
-  .dgroup__title {
+  .dgroups .dgroup__title {
     display: table-row;
     position: static;
     background: none;
     break-after: avoid;
   }
 
-  .dgroup__title > .dgroup__name {
+  .dgroups .dgroup__title > .dgroup__name {
     display: table-cell;
     padding: 4mm 0 1mm;
     color: #000000 !important;
@@ -140,24 +140,24 @@
     white-space: nowrap; /* название дня шире колонки клиента — уходит в пустые соседние ячейки строки */
   }
 
-  .dgroup__title > .dgroup__count,
-  .dgroup__name > .icon {
+  .dgroups .dgroup__title > .dgroup__count,
+  .dgroups .dgroup__name > .icon {
     display: none;
   }
 
   /* Строки групп — прямо в группу таблицы; одиночная таблица (карточка клиента) — своя таблица со своей шапкой */
-  .dgroup > .dtable {
+  .dgroups > .dgroup > .dtable {
     display: contents;
   }
 
-  .dtable:not(.dgroup > .dtable) {
+  .dtable:not(.dgroups > .dgroup > .dtable) {
     display: table;
     width: 100%;
     table-layout: fixed;
     border-collapse: collapse;
   }
 
-  .dtable:not(.dgroup > .dtable) > .dtable__head {
+  .dtable:not(.dgroups > .dgroup > .dtable) > .dtable__head {
     display: table-header-group;
   }
 
@@ -303,5 +303,35 @@
 
   .page {
     max-width: none;
+  }
+
+  /* «Месяц» на бумаге: девять колонок во всю ширину листа, без прокрутки вбок */
+  .panel.mcheck {
+    overflow: visible;
+  }
+
+  .mcheck__table {
+    min-width: 0;
+  }
+
+  .mcheck__head,
+  .mcheck__row {
+    grid-template-columns: minmax(0, 1.6fr) repeat(7, minmax(0, 1fr)) 2.75rem;
+    gap: 1mm;
+    padding: 0;
+  }
+
+  .mcheck__head {
+    font-size: 8.5pt;
+    white-space: normal;
+  }
+
+  .mcheck__head > :first-child,
+  .mcheck__who {
+    position: static;
+  }
+
+  .mcheck__box {
+    box-shadow: inset 0 0 0 1px #000000 !important;
   }
 }

@@ -31,6 +31,13 @@
   font-size: var(--text-lg);
 }
 
+/* Телефон: подсказка поиска целиком («Фамилия, КВЕД, телефон…»), а не «Фамилия, КВЕД, теле» */
+@media (max-width: 479px) {
+  .search-input--lg {
+    font-size: var(--text-md);
+  }
+}
+
 .search-input:focus-within {
   box-shadow: inset 0 0 0 2px var(--focus), 0 0 0 4px color-mix(in srgb, var(--focus) 15%, transparent);
 }
@@ -137,7 +144,8 @@
   min-width: 0;
 }
 
-/* Полное имя — до двух строк, без обрезки на полуслове */
+/* Полное имя — до двух строк, без обрезки на полуслове; на телефоне — целиком, в три строки, если нужно
+   (приёмка 16.10, Г-5: «Соловей Тетяна…» — отчество срезано) */
 .ctable__who strong {
   font-weight: var(--weight-semibold);
   line-height: 1.3;
@@ -146,6 +154,13 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   transition: color var(--dur-fast) ease;
+}
+
+@container (max-width: 559px) {
+  .ctable__who strong {
+    display: block;
+    overflow: visible;
+  }
 }
 
 /* Строка клиента: настоящая кнопка с именем, её зона растянута на всю строку */
