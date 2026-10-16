@@ -76,7 +76,8 @@ function loginMessage(e: unknown): string {
   return e.message || 'Не получилось войти — попробуйте ещё раз';
 }
 
-const NONCE_TIMEOUT_MS = 15_000;
+// Холодный старт Apps Script до нашего кода — 13–15 с (живой домен 16.10: 13,8 с; два раза по 15 с не успели), иногда 30+ с.
+const NONCE_TIMEOUT_MS = 22_000;
 const NONCE_TRIES = 3;
 
 export class Auth {
@@ -122,7 +123,7 @@ export class Auth {
 
   /** Взять код входа заранее (session.ts — при открытии страницы без сеанса). Параллельные вызовы сливаются в один.
    *  Код иногда отвечает 30 с и обрывается (холодный старт Apps Script, 16.10: 2 из 5 открытий; следующая попытка — 5 с):
-   *  до 3 попыток по 15 с, «нет связи» — только после третьей. */
+   *  до 3 попыток по 22 с, «нет связи» — только после третьей. */
   prefetchNonce(): Promise<{ nonce: string; at: number }> {
     if (this.fetching) return this.fetching;
     const p = (async () => {
