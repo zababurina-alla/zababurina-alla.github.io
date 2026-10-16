@@ -25,10 +25,10 @@ interface Gis {
 const KEY = 'buh.session';
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
 const SILENT_MS = 15_000;
-/** nonce на сервере живёт 10 мин (v5.63): экран входа берёт новый через 8 мин — только если вход сейчас не идёт. */
-const REARM_MS = 8 * 60_000;
+/** nonce на сервере живёт 20 мин (координатор 16.10): новый берём за 2 мин до конца — только если вход сейчас не идёт. */
+const REARM_MS = 18 * 60_000;
 /** Ответ Google на код старше этого на сервер не отправляем: тот откажет «nonce просрочен» (diag 15.10, 17:42). */
-const NONCE_SAFE_MS = 9.5 * 60_000;
+const NONCE_SAFE_MS = 19.5 * 60_000;
 /** После нажатия кнопки Google (окно выбора аккаунта открыто) код не трогаем столько, сколько длится выбор. */
 const ATTEMPT_MS = 3 * 60_000;
 
@@ -106,6 +106,9 @@ export class Auth {
   /** Когда мама нажала кнопку Google: пока идёт выбор аккаунта, GIS не переинициализируем — новый initialize
    *  отменяет открытый запрос FedCM (AbortError, 15.10.2026). 0 — вход сейчас не идёт. */
   private attemptAt = 0;
+  /** Код входа, взятый заранее (в фоне при открытии страницы): первый auth.nonce — холодный старт Apps Script, 5–30 с. */
+  private ready: { nonce: string; at: number } | null = null;
+  private fetching: Promise<{ nonce: string; at: number }> | null = null;
 
   /** Вход идёт: нажата кнопка (окно Google открыто) и ответа ещё нет. */
   signingIn(now = Date.now()): boolean {
@@ -117,22 +120,68 @@ export class Auth {
     if (this.buttonEl) { this.attemptAt = Date.now(); if (this.state.error) this.set({ ...this.state, error: null }); }
   }
 
-  /** Новый nonce и настройка GIS под него: initialize помнит только последний вызов, поэтому — перед каждой попыткой. */
-  private async arm(): Promise<Gis> {
-    const g = await loadGis();
-    // Код входа иногда отвечает 30 с и обрывается (16.10: 2 из 5 открытий; следующая попытка — 5 с). Без кода нет кнопки
-    // Google, а повторить маме нечем — поэтому до 3 попыток по 15 с, «нет связи» — только после третьей.
-    let env: Envelope<{ nonce: string }> | null = null;
-    for (let attempt = 1; !env; attempt++) {
-      try {
-        env = await call<{ nonce: string }>({ url: this.url, action: 'auth.nonce', fetchImpl: this.fetchImpl, timeoutMs: NONCE_TIMEOUT_MS });
-      } catch (e) {
-        if (attempt >= NONCE_TRIES || !(e instanceof ApiError) || e.code !== 'NETWORK') throw e;
-        console.info(`Вход: код входа не пришёл (попытка ${attempt}), прошу ещё раз`);
+  /** Взять код входа заранее (session.ts — при открытии страницы без сеанса). Параллельные вызовы сливаются в один.
+   *  Код иногда отвечает 30 с и обрывается (холодный старт Apps Script, 16.10: 2 из 5 открытий; следующая попытка — 5 с):
+   *  до 3 попыток по 15 с, «нет связи» — только после третьей. */
+  prefetchNonce(): Promise<{ nonce: string; at: number }> {
+    if (this.fetching) return this.fetching;
+    const p = (async () => {
+      let env: Envelope<{ nonce: string }> | null = null;
+      for (let attempt = 1; !env; attempt++) {
+        try {
+          env = await call<{ nonce: string }>({ url: this.url, action: 'auth.nonce', fetchImpl: this.fetchImpl, timeoutMs: NONCE_TIMEOUT_MS });
+        } catch (e) {
+          if (attempt >= NONCE_TRIES || !(e instanceof ApiError) || e.code !== 'NETWORK') throw e;
+          console.info(`Вход: код входа не пришёл (попытка ${attempt}), прошу ещё раз`);
+        }
       }
-    }
-    const nonce = env.data.nonce;
-    const issuedAt = Date.now();
+      const r = { nonce: env.data.nonce, at: Date.now() };
+      this.ready = r;
+      return r;
+    })();
+    this.fetching = p;
+    void p.then(() => undefined, () => undefined).finally(() => { if (this.fetching === p) this.fetching = null; });
+    return p;
+  }
+
+  /** Готовый неистраченный код не старше REARM_MS — сразу, иначе — новый. */
+  private freshNonce(maxAge = REARM_MS): Promise<{ nonce: string; at: number }> {
+    const r = this.ready;
+    if (r && !this.usedNonces.has(r.nonce) && Date.now() - r.at < maxAge) return Promise.resolve(r);
+    this.ready = null;
+    return this.prefetchNonce();
+  }
+
+  /** Код в руках (не старый и не истраченный)? Тогда кнопка сразу настоящая, без заглушки. */
+  private hasFreshNonce(): boolean {
+    const r = this.ready;
+    return Boolean(r && !this.usedNonces.has(r.nonce) && Date.now() - r.at < REARM_MS);
+  }
+
+  /** Кнопка Google сразу, пока код входа ещё идёт (вариант «а» координатора, 16.10): нажатие до кода даёт токен без
+   *  нашего кода — его не отправляем, просим нажать ещё раз (к этому времени кнопка уже настоящая). */
+  private placeholder(g: Gis): void {
+    g.initialize({
+      client_id: this.clientId,
+      auto_select: false,
+      cancel_on_tap_outside: false,
+      context: 'signin',
+      itp_support: true,
+      callback: () => {
+        this.attemptAt = 0;
+        console.info('Вход: нажали до кода входа — токен не отправляю');
+        this.set({ ...this.state, error: 'Секунду — готовлю вход. Нажмите «Войти через Google» ещё раз' });
+        void this.rearm();
+      },
+    });
+  }
+
+  /** Новый nonce и настройка GIS под него: initialize помнит только последний вызов, поэтому — перед каждой попыткой. */
+  private async arm(maxAge = REARM_MS): Promise<Gis> {
+    const g = await loadGis();
+    const got = await this.freshNonce(maxAge);
+    const nonce = got.nonce;
+    const issuedAt = got.at;
     this.arms += 1;
     const no = this.arms;
     // Диагностика входа — без кода входа, токена и почты: номер выдачи и возраст кода.
@@ -161,6 +210,7 @@ export class Auth {
           return;
         }
         this.usedNonces.add(nonce);
+        this.ready = null;
         this.attemptAt = 0;
         void this.finish(r.credential ?? '', nonce);
       },
@@ -171,15 +221,20 @@ export class Auth {
 
   /** Свежий код входа и кнопка заново (если экран входа на месте). Параллельные вызовы сливаются в один.
    *  prompt — только для тихого входа; на экране входа один запрос — кнопка (два запроса FedCM гасят друг друга). */
-  private rearm(prompt = false): Promise<void> {
+  private rearm(prompt = false, maxAge = REARM_MS): Promise<void> {
     this.arming ??= (async () => {
       try {
-        const g = await this.arm();
-        if (this.buttonEl) {
-          this.buttonEl.replaceChildren();
-          // Тёмная тема — тёмная кнопка Google: синяя в белой рамке iframe выглядела белым пятном (отдел «Качество»).
-          g.renderButton(this.buttonEl, { type: 'standard', theme: getTheme() === 'dark' ? 'filled_black' : 'filled_blue', size: 'large', text: 'signin_with', shape: 'pill', locale: 'ru', width: String(Math.min(320, this.buttonEl.clientWidth || 320)) }); // на 360 px не шире карточки
+        // Кода ещё нет (первый auth.nonce — холодный старт) — кнопка сразу, заглушкой; настоящая — когда код придёт.
+        // Только на пустом месте: уже нарисованная кнопка (код истрачен или устарел) остаётся — её нажатие само
+        // попросит нажать ещё раз, а заглушка поверх неё лишь мигнула бы.
+        if (this.buttonEl && !this.buttonEl.hasChildNodes() && !this.hasFreshNonce()) {
+          const g0 = await loadGis();
+          if (this.buttonEl && !this.buttonEl.hasChildNodes() && !this.hasFreshNonce()) { this.placeholder(g0); this.render(g0); }
         }
+        const g = await this.arm(maxAge);
+        // Мама уже нажала заглушку и выбирает аккаунт — новый initialize оборвал бы окно Google (FedCM AbortError);
+        // её ответ придёт в заглушку, та попросит нажать ещё раз и перерисует кнопку.
+        if (this.buttonEl && !this.signingIn()) this.render(g);
         if (prompt) g.prompt();
       } catch (e) {
         this.set({ ...this.state, error: loginMessage(e) });
@@ -188,6 +243,13 @@ export class Auth {
       }
     })();
     return this.arming;
+  }
+
+  private render(g: Gis): void {
+    if (!this.buttonEl) return;
+    this.buttonEl.replaceChildren();
+    // Тёмная тема — тёмная кнопка Google: синяя в белой рамке iframe выглядела белым пятном (отдел «Качество»).
+    g.renderButton(this.buttonEl, { type: 'standard', theme: getTheme() === 'dark' ? 'filled_black' : 'filled_blue', size: 'large', text: 'signin_with', shape: 'pill', locale: 'ru', width: String(Math.min(320, this.buttonEl.clientWidth || 320)) }); // на 360 px не шире карточки
   }
 
   private async finish(idToken: string, nonce: string) {
@@ -223,10 +285,10 @@ export class Auth {
     if (this.buttonEl === el) this.buttonEl = null;
   }
 
-  /** Пока открыт экран входа и вход не идёт: код старше maxAge (8 мин) — взять новый (сервер держит его 10 мин).
+  /** Пока открыт экран входа и вход не идёт: код старше maxAge (18 мин) — взять новый (сервер держит его 20 мин).
    *  Зовётся и в фоновой вкладке: кнопка не должна дожидаться маму с кодом, который сервер уже не примет. */
   keepFresh(maxAge = REARM_MS): void {
-    if (this.buttonEl && !this.arming && !this.signingIn() && Date.now() - this.armedAt >= maxAge) void this.rearm();
+    if (this.buttonEl && !this.arming && !this.signingIn() && Date.now() - this.armedAt >= maxAge) void this.rearm(false, maxAge);
   }
 
   /** Тихий вход, когда сеанс истёк посреди работы. Не вышло за 15 с — экран входа. */

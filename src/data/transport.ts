@@ -47,7 +47,9 @@ export interface CallArgs {
 }
 
 export async function call<T>({ url, action, payload = {}, session, requestId, fetchImpl = fetch, timeoutMs = TIMEOUT_MS }: CallArgs): Promise<Envelope<T>> {
-  const body: Record<string, unknown> = { v: 1, action, payload };
+  // sentAt — часы браузера (мс): сервер считает по нему время пути до своего кода (arriveMs в diag.counters) — так видны
+  // холодные старты Apps Script (координатор 16.10, разбор зависаний auth.nonce).
+  const body: Record<string, unknown> = { v: 1, action, payload, sentAt: Date.now() };
   if (session) body.session = session;
   if (requestId) body.requestId = requestId;
   const ctrl = new AbortController();

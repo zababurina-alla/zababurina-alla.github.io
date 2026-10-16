@@ -1,16 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Auth } from './auth';
 
-// Подменяем Google Identity Services: initialize запоминает callback, renderButton считает перерисовки.
-type Cfg = { nonce: string; callback: (r: { credential?: string }) => void };
+// Подменяем Google Identity Services: initialize запоминает callback, renderButton считает перерисовки настоящей кнопки
+// (с кодом входа); заглушка до кода — в placeholders.
+type Cfg = { nonce?: string; callback: (r: { credential?: string }) => void };
 let cfg: Cfg | null = null;
 let renders = 0;
+let placeholders = 0;
 
 function installGis() {
   (window as unknown as { google: unknown }).google = {
     accounts: { id: {
       initialize: (c: Cfg) => { cfg = c; },
-      renderButton: () => { renders++; },
+      renderButton: (el: HTMLElement) => { if (cfg?.nonce) renders++; else placeholders++; el.replaceChildren(document.createElement('i')); },
       prompt: () => undefined,
       disableAutoSelect: () => undefined,
       cancel: () => undefined,
@@ -35,7 +37,7 @@ const flush = async () => { for (let i = 0; i < 10; i++) await Promise.resolve()
 const invalid = { ok: false, error: { code: 'AUTH_INVALID', message: 'Не получилось войти — попробуйте ещё раз' }, current: null };
 
 describe('вход: одноразовый код (nonce)', () => {
-  beforeEach(() => { cfg = null; renders = 0; installGis(); sessionStorage.clear(); localStorage.clear(); });
+  beforeEach(() => { cfg = null; renders = 0; placeholders = 0; installGis(); sessionStorage.clear(); localStorage.clear(); });
   afterEach(() => { vi.useRealTimers(); });
 
   it('отказ AUTH_INVALID → сразу новый код и кнопка заново; повтор уходит с новым кодом', async () => {
@@ -67,13 +69,45 @@ describe('вход: одноразовый код (nonce)', () => {
     await a.mountButton(document.createElement('div'));
     expect([cfg?.nonce, renders, a.getState().error]).toEqual(['N1', 1, null]);
 
-    cfg = null; renders = 0;
+    cfg = null; renders = 0; placeholders = 0;
     const down = vi.fn(async () => { throw new TypeError('Failed to fetch'); }) as unknown as typeof fetch;
     const b = new Auth('https://x/exec', 'cid', down);
     await b.mountButton(document.createElement('div'));
     expect(down).toHaveBeenCalledTimes(3);
-    expect([cfg, renders]).toEqual([null, 0]);
+    expect([(cfg as Cfg | null)?.nonce, renders, placeholders]).toEqual([undefined, 0, 1]); // осталась заглушка, настоящей кнопки нет
     expect(b.getState().error).toContain('Нет связи');
+  });
+
+  it('код взят заранее (при открытии страницы) — кнопка сразу настоящая, без заглушки и без второго auth.nonce', async () => {
+    const s = server([]);
+    const a = new Auth('https://x/exec', 'cid', s.fetchImpl);
+    await a.prefetchNonce();
+    await a.mountButton(document.createElement('div'));
+    expect([cfg?.nonce, renders, placeholders]).toEqual(['N1', 1, 0]);
+    expect(s.sent.filter((x) => x.action === 'auth.nonce')).toHaveLength(1);
+  });
+
+  it('кода ещё нет — кнопка сразу заглушкой; нажатие до кода: токен не уходит, «нажмите ещё раз», кнопка уже настоящая', async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((r) => { release = r; });
+    const sent: string[] = [];
+    const fetchImpl = vi.fn(async (_u: unknown, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as { action: string };
+      sent.push(body.action);
+      if (body.action === 'auth.nonce') await gate;
+      return new Response(JSON.stringify({ ok: true, data: { nonce: 'N1' }, cursor: null }), { status: 200 });
+    }) as unknown as typeof fetch;
+    const a = new Auth('https://x/exec', 'cid', fetchImpl);
+    const mounting = a.mountButton(document.createElement('div'));
+    await flush();
+    expect([placeholders, renders, cfg?.nonce]).toEqual([1, 0, undefined]); // кнопка есть, кода ещё нет
+    cfg?.callback({ credential: 'tok-without-nonce' }); // нажала, пока код идёт
+    expect(a.getState().error).toContain('ещё раз');
+    release();
+    await mounting;
+    await flush();
+    expect([renders, cfg?.nonce]).toEqual([1, 'N1']);
+    expect(sent).not.toContain('auth.login');
   });
 
   it('тот же код второй раз не отправляется', async () => {
@@ -89,7 +123,7 @@ describe('вход: одноразовый код (nonce)', () => {
     expect(s.sent.filter((x) => x.action === 'auth.login').map((x) => x.payload?.nonce)).toEqual(['N1']);
   });
 
-  it('экран входа открыт дольше 8 мин — код обновляется; раньше — нет', async () => {
+  it('экран входа открыт дольше 18 мин (код живёт 20) — код обновляется; раньше — нет', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     const s = server([]);
     const a = new Auth('https://x/exec', 'cid', s.fetchImpl);
@@ -98,7 +132,7 @@ describe('вход: одноразовый код (nonce)', () => {
     a.keepFresh();
     await flush();
     expect(cfg?.nonce).toBe('N1');
-    vi.setSystemTime(Date.now() + 5 * 60_000);
+    vi.setSystemTime(Date.now() + 15 * 60_000);
     a.keepFresh();
     await flush();
     expect(cfg?.nonce).toBe('N1');
@@ -128,12 +162,12 @@ describe('вход: одноразовый код (nonce)', () => {
     expect(a.getState().status).toBe('signedIn');
   });
 
-  it('ответ Google на код старше 9,5 мин на сервер не уходит: новый код и «нажмите ещё раз» (diag: nonce_expired)', async () => {
+  it('ответ Google на код старше 19,5 мин на сервер не уходит: новый код и «нажмите ещё раз» (diag: nonce_expired)', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     const s = server([]);
     const a = new Auth('https://x/exec', 'cid', s.fetchImpl);
     await a.mountButton(document.createElement('div'));
-    vi.setSystemTime(Date.now() + 10 * 60_000); // вкладка в фоне, кнопка провисела 10 мин
+    vi.setSystemTime(Date.now() + 20 * 60_000); // вкладка в фоне, кнопка провисела 20 мин
     cfg?.callback({ credential: 'tok' });
     await flush();
     expect(s.sent.filter((x) => x.action === 'auth.login')).toEqual([]);

@@ -14,7 +14,11 @@ function server(...replies: unknown[]) {
   const inits: RequestInit[] = [];
   const fetchImpl = vi.fn(async (_url: unknown, init?: RequestInit) => {
     inits.push(init ?? {});
-    sent.push(JSON.parse(String(init?.body)) as Sent);
+    // sentAt (часы браузера) — в каждом запросе; проверяем здесь и убираем, чтобы тела сравнивались по смыслу.
+    const body = JSON.parse(String(init?.body)) as Sent & { sentAt?: unknown };
+    if (typeof body.sentAt !== 'number' || Math.abs(body.sentAt - Date.now()) > 60_000) throw new Error('нет sentAt');
+    delete body.sentAt;
+    sent.push(body);
     const r = replies.shift();
     if (r instanceof Error) throw r;
     return new Response(typeof r === 'string' ? r : JSON.stringify(r), { status: 200 });

@@ -12,6 +12,10 @@ export const auth: Auth | null = isLive() ? new Auth(apiUrl(), GOOGLE_CLIENT_ID)
 export const liveApi: LiveApi | null = auth ? new LiveApi(apiUrl(), auth) : null;
 export const api: CabinetApi = liveApi ?? fakeServer;
 
+// Сеанса нет — код входа берём сразу, в фоне, пока грузятся экраны: первый auth.nonce — холодный старт Apps Script
+// (5–30 с), к нажатию кнопки он уже готов. Ошибку покажет сама кнопка, если код так и не придёт.
+if (auth && auth.getState().status !== 'signedIn') void auth.prefetchNonce().catch(() => undefined);
+
 const DEMO: AuthState = { status: 'signedIn', user: null, error: null };
 const noop = () => () => undefined;
 
