@@ -1073,6 +1073,9 @@
 @media (min-width: 900px) {
   .chats {
     grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr);
+    /* Строка — ровно высота блока: без неё строка росла по содержимому (диалог 919 px при блоке 520), .chats обрезал,
+       а лента не получала своей высоты и не крутилась колесом (приёмка «Пользователя» Г-6, 16.10). */
+    grid-template-rows: minmax(0, 1fr);
     height: min(calc(100dvh - 13rem), 48rem);
   }
 
