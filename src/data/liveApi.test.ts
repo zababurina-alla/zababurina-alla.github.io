@@ -487,6 +487,19 @@ describe('живой адаптер: чтение', () => {
     expect([r.percent, r.checks.salary, r.checks.report]).toEqual([43, true, false]);
   });
 
+  it('вопросы: test: true не показываются — ни в снимке, ни в questions.list, ни в журнале (там — удаление)', async () => {
+    const q = { id: 'Q-1', version: 1, text: 'Подавали?', type: 'choice', options: ['Да', 'Нет'], clientId: 'C-1', status: 'asked', askedAt: null, answer: null };
+    const s = server(
+      ok({ clients: [], deadlines: [], payments: [], tasks: [], activity: [], questions: [q, { ...q, id: 'Q-T', test: true }], cursor: 1 }),
+      ok({ questions: [{ ...q, id: 'Q-T', test: true }, q] }),
+      ok({ changes: [{ rev: 2, entity: 'question', op: 'upsert', id: 'Q-T', origin: 'бот', record: { ...q, id: 'Q-T', test: true } }], cursor: 2, hasMore: false }),
+    );
+    const api = new LiveApi(URL_, auth(), s.fetchImpl);
+    expect((await api.snapshot()).questions.map((x) => x.id)).toEqual(['Q-1']);
+    expect((await api.listQuestions()).map((x) => x.id)).toEqual(['Q-1']);
+    expect((await api.changesSince(1)).changes.map((c) => [c.id, c.op, c.record])).toEqual([['Q-T', 'delete', undefined]]);
+  });
+
   it('tasks.completeMany: сделанные — изменения, не отметившиеся — в failed', async () => {
     const t = { id: 'T-1', version: 2, clientId: null, text: 'а', due: null, type: 'docs', priority: 'medium', done: true };
     const s = server(ok({ results: [{ id: 'T-1', ok: true, task: t }, { id: 'T-2', ok: false, error: { code: 'NOT_FOUND', message: 'Задачи уже нет' }, current: null }], updated: 1, failed: 1 }, 30));

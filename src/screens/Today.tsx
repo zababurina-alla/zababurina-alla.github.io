@@ -1,5 +1,5 @@
 // «Сегодня»: за 10 секунд понять день. Сверху — одна фраза о дне из чисел и четыре плашки срочности (они же фильтр),
-// ниже — что сдать по дням; сбоку — вопрос от Дмитрия, ключи ЭЦП, деньги месяца, что изменилось.
+// ниже — что сдать по дням; сбоку — вопросы по таблице, ключи ЭЦП, деньги месяца, что изменилось.
 import { useRef, useState, useEffect } from 'react';
 import { InboxCard } from './Inbox';
 import gsap from 'gsap';
@@ -83,7 +83,7 @@ const FILTER_TITLE: Record<Filter, string> = {
 
 export function Today() {
   const store = useStore();
-  // Новые вопросы от Дмитрия — при открытии «Сегодня» (не чаще раза в 2 мин, см. store.refreshQuestions).
+  // Новые вопросы по таблице — при открытии «Сегодня» (не чаще раза в 2 мин, см. store.refreshQuestions).
   const { refreshQuestions, loaded } = store;
   useEffect(() => { if (loaded) void refreshQuestions(); }, [loaded, refreshQuestions]);
   const ui = useUi();
@@ -139,7 +139,7 @@ export function Today() {
   const plan = [
     overdue.length && { key: 'overdue', icon: 'overdue' as const, tone: 'red', title: 'Закрыть просроченные', n: `${overdue.length} ${plural(overdue.length, 'срок', 'срока', 'сроков')}` },
     todayTasks.length && { key: 'tasks', icon: 'tasks' as const, tone: tasksLate ? 'red' : 'accent', title: tasksTitle, n: tasksN },
-    store.questions.length && { key: 'q', icon: 'questions' as const, tone: 'wheat', title: 'Ответить Дмитрию', n: `${store.questions.length} ${plural(store.questions.length, 'вопрос', 'вопроса', 'вопросов')}` },
+    store.questions.length && { key: 'q', icon: 'questions' as const, tone: 'wheat', title: 'Вопросы по таблице', n: `${store.questions.length} ${plural(store.questions.length, 'вопрос', 'вопроса', 'вопросов')}` },
     keys.length && { key: 'keys', icon: 'keys' as const, tone: keysGone ? 'red' : 'accent', title: keysGone ? 'Ключи ЭЦП: закончились' : 'Продлить ключи ЭЦП',
       // Один подсчёт на всё (п. 54): «закончились · 7», когда закончились 4, вводило в заблуждение.
       n: keysGone ? `${keysGone} ${plural(keysGone, 'закончился', 'закончились', 'закончились')}${keysSoon ? `, ещё ${keysSoon} — до ${KEY_DAYS} дн.` : ''}` : `${keys.length} ${plural(keys.length, 'клиент', 'клиента', 'клиентов')}` },

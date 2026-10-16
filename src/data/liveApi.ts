@@ -122,7 +122,10 @@ function normRecord(entity: Entity, raw: unknown): NonNullable<Change['record']>
 function toChange(c: ServerChange): Change | null {
   if (!ENTITIES.has(c.entity)) return null; // незнакомая сущность (новая на сервере) — пропускаем
   const entity = c.entity as Entity;
-  const change: Change = { cursor: c.rev, entity, op: c.op, id: c.id, origin: c.origin };
+  // Тестовый вопрос (test: true) — для сайта его нет: приходит как удаление, даже если сервер прислал upsert.
+  const testQ = entity === 'question' && c.op === 'upsert' && (c.record as { test?: unknown } | undefined)?.test === true;
+  const change: Change = { cursor: c.rev, entity, op: testQ ? 'delete' : c.op, id: c.id, origin: c.origin };
+  if (testQ) return change;
   if (c.op === 'upsert' && c.record !== undefined) change.record = normRecord(entity, c.record);
   return change;
 }
@@ -153,7 +156,7 @@ export class LiveApi implements CabinetApi {
       payments: d.payments.map(normPayment),
       tasks: d.tasks.map((x) => normRecord('task', x) as Task),
       activity: d.activity.map((x) => normRecord('activity', x) as Activity),
-      questions: d.questions ?? [],
+      questions: (d.questions ?? []).filter((q) => (q as { test?: unknown }).test !== true),
       inbox: (d.inbox ?? []).map((x) => normRecord('inbox', x) as InboxItem),
       consultations: (d.consultations ?? []).map(normConsultation),
       consultationsSkipped: d.consultationsSkipped === true,
@@ -344,7 +347,7 @@ export class LiveApi implements CabinetApi {
 
   async listQuestions(): Promise<Question[]> {
     const env = await this.rpc<{ questions: Question[] }>('questions.list', {});
-    return env.data.questions;
+    return (env.data.questions ?? []).filter((q) => (q as { test?: unknown }).test !== true);
   }
 
   /** Напоминание клиенту: запись с requestId (сервер не отправит дважды), но мимо очереди — ответ показываем сразу. */

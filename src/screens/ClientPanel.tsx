@@ -163,7 +163,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
 
   const own = c ? store.deadlines.filter((d) => d.clientId === c.id).sort((a, b) => a.due.localeCompare(b.due)) : [];
   const pays = c ? store.payments.filter((p) => p.clientId === c.id) : [];
-  // Всё про клиента на одном экране: его открытые задачи и вопросы Дмитрия о нём — прямо в обзоре.
+  // Всё про клиента на одном экране: его открытые задачи и вопросы таблицы о нём — прямо в обзоре.
   const tasks = c ? store.tasks.filter((t) => t.clientId === c.id && !t.done) : [];
   const questions = c ? store.questions.filter((q) => q.clientId === c.id) : [];
   // Карточка целиком и история — из clients.get (п. 3, 9): снимок показывается сразу, ответ (до 7 с) дополняет его.
@@ -231,7 +231,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                 </section>
                 {questions.length > 0 && (
                   <section className="cp__block cp__questions">
-                    <h3 className="cp__h">Вопрос от Дмитрия</h3>
+                    <h3 className="cp__h">Вопрос по таблице</h3>
                     {questions.map((q) => (
                       <div key={q.id} className="question">
                         <p className="question__text"><TableText text={q.text} /></p>

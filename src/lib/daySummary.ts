@@ -45,7 +45,7 @@ export function daySummary(d: DayInput): string[] {
   const todayTasks = open.length - late;
   if (late) lines.push(`${late} ${plural(late, 'задача просрочена', 'задачи просрочены', 'задач просрочено')}.`);
   if (todayTasks) lines.push(`${todayTasks} ${plural(todayTasks, 'задача', 'задачи', 'задач')} на сегодня.`);
-  if (d.questions) lines.push(`Дмитрий ждёт ответа на ${d.questions} ${plural(d.questions, 'вопрос', 'вопроса', 'вопросов')}.`);
+  if (d.questions) lines.push(`${d.questions} ${plural(d.questions, 'вопрос', 'вопроса', 'вопросов')} по таблице ждут ответа.`);
   if (lines.length === 2 && !overdue.length) lines.push('Всё спокойно.');
   return lines;
 }
