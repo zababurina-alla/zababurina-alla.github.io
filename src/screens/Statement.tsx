@@ -20,7 +20,7 @@ function sentText(r: StatementResult): string {
 export function StatementBlock({ clientId }: { clientId: string }) {
   const { statement } = useStore();
   const [pdf, setPdf] = useState<{ kind: 'idle' | 'busy' } | { kind: 'ready'; url: string; fileName: string } | { kind: 'error'; text: string }>({ kind: 'idle' });
-  const [send, setSend] = useState<{ kind: 'idle' | 'loading' } | { kind: 'preview' | 'sending'; text: string } | { kind: 'done'; text: string; ok: boolean }>({ kind: 'idle' });
+  const [send, setSend] = useState<{ kind: 'idle' | 'loading' } | { kind: 'preview' | 'sending'; text: string } | { kind: 'done'; text: string; tone: 'ok' | 'info' | 'error' }>({ kind: 'idle' });
   if (!statement.pdf && !statement.preview) return null;
   const err = (e: unknown) => (e instanceof Error && e.name === 'ApiError' ? e.message : 'Таблица не ответила — попробуйте ещё раз');
 
@@ -34,13 +34,17 @@ export function StatementBlock({ clientId }: { clientId: string }) {
     setSend({ kind: 'loading' });
     try {
       const p = await statement.preview(clientId);
-      setSend(p.preview ? { kind: 'preview', text: p.preview } : { kind: 'done', text: p.message ?? 'Отправить нельзя', ok: false });
-    } catch (e) { setSend({ kind: 'done', text: err(e), ok: false }); }
+      // Нет бота / тестовый клиент — не ошибка, а спокойное «так нельзя» (дизайн 16.10): красным только сбой.
+      setSend(p.preview ? { kind: 'preview', text: p.preview } : { kind: 'done', text: p.message ?? 'Отправить нельзя', tone: 'info' });
+    } catch (e) { setSend({ kind: 'done', text: err(e), tone: 'error' }); }
   }
   async function doSend() {
     if (!statement.send || send.kind !== 'preview') return;
     setSend({ kind: 'sending', text: send.text });
-    try { const r = await statement.send(clientId); setSend({ kind: 'done', text: sentText(r), ok: r.sent }); } catch (e) { setSend({ kind: 'done', text: err(e), ok: false }); }
+    try {
+      const r = await statement.send(clientId);
+      setSend({ kind: 'done', text: sentText(r), tone: r.sent ? 'ok' : r.reason === 'unknown' ? 'error' : 'info' });
+    } catch (e) { setSend({ kind: 'done', text: err(e), tone: 'error' }); }
   }
 
   return (
@@ -67,7 +71,7 @@ export function StatementBlock({ clientId }: { clientId: string }) {
           <button type="button" className="btn btn--ghost btn--sm" disabled={send.kind === 'sending'} onClick={() => setSend({ kind: 'idle' })}>Отмена</button>
         </div>
       )}
-      {send.kind === 'done' && <p className={send.ok ? 'sub' : 'field__error'} role="status">{send.text}</p>}
+      {send.kind === 'done' && <p className={send.tone === 'error' ? 'field__error' : 'sub'} role={send.tone === 'error' ? 'alert' : 'status'}>{send.text}</p>}
     </section>
   );
 }
