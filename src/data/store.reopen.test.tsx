@@ -58,3 +58,23 @@ describe('«Вернуть срок» из уведомления', () => {
     act(() => root.unmount());
   });
 });
+
+describe('строка-«призрак» (№ 24): ответ таблицы раньше конца анимации', () => {
+  it('закрытие с показом через 3 с, таблица ответила раньше — «закрыто» сразу, «Вернуть срок» работает', async () => {
+    sent.length = 0;
+    const box: { s: ReturnType<typeof useStore> | null } = { s: null };
+    function Grab() { const s = useStore(); useEffect(() => { box.s = s; }); return null; }
+    const root = createRoot(document.createElement('div'));
+    await act(async () => { root.render(<StoreProvider><Grab /></StoreProvider>); });
+    for (let i = 0; i < 50 && !box.s?.loaded; i++) await tick();
+    const atClose = box.s;
+    let undo: (() => void) | null = null;
+    await act(async () => { atClose?.closeDeadline('D-1', () => { undo = () => atClose.reopenDeadline('D-1'); }, 3000); });
+    for (let i = 0; i < 50 && !undo; i++) await tick(); // ответ через ~30 мс — задолго до 3 с
+    expect(box.s?.closed.map((c) => [c.deadline.id, c.save])).toEqual([['D-1', 'saved']]);
+    await act(async () => { undo?.(); });
+    for (let i = 0; i < 50 && !box.s?.deadlines.length; i++) await tick();
+    expect(box.s?.deadlines.map((d) => d.id)).toEqual(['D-1']);
+    act(() => root.unmount());
+  });
+});

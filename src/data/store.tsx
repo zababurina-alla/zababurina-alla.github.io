@@ -205,7 +205,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // «Вернуть срок» зовут из уведомления, созданного в момент закрытия: его store видел список «закрыто» ДО этого срока.
   // Поэтому reopenDeadline читает текущий список отсюда, а не из замыкания (находка «Пользователя» № 19).
   const closedRef = useRef<ClosedEntry[]>([]);
+  const deadlinesRef = useRef<DatedDeadline[]>([]);
+  /** Записи, показ которых на экране отложен на время анимации: requestId → «показать сейчас». */
+  const delayed = useRef(new Map<string, () => void>());
   useEffect(() => { closedRef.current = closed; }, [closed]);
+  useEffect(() => { deadlinesRef.current = deadlines; }, [deadlines]);
   const [fresh, setFresh] = useState<string[]>([]);
   const [pending, setPending] = useState<OutboxItem[]>([]);
   const [counters, setCounters] = useState<Counters>({ entered: 0, sent: 0, accepted: 0, rejected: 0, applied: 0, seenInTable: 0 });
@@ -315,11 +319,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return xs.filter((x) => !ids.has(x.id));
       });
     } else if (op.kind === 'closeDeadline') {
-      setDeadlines((xs) => {
-        const d = xs.find((x) => x.id === op.id);
-        if (d) setClosed((cs) => [{ deadline: d, next: null, save: 'saving', requestId: op.requestId, by: 'сайт' }, ...cs.filter((c) => c.requestId !== op.requestId)]);
-        return xs.filter((x) => x.id !== op.id);
-      });
+      // Срок — из ref, а не изнутри setDeadlines: вложенный setClosed выполнялся бы позже ответа таблицы и затирал
+      // «сохранено» на «сохраняется» (ответ раньше конца строки-«призрака», № 24).
+      const d = deadlinesRef.current.find((x) => x.id === op.id);
+      if (d) setClosed((cs) => [{ deadline: d, next: null, save: 'saving', requestId: op.requestId, by: 'сайт' }, ...cs.filter((c) => c.requestId !== op.requestId)]);
+      setDeadlines((xs) => xs.filter((x) => x.id !== op.id));
     } else if (op.kind === 'addPayment') {
       setPayments((xs) => upsert(xs, { ...op.payment, save: 'saving' }));
     } else if (op.kind === 'cancelPayment') {
@@ -367,6 +371,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       if (e.type === 'offline') { setOnlineState(false); return; }
       const op = e.item.op;
+      // Ответ (любой) пришёл раньше конца анимации — сначала показать запись, потом разбирать ответ.
+      delayed.current.get(op.requestId)?.();
       if (e.type === 'applied') {
         setOnlineState(true);
         applyChanges(e.result.changes, false);
@@ -556,7 +562,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (onApplied) callbacks.current.set(op.requestId, onApplied);
     // Запись — в очередь сразу; на экране — сразу или после короткой анимации (таймер, не кадры анимации:
     // в фоновой вкладке кадры почти не идут, а запись ждать не должна).
-    if (showAfterMs > 0) window.setTimeout(() => applyOptimistic(op), showAfterMs);
+    if (showAfterMs > 0) {
+      // Ответ таблицы может прийти раньше конца анимации (строка-«призрак» 3 с, № 24) — тогда показ сразу, в 'applied':
+      // иначе «Вернуть срок» из уведомления не нашёл бы срок в «закрыто», а строка зависла бы на «сохраняется».
+      const t = window.setTimeout(() => { delayed.current.delete(op.requestId); applyOptimistic(op); }, showAfterMs);
+      delayed.current.set(op.requestId, () => { window.clearTimeout(t); delayed.current.delete(op.requestId); applyOptimistic(op); });
+    }
     else applyOptimistic(op);
     void outboxRef.current?.enqueue(op, label, holdMs);
   }, [applyOptimistic]);
