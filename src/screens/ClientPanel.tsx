@@ -303,6 +303,11 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                       <button type="button" className="btn btn--secondary btn--sm cp__remind" onClick={() => setRemindKey(true)} {...roAttrs('remind')}>Напомнить про ключ</button>
                     )}
                     {remindKey && <RemindDialog open onClose={() => setRemindKey(false)} client={c} keyReminder />}</div>
+                  {c.incomeBasis && (
+                    <div><h3 className="cp__h">{c.incomeBasis === 'quarterTurnover' ? 'Оборот за квартал' : 'Прибыль за год'}</h3>
+                      <p>{c.incomeKopecks !== null && c.incomeKopecks !== undefined ? <Money text={formatMoney(c.incomeKopecks)} /> : <span className="nil">не указан</span>}</p>
+                      {c.incomeBasis === 'quarterTurnover' && <p className="sub">Годового дохода в таблице нет — предел группы по этому числу не считается.</p>}</div>
+                  )}
                   <div><h3 className="cp__h">Ключ выпущен</h3><p>{c.keyIssuer ? <TableText text={c.keyIssuer} tidy /> : <span className="nil">не указано</span>}</p></div>
                   <div><h3 className="cp__h">Пароль от кабинета</h3><PasswordReveal clientId={c.id} /></div>
                 </section>

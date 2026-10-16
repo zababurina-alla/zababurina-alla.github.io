@@ -35,7 +35,7 @@ function normClient(raw: unknown): Client {
   const main = text((raw as { kvedMain?: unknown }).kvedMain).trim();
   const note = text((raw as { kvedMainNote?: unknown }).kvedMainNote).trim();
   return { ...c, name: c.name ?? '', phone: c.phone ?? '', keyIssuer: c.keyIssuer ?? '', marks: c.marks ?? [], kved: c.kved ?? [], monthly: c.monthly ?? [],
-    kvedMain: main || null, kvedMainNote: note || null };
+    kvedMain: main || null, kvedMainNote: note || null, ...clientExtras(raw as Record<string, unknown>) };
 }
 
 const METHODS: ReadonlySet<string> = new Set(['bank', 'cash', 'mono', 'diia', 'transfer', 'other']);
@@ -79,6 +79,17 @@ export function normKved(raw: unknown): KvedItem {
     for (const [g, v] of Object.entries(k.epByGroup as Record<string, unknown>)) if (text(v)) ep[g] = text(v);
   }
   return { code: text(k.code), title: text(k.title), epByGroup: ep, councilDecision: text(k.councilDecision) || null };
+}
+
+/** Поля клиента v5.88: доход (целое, копейки) и его основа, банк, язык бота; непонятное — null. */
+function clientExtras(r: Record<string, unknown>): Pick<Client, 'incomeKopecks' | 'incomeBasis' | 'bank' | 'lang'> {
+  const inc = num(r.incomeKopecks);
+  return {
+    incomeKopecks: inc !== null && Number.isInteger(inc) ? inc : null,
+    incomeBasis: r.incomeBasis === 'quarterTurnover' || r.incomeBasis === 'yearProfit' ? r.incomeBasis : null,
+    bank: text(r.bank).trim() || null,
+    lang: r.lang === 'uk' || r.lang === 'ru' ? r.lang : null,
+  };
 }
 
 /** Консультация: пустая дата → null, минуты — только целое, тема и заметка — строки. */

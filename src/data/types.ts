@@ -25,6 +25,14 @@ export interface Client {
   kvedMain?: string | null;
   /** Пометка к главному из той же клетки, например «max ставка». */
   kvedMainNote?: string | null;
+  /** «📈 Доход», копейки (v5.88): у ФОП 3 / ТОВ 3 — оборот последнего квартала, у ФОП общей — прибыль года.
+   *  Годового дохода в таблице нет — предел группы по нему не считаем. null — не указан или не нужен. */
+  incomeKopecks?: number | null;
+  incomeBasis?: 'quarterTurnover' | 'yearProfit' | null;
+  /** «🏦 Банк» — та же клетка, что keyIssuer. */
+  bank?: string | null;
+  /** Язык клиентского бота. */
+  lang?: 'uk' | 'ru' | null;
   phone: string;
   /** [п. 17] Колонка F: банк / АЦСК, где выпущен ключ ЭЦП (одно поле вместо «банк» + «кем выдан»). */
   keyIssuer: string;

@@ -439,6 +439,16 @@ describe('живой адаптер: чтение', () => {
     expect(await api.sendStatement('C-1', 'R2')).toEqual({ sent: false, reason: 'rateLimit', message: 'Уже писали', retryAt: '2026-10-17T04:00:00+03:00' });
   });
 
+  it('клиент v5.88: доход (целое, копейки) и его основа, банк, язык бота; непонятное — null', async () => {
+    const base = { version: 1, name: 'К', kind: 'fop3', marks: [], employer: false, kved: [], phone: null, keyIssuer: null, keyUntil: null, monthly: [] };
+    const s = server(ok({ clients: [
+      { ...base, id: 'C-1', incomeKopecks: 12345600, incomeBasis: 'quarterTurnover', bank: ' Монобанк ', lang: 'uk' },
+      { ...base, id: 'C-2', incomeKopecks: 12.5, incomeBasis: 'year', bank: '', lang: 'en' },
+    ], deadlines: [], payments: [], tasks: [], activity: [], cursor: 1 }));
+    const snap = await new LiveApi(URL_, auth(), s.fetchImpl).snapshot();
+    expect(snap.clients.map((c) => [c.incomeKopecks, c.incomeBasis, c.bank, c.lang])).toEqual([[12345600, 'quarterTurnover', 'Монобанк', 'uk'], [null, null, null, null]]);
+  });
+
   it('«Не писать клиенту»: снято / снимать нечего / уже ушло (CONFLICT с sentAt); requestId — свой на нажатие', async () => {
     const s = server(ok({ id: 'D-1', cancelled: true }), ok({ id: 'D-1', cancelled: false }), fail('CONFLICT', 'Уже отправлено', {}, { id: 'D-1', sentAt: '2026-10-16T02:10:00+03:00' }));
     const api = new LiveApi(URL_, auth(), s.fetchImpl);
