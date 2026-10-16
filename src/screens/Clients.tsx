@@ -1,6 +1,8 @@
 // «Клиенты»: поиск в любом падеже, фильтр по типу, таблица; нажатие на строку — карточка справа.
 // Пустое поле из таблицы остаётся пустым и называет причину («ключа нет», «КВЕД не указан»).
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { NO_PAY_DAYS, lastPaid, noPaymentFor } from '../lib/noPayment';
+import type { NoPayDays } from '../lib/noPayment';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { kindLabel } from '../data/fake';
@@ -30,6 +32,10 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
   // «Без телефона»: бот узнаёт клиента в Telegram по телефону — у кого его нет, тому бот не пишет (просьба «Связи»).
   const [noPhone, setNoPhone] = useState(false);
   const phoneless = store.clients.filter((c) => !c.phone.trim()).length;
+  // «Без платежа N дней» (бот: find_no_payment): по платежам снимка — он держит 90 дней, поэтому N — 30, 60 или 90.
+  const [noPay, setNoPay] = useState<NoPayDays | null>(null);
+  const paidLast = useMemo(() => lastPaid(store.payments), [store.payments]);
+  const unpaid = (days: number) => store.clients.filter((c) => noPaymentFor(paidLast, c.id, days, TODAY)).length;
 
   useEffect(() => { if (focusSearch) input.current?.focus(); }, [focusSearch]);
 
@@ -53,7 +59,7 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
   const isOther = (k: ClientKind | null) => !['fop1', 'fop2', 'fop3'].includes(k ?? '');
   const byKind = (k: ClientKind | null, f: KindFilter) => f === 'all' || k === f || (f === 'other' && isOther(k));
   const found = search(
-    store.clients.filter((c) => byKind(c.kind, kind) && (!noPhone || !c.phone.trim())).map((c) => ({ ...c, extra: [...c.kved.map((k) => k.code), c.phone],
+    store.clients.filter((c) => byKind(c.kind, kind) && (!noPhone || !c.phone.trim()) && (noPay === null || noPaymentFor(paidLast, c.id, noPay, TODAY))).map((c) => ({ ...c, extra: [...c.kved.map((k) => k.code), c.phone],
       words: [...c.kved.map((k) => k.title), c.keyIssuer, ...store.deadlines.filter((d) => d.clientId === c.id).map((d) => d.what)] })),
     q,
   );
@@ -90,6 +96,14 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
               <Icon name="call" size={16} />Без телефона<span className="chip__n num">{phoneless}</span>
             </button>
           )}
+          <div className="chips clients__nopay" role="group" aria-label="Без платежа">
+            {NO_PAY_DAYS.map((n) => (
+              <button key={n} type="button" className="chip" aria-pressed={noPay === n} onClick={() => { setNoPay((v) => (v === n ? null : n)); play('tick'); }}
+                title={n === 90 ? 'Ни одного полученного платежа за 90 дней (столько держит снимок)' : `Последний полученный платёж — больше ${n} дней назад`}>
+                <Icon name="payments" size={16} />Без платежа {n} дн.<span className="chip__n num">{unpaid(n)}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="ctable" role="table" aria-label="Клиенты">
