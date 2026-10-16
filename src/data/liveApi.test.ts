@@ -357,6 +357,14 @@ describe('живой адаптер: чтение', () => {
     expect(r.ok && r.changes.map((c) => [c.entity, c.id, (c.record as { minutes: number }).minutes])).toEqual([['consultation', 'K-2', 20]]);
   });
 
+  it('главный КВЕД: kvedMain / kvedMainNote из снимка; пусто или нет поля — null', async () => {
+    const base = { version: 1, name: 'К', kind: 'fop2', marks: [], employer: false, kved: [{ code: '47.11', title: 'т' }, { code: '56.10', title: 'р' }], phone: null, keyIssuer: null, keyUntil: null, monthly: [] };
+    const s = server(ok({ clients: [{ ...base, id: 'C-1', kvedMain: '56.10', kvedMainNote: 'max ставка' }, { ...base, id: 'C-2', kvedMain: '' }, { ...base, id: 'C-3' }],
+      deadlines: [], payments: [], tasks: [], activity: [], cursor: 1 }));
+    const snap = await new LiveApi(URL_, auth(), s.fetchImpl).snapshot();
+    expect(snap.clients.map((c) => [c.kvedMain, c.kvedMainNote])).toEqual([['56.10', 'max ставка'], [null, null], [null, null]]);
+  });
+
   it('«Не писать клиенту»: снято / снимать нечего / уже ушло (CONFLICT с sentAt); requestId — свой на нажатие', async () => {
     const s = server(ok({ id: 'D-1', cancelled: true }), ok({ id: 'D-1', cancelled: false }), fail('CONFLICT', 'Уже отправлено', {}, { id: 'D-1', sentAt: '2026-10-16T02:10:00+03:00' }));
     const api = new LiveApi(URL_, auth(), s.fetchImpl);

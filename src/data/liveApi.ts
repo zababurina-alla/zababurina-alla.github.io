@@ -31,7 +31,10 @@ const MAX_PAGES = 20;
 // Сервер отдаёт пустое как null (контракт, раздел 2); экраны сайта ждут строку.
 function normClient(raw: unknown): Client {
   const c = raw as Client & { phone: string | null; keyIssuer: string | null };
-  return { ...c, name: c.name ?? '', phone: c.phone ?? '', keyIssuer: c.keyIssuer ?? '', marks: c.marks ?? [], kved: c.kved ?? [], monthly: c.monthly ?? [] };
+  const main = text((raw as { kvedMain?: unknown }).kvedMain).trim();
+  const note = text((raw as { kvedMainNote?: unknown }).kvedMainNote).trim();
+  return { ...c, name: c.name ?? '', phone: c.phone ?? '', keyIssuer: c.keyIssuer ?? '', marks: c.marks ?? [], kved: c.kved ?? [], monthly: c.monthly ?? [],
+    kvedMain: main || null, kvedMainNote: note || null };
 }
 
 const METHODS: ReadonlySet<string> = new Set(['bank', 'cash', 'mono', 'diia', 'transfer', 'other']);

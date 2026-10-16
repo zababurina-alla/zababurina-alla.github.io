@@ -20,6 +20,11 @@ export interface Client {
   marks: ClientMark[];
   employer: boolean;
   kved: { code: string; title: string }[];
+  /** Главный КВЕД — по нему считается ЄП («⭐ Расчёт ЄП по: 56.10 (max ставка)» в карточке таблицы). null — не указан;
+   *  нет поля — сервер ещё не отдаёт. Порядок kved[] главным не считается. */
+  kvedMain?: string | null;
+  /** Пометка к главному из той же клетки, например «max ставка». */
+  kvedMainNote?: string | null;
   phone: string;
   /** [п. 17] Колонка F: банк / АЦСК, где выпущен ключ ЭЦП (одно поле вместо «банк» + «кем выдан»). */
   keyIssuer: string;
