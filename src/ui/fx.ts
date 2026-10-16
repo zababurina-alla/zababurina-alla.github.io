@@ -31,3 +31,22 @@ if (typeof window !== 'undefined' && window.matchMedia?.('(hover: hover) and (po
   }, { passive: true });
   document.addEventListener('pointerleave', () => { current?.style.setProperty('--fx-on', '0'); current = null; });
 }
+
+// Прилипшие шапки (таблица «Клиентов», заголовки дней на «Сроках», «Платежах», «Задачах»): прилипла — класс is-stuck,
+// под ней тень (styles/fx.css). Проверка — раз за кадр при прокрутке; шапок на экране немного (до 30).
+const STICKY = '.ctable__head, .dgroup__title';
+let stuckRaf = 0;
+function markStuck() {
+  stuckRaf = 0;
+  for (const el of document.querySelectorAll<HTMLElement>(STICKY)) {
+    const top = parseFloat(getComputedStyle(el).top) || 0;
+    const r = el.getBoundingClientRect();
+    const box = el.parentElement?.getBoundingClientRect();
+    // Прилипла: стоит на своей высоте, а её блок уже уехал выше — значит, прокрутили за начало блока.
+    const stuck = r.height > 0 && Math.abs(r.top - top) < 1 && box !== undefined && box.top < top - 1;
+    el.classList.toggle('is-stuck', stuck);
+  }
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('scroll', () => { if (!stuckRaf) stuckRaf = requestAnimationFrame(markStuck); }, { passive: true, capture: true });
+}

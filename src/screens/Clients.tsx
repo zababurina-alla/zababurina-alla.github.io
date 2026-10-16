@@ -19,6 +19,8 @@ import { useUi } from '../app/ui-context';
 import { roAttrs } from '../ui/readonly';
 import { URGENCY_ICON } from './DeadlineTable';
 import { TableText } from '../ui/TableText';
+import { KvedCell } from './KvedCell';
+import { useFlipRows } from '../ui/flip';
 
 type KindFilter = 'all' | 'fop1' | 'fop2' | 'fop3' | 'other';
 
@@ -63,6 +65,11 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
       words: [...c.kved.map((k) => k.title), c.keyIssuer, ...store.deadlines.filter((d) => d.clientId === c.id).map((d) => d.what)] })),
     q,
   );
+
+  // Перестановка строк при поиске и фильтрах — плавно (FLIP): строки, что остались, переезжают на новые места, а не
+  // прыгают; новые появляются лесенкой (row-in в CSS). Ключ — порядок клиентов, чтобы не дёргать при прочих обновлениях.
+  const table = useRef<HTMLDivElement>(null);
+  useFlipRows(table, '.ctable__row', found.map((c) => c.id).join(','));
   const count = (f: KindFilter) => store.clients.filter((c) => byKind(c.kind, f)).length;
   const total = store.clients.length;
 
@@ -106,7 +113,7 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
           </div>
         </div>
 
-        <div className="ctable" role="table" aria-label="Клиенты">
+        <div ref={table} className="ctable" role="table" aria-label="Клиенты">
           <div className="ctable__head" role="row">
             <span role="columnheader">Клиент</span>
             <span role="columnheader">КВЕД</span>
@@ -134,7 +141,7 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
                       {month > 0 && <span className="ctable__month-inline"> · <Money text={formatMoney(month)} /> в месяц</span>}</span>
                   </span>
                 </span>
-                <span role="cell" className="ctable__kved num">{c.kved.length ? c.kved.map((k) => k.code).join(', ') : <span className="nil">не указан</span>}</span>
+                <span role="cell" className="ctable__kved"><KvedCell c={c} /></span>
                 <span role="cell" className="ta-r ctable__sum">{month ? <Money text={formatMoney(month)} /> : <span className="nil" title={c.monthly.map((m) => m.note).filter(Boolean).join('; ') || undefined}>не посчитано</span>}</span>
                 <span role="cell" className="ctable__key">
                   {keyDays === null || !keySt

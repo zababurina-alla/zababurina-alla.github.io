@@ -58,6 +58,7 @@ function InboxActions({ it }: { it: InboxItem }) {
   const saving = store.pending.some((p) => p.op.kind === 'decideInbox' && p.op.id === it.id);
   const parsed = parseMoney(sum);
   const tooSmall = parsed.ok && parsed.kopecks < MIN_KOPECKS;
+  const acceptIsTask = it.type !== 'payment' && it.clientId !== null && INBOX_TYPE[it.type].accept.startsWith('В задачи');
   const toast = useToast();
   const decide = (action: InboxAction, amount?: number) => {
     const rid = store.decideInbox(it.id, action, amount);
@@ -100,7 +101,8 @@ function InboxActions({ it }: { it: InboxItem }) {
           <button type="button" className="btn btn--secondary btn--sm" onClick={() => decide('taxTask')} {...roAttrs('inbox')}>По налогу {formatMoney(it.taxKopecks)}</button>
           <button type="button" className="btn btn--ghost btn--sm" onClick={() => setTaskPick(false)}>Отмена</button>
         </span>
-      ) : (
+      ) : acceptIsTask ? null : (
+        // № 21 (проход 2): если главная кнопка уже «В задачи: …» — второй «Задачи» рядом нет, способ один
         <button type="button" className="btn btn--secondary btn--sm" aria-expanded={it.taxKopecks ? false : undefined}
           onClick={() => (it.taxKopecks ? setTaskPick(true) : decide('task'))} {...roAttrs('inbox')}>Задача</button>
       )}
@@ -171,7 +173,7 @@ function Bubble({ it, i }: { it: InboxItem; i: number }) {
           ? <p className="bubble__voice"><Icon name="mic" size={18} /><span>{voiceText(it) || 'Голосовое — послушать в Telegram'}</span></p>
           : <p className="bubble__text">{it.snippet}</p>}
         {it.type === 'order' && it.amount ? <p className="bubble__order">Оплатить за клиента: <span className="num">{formatMoney(it.amount)}</span></p> : null}
-        {it.file && <span className="bubble__file"><Icon name="attach" size={16} />Файл — в Telegram</span>}
+        {it.file && <span className="bubble__file"><Icon name="attach" size={16} />файл приложен — открыть можно в Telegram</span>}
         {it.taxKopecks ? <p className="bubble__tax">В сообщении и налог: <span className="num">{formatMoney(it.taxKopecks)}</span></p> : null}
         <time className="bubble__time num" dateTime={it.at}>{hhmm(it.at)}</time>
       </div>
@@ -199,8 +201,8 @@ function Dialog({ chat, visible }: { chat: Thread; visible: boolean }) {
     let g = days[days.length - 1];
     if (!g || g.day !== d) { g = { day: d, rows: [] }; days.push(g); }
     g.rows.push(<Bubble key={it.id} it={it} i={i} />);
-    if (it.status !== 'new') g.rows.push(<li key={`s-${it.id}`} className="feed__service"><Icon name="check" size={14} />{doneText(it)}</li>);
-    if (it.repliedAt) g.rows.push(<li key={`r-${it.id}`} className="feed__service"><Icon name="message" size={14} />Вы ответили в Telegram · {hhmm(it.repliedAt)}</li>);
+    if (it.status !== 'new') g.rows.push(<li key={`s-${it.id}`} className="dfeed__service"><Icon name="check" size={14} />{doneText(it)}</li>);
+    if (it.repliedAt) g.rows.push(<li key={`r-${it.id}`} className="dfeed__service"><Icon name="message" size={14} />Вы ответили в Telegram · {hhmm(it.repliedAt)}</li>);
   });
   return (
     <section className="dialog" aria-label={`Переписка: ${chat.name}`}>
@@ -217,11 +219,11 @@ function Dialog({ chat, visible }: { chat: Thread; visible: boolean }) {
           title={tg ? 'Откроет чат с клиентом в Telegram по телефону из карточки' : 'Телефона клиента нет в таблице — откроется Telegram'}>
           <Icon name="reply" size={16} />{tg ? 'Ответить в Telegram' : 'Открыть Telegram'}</a>
       </header>
-      <ol ref={feed} className="feed" key={chat.key}>
+      <ol ref={feed} className="dfeed" key={chat.key}>
         {days.map((g) => (
-          <li key={g.day} className="feed__group">
-            <p className="feed__day"><span>{dayTitle(g.day)}</span></p>
-            <ol className="feed__items">{g.rows}</ol>
+          <li key={g.day} className="dfeed__group">
+            <p className="dfeed__day"><span>{dayTitle(g.day)}</span></p>
+            <ol className="dfeed__items">{g.rows}</ol>
           </li>
         ))}
       </ol>

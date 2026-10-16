@@ -68,18 +68,32 @@
 .ctable__head,
 .ctable__row {
   display: grid;
-  grid-template-columns: minmax(15rem, 2fr) 6.5rem 8.5rem 10rem minmax(12rem, 1.5fr);
+  grid-template-columns: minmax(15rem, 2fr) 8rem 8.5rem 10rem minmax(12rem, 1.5fr); /* КВЕД 8rem: «⭐ 56.10 +6» в одну строку */
   align-items: center;
   gap: var(--space-4);
   padding: 0 var(--space-3);
 }
 
+/* Шапка таблицы прилипает сверху (владелец, 16.10: при прокрутке не видно, что за колонки); прилипла — тень (fx.ts) */
 .ctable__head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
   min-height: 2.5rem;
+  margin-inline: calc(-1 * var(--space-2));
+  padding-inline: calc(var(--space-3) + var(--space-2));
+  background: var(--surface);
   color: var(--ink-2);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   box-shadow: inset 0 -1px 0 var(--line);
+  transition: box-shadow var(--dur-base) ease;
+}
+
+@media (max-width: 1023px) {
+  .ctable__head {
+    top: 3.75rem; /* под верхней полосой телефона/планшета */
+  }
 }
 
 .ctable__row {
@@ -187,14 +201,16 @@
   animation-delay: calc(min(var(--i, 0), 20) * var(--stagger) + 120ms);
 }
 
+/* Лист уже 1100 px (ноутбук 1280 с меню — около 940): прячем «В месяц» (сумма — строкой под именем), а не КВЕД —
+   раньше на ноутбуке колонки КВЕД не было вовсе (владелец, 16.10) */
 @container (max-width: 1099px) {
   .ctable__head,
   .ctable__row {
     grid-template-columns: minmax(13rem, 1.6fr) 8rem 9.5rem minmax(10rem, 1.3fr);
   }
 
-  .ctable__head > :nth-child(2),
-  .ctable__row > :nth-child(2) {
+  .ctable__head > :nth-child(3),
+  .ctable__row > :nth-child(3) {
     display: none;
   }
 }
@@ -216,9 +232,16 @@
     padding: var(--space-3);
   }
 
-  .ctable__row > :nth-child(2),
   .ctable__row > :nth-child(3) {
     display: none;
+  }
+
+  /* Телефон: ⭐ главный КВЕД и «+N» — справа в строке имени (раньше КВЕДа на телефоне не было) */
+  .ctable__row > .ctable__kved {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
+    padding-top: 2px;
   }
 
   .ctable__row > :nth-child(4),
@@ -632,11 +655,6 @@
   }
 }
 
-@container (min-width: 760px) and (max-width: 1099px) {
-  .ctable__month-inline {
-    display: none;
-  }
-}
 
 /* «Ключ продлён…» (KeyRenew, техника сайта): форма раскрывается вложенным блоком, как действия со сроком */
 .keyrenew {
@@ -670,4 +688,157 @@
 
 .cp__loading .sk-row {
   padding: var(--space-3) 0;
+}
+
+/* ═════════ КВЕД одной строкой: ⭐ главный + «+N» со списком (владелец, 16.10) ═════════ */
+.ctable__kved {
+  min-width: 0;
+}
+
+.kv {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.kv__star {
+  flex: none;
+  color: var(--wheat);
+}
+
+.kv__main {
+  font-weight: var(--weight-semibold);
+}
+
+/* «+6» — над растянутой зоной строки (иначе нажатие открыло бы карточку) */
+.kv__more {
+  position: relative;
+  z-index: 2;
+  min-width: 2.25rem;
+  height: 1.75rem;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunk);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease, transform var(--dur-press) var(--ease-out);
+}
+
+.kv__more[aria-expanded='true'],
+.kv__more:hover {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+  color: var(--accent);
+}
+
+.kv__more:active {
+  transform: scale(0.94);
+}
+
+/* Список всех КВЕДов: поверх страницы, ширина S, главный — первым, со звездой и «по нему считается ЄП» */
+.kv-pop {
+  position: fixed;
+  z-index: 70;
+  width: min(var(--win-s) + 4rem, calc(100vw - 16px));
+  max-height: min(60vh, 26rem);
+  overflow-y: auto;
+  padding: var(--space-2);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--edge), 0 0 0 1px var(--line), var(--shadow-3);
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink-2) 45%, transparent) transparent;
+  transform-origin: 24px 0;
+}
+
+.kv-pop.is-up {
+  transform-origin: 24px 100%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .kv-pop {
+    animation: kv-pop-in 220ms var(--spring-pop) both;
+  }
+}
+
+@keyframes kv-pop-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+
+.kv-pop__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+
+.kv-pop__item {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  line-height: 1.35;
+}
+
+.kv-pop__item + .kv-pop__item {
+  box-shadow: inset 0 1px 0 var(--line);
+}
+
+.kv-pop__item.is-main {
+  background: var(--wheat-soft);
+}
+
+.kv-pop__code {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 4px;
+  font-weight: var(--weight-semibold);
+}
+
+.kv-pop__code .kv__star {
+  margin-top: 2px;
+}
+
+.kv-pop__title {
+  display: grid;
+  gap: 2px;
+}
+
+.kv-pop__why {
+  color: var(--wheat-ink);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+
+/* Строки таблицы — одной высоты (владелец, 16.10): в каждой ячейке не больше двух строк — название и подпись,
+   длинное обрезается многоточием (полный текст — в карточке). На телефоне строки — карточки, там высота по содержимому. */
+@container (min-width: 760px) {
+  .ctable__row {
+    height: 5.25rem;
+    min-height: 0;
+  }
+
+  .ctable__who,
+  .ctable__state-text,
+  .ctable__next,
+  .ctable__key {
+    min-width: 0;
+  }
+
+  .ctable__who strong,
+  .ctable__who > .sub,
+  .ctable__state-text > *,
+  .ctable__next .ttext {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }

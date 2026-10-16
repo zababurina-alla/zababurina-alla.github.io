@@ -150,6 +150,7 @@ export const ICONS = {
 
   // ── Поля клиента
   email: { cat: 'Поля клиента', label: 'Почта', el: MAIL },
+  star: { cat: 'Поля клиента', label: 'Главный КВЕД — по нему ЄП', filled: true, el: <path d="M12 3.6l2.5 5.2 5.7.8-4.1 4 1 5.7L12 16.6l-5.1 2.7 1-5.7-4.1-4 5.7-.8z" fill="currentColor" strokeLinejoin="round" /> },
   password: { cat: 'Поля клиента', label: 'Пароль', tone: <rect x="4" y="10" width="16" height="11" rx="2.5" />, el: <><rect x="4" y="10" width="16" height="11" rx="2.5" /><path d="M8 10V7.5a4 4 0 0 1 8 0V10M12 14v3" /></> },
   date: { cat: 'Поля клиента', label: 'Дата', el: CAL },
   daysLeft: { cat: 'Поля клиента', label: 'Сколько дней осталось', el: <><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2.5 1.5M10 2.75h4" /></> },

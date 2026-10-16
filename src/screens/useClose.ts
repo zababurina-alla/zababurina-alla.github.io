@@ -17,6 +17,9 @@ const FAR_DAYS = 30;
 // следующего срока, и второй щелчок закрыл бы чужой срок. Поэтому 1,2 с после закрытия нажатие на кружок без движения
 // мыши (меньше 12 px) не считается: кружок только качнётся. Сдвинули мышь или нажали позже — закрывается как обычно.
 const GUARD_MS = 1200;
+// Находка № 24 (проход 2): через ~3 с щелчок всё равно попадал в подъехавший срок. Теперь закрытая строка — «призрак»:
+// 3 с остаётся на месте (зачёркнута, бледная, не нажимается), только потом уходит — список не подъезжает под курсор.
+const GHOST_MS = 3000;
 const GUARD_PX = 12;
 let guard: { until: number; x: number; y: number } | null = null;
 let px = 0;
@@ -67,7 +70,7 @@ export function useCloseDeadline(rowSelector = '[data-row]') {
     setClosing(id);
     const row = document.querySelector<HTMLElement>(`${rowSelector}[data-id="${id}"]`);
     const animate = Boolean(row) && !reducedMotion();
-    armGuard(animate ? 600 : 0);
+    armGuard(animate ? GHOST_MS : 0);
     const name = store.client(d.clientId)?.name.split(' ').slice(0, 2).join(' ') ?? '';
     // Запись уходит в очередь сразу по нажатию. «Закрыто в таблице» — только после ответа сервера (бриф, п. 6).
     const res = store.closeDeadline(id, (_next, notifyAt) => {
@@ -83,17 +86,19 @@ export function useCloseDeadline(rowSelector = '[data-row]') {
         ...(notifyAt && store.cancelCloseNotice ? { secondary: { label: 'Не писать клиенту', run: () => { void cancelNotice(id); } } } : {}),
         timeout: 12_000,
       });
-    }, animate ? 600 : 0);
+    }, animate ? GHOST_MS : 0);
     window.setTimeout(() => setClosing(null), animate ? 600 : 0);
     if (!res.ok) { toast({ text: res.reason, tone: 'error' }); return; }
     if (!row || !animate) return;
-    // Только вид: галочка вспыхивает (CSS + 8 точек), плашка «улетает» в счётчик «Закрыто сегодня», строка тает.
+    // Только вид: галочка вспыхивает (CSS + 8 точек), плашка «улетает» в счётчик «Закрыто сегодня», строка 3 с —
+    // призрак на своём месте, потом тает.
     row.classList.add('is-closing');
     const btn = row.querySelector<HTMLElement>('.check-btn');
     if (btn) burst(btn);
     const what = row.querySelector<HTMLElement>('.dtable__what') ?? row;
     window.setTimeout(() => { void flyToCounter(what, d.what); }, 320);
-    gsap.to(row, { opacity: 0, x: 16, duration: 0.24, ease: 'power2.in', delay: 0.34 });
+    window.setTimeout(() => row.classList.add('is-ghost'), 420);
+    gsap.to(row, { opacity: 0, duration: 0.28, ease: 'power2.in', delay: (GHOST_MS - 320) / 1000 });
   }
 
   async function cancelNotice(id: string) {

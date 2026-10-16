@@ -881,7 +881,7 @@
 }
 
 /* Лента: мягкий фон «бумаги» с отсветом, как обои чата; пузыри клиента — слева */
-.feed {
+.dfeed {
   list-style: none;
   margin: 0;
   padding: var(--space-4);
@@ -899,20 +899,20 @@
 }
 
 /* День — своя группа: плашка даты по центру, прилипает сверху, пока листаем этот день (как в Telegram) */
-.feed__group,
-.feed__items {
+.dfeed__group,
+.dfeed__items {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
 }
 
-.feed__items {
+.dfeed__items {
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
-.feed__day {
+.dfeed__day {
   position: sticky;
   top: 0;
   z-index: 1;
@@ -920,7 +920,7 @@
   margin: var(--space-2) 0;
 }
 
-.feed__day > span {
+.dfeed__day > span {
   display: inline-block;
   padding: 2px var(--space-3);
   border-radius: var(--radius-full);
@@ -934,7 +934,7 @@
 }
 
 /* Служебная строка: решение, «вы ответили» — по центру, тихо */
-.feed__service {
+.dfeed__service {
   align-self: center;
   display: inline-flex;
   align-items: center;
@@ -990,17 +990,15 @@
   overflow-wrap: anywhere;
 }
 
+/* Файл — тихая подпись, а не «кнопка» (находка № 23, проход 2): открыть его можно только в Telegram */
 .bubble__file {
   justify-self: start;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px var(--space-3);
-  border-radius: var(--radius-md);
-  background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--ink-2);
   font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
+  font-style: italic;
 }
 
 .bubble__tax {
@@ -1061,7 +1059,7 @@
     animation-delay: calc(min(var(--i, 0), 8) * 35ms);
   }
 
-  .feed__service {
+  .dfeed__service {
     animation: fade-in 320ms var(--ease-out) both;
   }
 }
@@ -1106,7 +1104,7 @@
     padding: var(--space-2) var(--space-3);
   }
 
-  .feed {
+  .dfeed {
     overflow: visible;
     padding: var(--space-3);
     min-height: 50dvh;
@@ -1215,5 +1213,180 @@
 @media (max-width: 32rem) {
   .help__steps {
     padding-left: calc(var(--space-3) + 1.25rem);
+  }
+}
+
+/* ═════════ Новые места техники (16.10): оформление ═════════ */
+/* Карточка: быстрые задачи по шаблону — ряд мягких «таблеток» с плюсом */
+.cp__tpl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.cp__tpl > .btn {
+  border-radius: var(--radius-full);
+  background: var(--surface-sunk);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink);
+}
+
+.cp__tpl > .btn > .icon {
+  color: var(--accent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .cp__tpl > .btn:hover {
+    background: var(--accent-soft);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+}
+
+/* Карточка, вкладка «Сроки»: «Новый срок» и «Сроки по шаблону» — строкой над таблицей */
+.cp__tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+/* «Сроки»: кнопки справа в шапке страницы */
+.page__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* «Клиенты»: «Без платежа 30 / 60 / 90 дн.» — те же фишки, что «Без телефона» */
+.clients__nopay {
+  flex: none;
+}
+
+.clients__nopay > .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.clients__nopay > .chip:not([aria-pressed='true']) > .icon {
+  color: var(--ink-2);
+}
+
+/* «Входящие», шапка диалога: «Ответить в Telegram» — справа; на телефоне только значок */
+.dialog__tg {
+  flex: none;
+  margin-left: auto;
+}
+
+@media (max-width: 479px) {
+  .dialog__tg {
+    width: 2.5rem;
+    padding: 0;
+    justify-content: center;
+    font-size: 0;
+  }
+
+  .dialog__tg > .icon {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+/* «Задачи»: «Выбрать несколько» — строка над списком; в режиме выбора кружки становятся квадратиками-флажками */
+.tasks__select {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+
+.tasks__select > .sub {
+  margin-right: auto;
+}
+
+.check-btn.is-choosing .check-btn__ring {
+  border-radius: var(--radius-xs);
+  color: transparent;
+}
+
+.check-btn.is-choosing[aria-pressed='true'] .check-btn__ring {
+  background: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--accent);
+  color: var(--on-accent);
+}
+
+/* Правка сделанной задачи: только пояснение и кнопки */
+.tedit--done {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.tedit--done > .sub {
+  margin: 0;
+}
+
+/* Вопрос Дмитрия, запись ответов выключена: «ответить нельзя» + «Ответить в Telegram» в одну строку */
+.question__answers--ro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+/* «Сроки по шаблону»: что будет создано — плашками с датой */
+.tpl__list {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.tpl__list > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunk);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.tpl__list strong {
+  font-weight: var(--weight-semibold);
+}
+
+/* Карточка, «Консультации»: тема и минуты в строку, заметка ниже; лента — как «Что изменилось» */
+.consult__form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 7rem;
+  align-items: start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunk);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.consult__form > .field:nth-of-type(3) {
+  grid-column: 1 / -1;
+}
+
+.consult__form > .btn {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+.consult__list {
+  margin-top: var(--space-4);
+}
+
+@media (max-width: 479px) {
+  .consult__form {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--space-3);
   }
 }
