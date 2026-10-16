@@ -16,7 +16,7 @@ import { readSnap, readSnapAt, saveSnap } from './snapCache';
 import { Outbox } from './outbox';
 import type { Counters, OutboxEvent, OutboxItem } from './outbox';
 import { newRequestId } from './api';
-import type { CancelNotifyResult, Change, DeadlinePatch, InboxAction, RemindPreview, RemindRequest, RemindResult, Snapshot, TaskPatch, WriteOp, WriteResult } from './api';
+import type { CancelNotifyResult, Change, CreateDeadlineResult, NewDeadline, DeadlinePatch, InboxAction, RemindPreview, RemindRequest, RemindResult, Snapshot, TaskPatch, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Consultation, DatedDeadline, Deadline, InboxItem, Payment, Question, SaveState, Task } from './types';
 import { isDated } from './types';
 import { TODAY, addDays, fmtDate, plural } from '../lib/dates';
@@ -111,6 +111,8 @@ interface Store {
   undoHeld: (requestId: string) => Promise<boolean>;
   /** clients.remind — напомнить клиенту в Telegram (под writes.deadlines). Ответ — сразу, мимо очереди. */
   remindClient: (req: RemindRequest) => Promise<RemindResult>;
+  /** «➕ Новый срок» (deadlines.create v5.88). null — сервер ещё не умеет (флаг deadlinesCreate) или запись сроков выключена. */
+  createDeadline: ((d: NewDeadline, requestId: string) => Promise<CreateDeadlineResult>) | null;
   /** «Не писать клиенту» после закрытия срока: срок остаётся закрытым. null — на этом сервере ещё нельзя
    *  (флаг cancelNotify) или запись сроков выключена: кнопку не показывать. */
   cancelCloseNotice: ((deadlineId: string) => Promise<CancelNotifyResult>) | null;
@@ -744,6 +746,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [syncNow]);
 
   const cancelNotify = useCallback((deadlineId: string) => api.cancelNotify(deadlineId, newRequestId()), []);
+  const createDeadlineNow = useCallback(async (d: NewDeadline, requestId: string) => {
+    const r = await api.createDeadline(d, requestId);
+    if (r.ok) { putOpen(r.deadline); markFresh([r.deadline.id]); void syncNow(); }
+    return r;
+  }, [putOpen, markFresh, syncNow]);
+  const createDeadline = hasFeature('deadlinesCreate') && canWrite('deadlines') ? createDeadlineNow : null;
   const cancelCloseNotice = hasFeature('cancelNotify') && canWrite('deadlines') ? cancelNotify : null;
 
   const remindPreview = useCallback(async (req: Omit<RemindRequest, 'text'>) => {
@@ -816,10 +824,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<Store>(() => ({
     loaded, online, syncedAt, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, consultations, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, addConsultation, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, addConsultation, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance,
   }), [loaded, online, syncedAt, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, consultations, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, addConsultation, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, addConsultation, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

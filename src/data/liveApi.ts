@@ -2,7 +2,8 @@
 // (docs/api-contract.md v2.1). Экраны и очередь записей не знают, с кем говорят.
 import { ApiError, call } from './transport';
 import type { Envelope } from './transport';
-import type { CabinetApi, CancelNotifyResult, Change, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
+import type { CabinetApi, CancelNotifyResult, Change, CreateDeadlineResult, NewDeadline, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
+import { RETRYABLE } from './api';
 import type { Activity, Client, Consultation, Deadline, InboxItem, InboxType, KvedItem, Payment, Question, RateGroup, Rates, Task } from './types';
 import { INBOX_TYPES } from './types';
 
@@ -321,6 +322,22 @@ export class LiveApi implements CabinetApi {
         return r;
       }
       throw e;
+    }
+  }
+
+  async createDeadline(d: NewDeadline, requestId: string): Promise<CreateDeadlineResult> {
+    const deadline: Record<string, unknown> = { id: requestId, clientId: d.clientId, obligation: d.obligation, due: d.due, periodicity: d.periodicity };
+    if (d.note) deadline.note = d.note;
+    try {
+      const env = await this.rpc<{ deadline: unknown }>('deadlines.create', { deadline }, requestId);
+      return { ok: true, deadline: normRecord('deadline', env.data.deadline) as Deadline };
+    } catch (e) {
+      const code = e instanceof ApiError && SITE_CODES.has(e.code) ? e.code as ErrorCode : null;
+      if (e instanceof ApiError && code && !RETRYABLE.has(code)) {
+        const cur = e.current && typeof e.current === 'object' && 'what' in e.current ? normRecord('deadline', e.current) as Deadline : null;
+        return { ok: false, code, message: e.message, field: e.field, current: cur };
+      }
+      throw e; // нет связи, занято — окно скажет «повторите», тот же requestId
     }
   }
 

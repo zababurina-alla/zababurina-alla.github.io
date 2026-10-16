@@ -301,7 +301,14 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                 </section>
               </>
             )}
-            {tab === 'deadlines' && <DeadlineTable items={own} showClient={false} empty="Открытых сроков нет" />}
+            {tab === 'deadlines' && (
+              <>
+                <div className="cp__tools">
+                  <button type="button" className="btn btn--secondary btn--sm" onClick={() => ui.openNewDeadline(c.id)} {...roAttrs('deadlines')}><Icon name="plus" size={16} />Новый срок</button>
+                </div>
+                <DeadlineTable items={own} showClient={false} empty="Открытых сроков нет" />
+              </>
+            )}
             {tab === 'payments' && (pays.length ? (
               <ul className="plist">{pays.map((p) => (
                 <li key={p.id} className="plist__row"><span><strong className="display"><Money text={formatPayMoney(p.kopecks)} /></strong><span className="sub">{p.period}, {METHOD_LABEL[p.method]}</span></span><span className="num sub">{p.date ? fmtDate(p.date) : <span className="nil">без даты</span>}</span></li>

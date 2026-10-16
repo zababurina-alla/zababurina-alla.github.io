@@ -89,6 +89,13 @@ export type RemindResult =
   | { sent: true; sentAt: string | null; preview: string | null }
   | { sent: false; reason: 'noBot' | 'test' | 'unknown' | 'rateLimit'; message: string; retryAt?: string };
 
+/** deadlines.create (v5.88, «➕ Новый срок»). periodEnd сервер считает сам — его не передаём. */
+export interface NewDeadline { clientId: string; obligation: string; due: string; periodicity: Deadline['periodicity']; note: string }
+/** Создан; отказ — с полем (VALIDATION) или с уже открытым сроком того же обязательства (CONFLICT, current). */
+export type CreateDeadlineResult =
+  | { ok: true; deadline: Deadline }
+  | { ok: false; code: ErrorCode; message: string; field: string | null; current: Deadline | null };
+
 /** deadlines.cancelNotify: сообщение клиенту о закрытии снято (срок остаётся закрытым); снимать было нечего;
  *  уже забрано на отправку (sentAt — примерно когда ушло). */
 export type CancelNotifyResult = { status: 'cancelled' } | { status: 'nothing' } | { status: 'sent'; sentAt: string | null };
@@ -119,6 +126,9 @@ export interface CabinetApi {
   /** clients.remind { preview:true } — текст сообщения на языке клиента, без отправки и без расхода лимита. */
   remindPreview(req: Omit<RemindRequest, 'text'>): Promise<RemindPreview>;
   cancelNotify(deadlineId: string, requestId: string): Promise<CancelNotifyResult>;
+  /** Мимо очереди, с requestId: ответ нужен сразу (CONFLICT — «уже есть такой срок, открыть?»); повтор тем же
+   *  requestId сервер не задвоит. */
+  createDeadline(d: NewDeadline, requestId: string): Promise<CreateDeadlineResult>;
   /** clients.get — карточка целиком (п. 3) и история изменений клиента (п. 9). */
   clientCard(id: string): Promise<ClientCard>;
   /** reference.rates — ставки года из «⚙️ Справочники». Цифр ставок в коде сайта нет. */

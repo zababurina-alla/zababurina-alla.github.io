@@ -3,7 +3,7 @@
 // — версии записей и ошибка CONFLICT; — журнал изменений с курсором; — повтор того же requestId не создаёт дубль.
 // Рычаги отладки (обрыв связи, отказ, правка извне) — для кнопок в режиме отладки.
 import { ACTIVITY, CLIENTS, CONSULTATIONS, DEADLINES, INBOX, KVEDS, PAYMENTS, QUESTIONS, RATES, TASKS } from './fake';
-import type { CabinetApi, CancelNotifyResult, Change, ClientCard, Entity, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
+import type { CabinetApi, CancelNotifyResult, Change, CreateDeadlineResult, NewDeadline, ClientCard, Entity, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Consultation, Deadline, InboxItem, KvedItem, Payment, Question, Rates, Task } from './types';
 import { fold } from '../lib/search';
 import { TODAY, addDays, endOfMonth, fmtDate, fmtDue } from '../lib/dates';
@@ -337,6 +337,32 @@ class FakeServer implements CabinetApi {
     const d = req.deadlineId ? this.deadlines.get(req.deadlineId) : undefined;
     const hi = `Добрий день${c ? `, ${c.name.split(' ')[1] ?? ''}` : ''}!`;
     return { preview: d ? `${hi} 📅 Нагадую: ${d.what} — до ${fmtDate(d.due ?? TODAY)}.` : `${hi} 🔐 Ключ ЕЦП діє до ${fmtDate(c?.keyUntil ?? TODAY)} — час продовжити.`, lang: 'uk', reason: null, message: null };
+  }
+
+  private created = new Map<string, CreateDeadlineResult>();
+  /** Как deadlines.create v5.88: обязательство 1–300, дата YYYY-MM-DD; тот же открытый срок у клиента — CONFLICT с ним
+   *  (регистр, ё и пробелы не важны); periodEnd — как у сроков таблицы (здесь — конец прошлого месяца/квартала/года). */
+  async createDeadline(d: NewDeadline, requestId: string): Promise<CreateDeadlineResult> {
+    await wait(READ_MS * 2);
+    if (!this.online) throw new Error('NETWORK');
+    const again = this.created.get(requestId);
+    if (again) return again;
+    const norm = (s: string) => fold(s).replace(/\s+/g, ' ');
+    const fail = (code: 'VALIDATION' | 'CONFLICT', field: string, message: string, current: Deadline | null = null): CreateDeadlineResult =>
+      ({ ok: false, code, message, field, current });
+    if (!this.clients.has(d.clientId)) return fail('VALIDATION', 'clientId', 'Клиента нет в таблице');
+    if (!d.obligation.trim() || d.obligation.length > 300) return fail('VALIDATION', 'obligation', 'Что сдать — от 1 до 300 знаков');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d.due)) return fail('VALIDATION', 'due', 'Дата — в виде ГГГГ-ММ-ДД');
+    const same = [...this.deadlines.values()].find((x) => x.clientId === d.clientId && x.status !== 'done' && norm(x.what) === norm(d.obligation));
+    if (same) return fail('CONFLICT', 'obligation', 'У клиента уже есть открытый срок с этим обязательством', { ...same });
+    const pe = d.periodicity === 'once' ? null : endOfMonth(addDays(`${d.due.slice(0, 7)}-01`, -1));
+    const rec: Deadline = { id: requestId, version: 1, clientId: d.clientId, what: d.obligation.trim(), periodicity: d.periodicity, due: d.due, periodEnd: pe, status: 'new', closedAt: null };
+    this.deadlines.set(rec.id, rec);
+    this.record('deadline', 'upsert', rec.id, requestId, rec);
+    this.act(`Новый срок: ${rec.what} — ${short(this.clients.get(d.clientId)?.name ?? '')}`, requestId, 'сайт');
+    const res: CreateDeadlineResult = { ok: true, deadline: { ...rec } };
+    this.created.set(requestId, res);
+    return res;
   }
 
   async cancelNotify(deadlineId: string, requestId: string): Promise<CancelNotifyResult> {
