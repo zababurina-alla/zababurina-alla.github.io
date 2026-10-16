@@ -263,12 +263,14 @@ export function Today() {
 
           <section className="panel reveal money-card" aria-labelledby="t-money">
             <header className="panel__head"><h2 id="t-money" className="panel__title">Получено в {monthName(month.key, 'prep')}</h2><a className="link" href="#/payments">Платежи</a></header>
-            {month.total === 0 && month.prevTotal === 0 && noStatus > 0 ? (
+            {month.total === 0 && month.prevTotal === 0 && noStatus === 0 ? (
+              // В таблице за два месяца ни одного платежа (16.10 на живом: 3 строки за весь 2026 год) — честно и коротко,
+              // без «запишут в таблицу, бота или здесь»: где мама ведёт оплаты, выясняется (координатор).
+              <p className="panel__note sub">Платежи в таблицу пока не вносятся.</p>
+            ) : month.total === 0 && month.prevTotal === 0 && noStatus > 0 ? (
               // Платежи есть, но без «✅ Получено» (сервер отдаёт пустой статус как «ожидается»): деньгами их не считаем —
               // решение за мамой (координатор 16.10), до него честно говорим, что статусы уточняются.
               <p className="panel__note sub">Статусы платежей уточняются: у {noStatus} {plural(noStatus, 'платежа', 'платежей', 'платежей')} за {monthName(month.prevKey, 'nom').toLowerCase()}–{monthName(month.key, 'nom').toLowerCase()} не отмечено «Получено» — сумму покажем, когда отметят.</p>
-            ) : month.total === 0 && month.prevTotal === 0 ? (
-              <p className="panel__note sub">В таблице платежей за {monthName(month.key, 'nom').toLowerCase()} и {monthName(month.prevKey, 'nom').toLowerCase()} нет — суммы появятся, когда платёж запишут в таблицу, бота или здесь.</p>
             ) : (
             <div className="money-card__body">
               <p className="money-card__sum display"><RollingNumber value={month.total} format={(n) => formatMoney(n)} /></p>
