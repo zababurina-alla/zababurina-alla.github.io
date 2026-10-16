@@ -192,7 +192,9 @@ function Dialog({ chat, visible }: { chat: Thread; visible: boolean }) {
   // Открыт и виден — прочитан до последнего сообщения (счётчик в списке гаснет), как в Telegram.
   useEffect(() => { if (visible) markRead(chat.key, chat.last.at); }, [visible, chat.key, chat.last.at]);
   // Открыли чат — лента внизу, у последнего сообщения (как в Telegram), если у неё своя прокрутка.
-  useLayoutEffect(() => { const el = feed.current; if (el) el.scrollTop = el.scrollHeight; }, [chat.key]);
+  // Мгновенно (behavior 'instant'), даже если стили ленты зададут scroll-behavior: smooth: плавный прокрут 0,5–1 с при
+  // открытии перебивал колесо мамы (замер дизайна 16.10: на 500 мс — 3 из 3 «не крутится»).
+  useLayoutEffect(() => { const el = feed.current; if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'instant' }); }, [chat.key]);
   // По дням: у каждого дня своя группа — плашка даты прилипает сверху только в пределах своего дня, следующий день
   // её выталкивает (как в Telegram), а не ложится поверх.
   const days: { day: string; rows: ReactNode[] }[] = [];
