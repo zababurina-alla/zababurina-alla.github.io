@@ -2,7 +2,7 @@
 // (docs/api-contract.md v2.1). Экраны и очередь записей не знают, с кем говорят.
 import { ApiError, call } from './transport';
 import type { Envelope } from './transport';
-import type { ApplyTemplateResult, BotLinkResult, CabinetApi, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
+import type { ApplyTemplateResult, BotLinkResult, CabinetApi, StatementPdf, StatementPreview, StatementResult, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
 import { RETRYABLE } from './api';
 import type { Activity, Client, Consultation, Deadline, InboxItem, InboxType, KvedItem, Payment, Question, RateGroup, Rates, Task } from './types';
 import { INBOX_TYPES } from './types';
@@ -376,6 +376,38 @@ export class LiveApi implements CabinetApi {
     const env = await this.rpc<{ connected?: unknown; link?: unknown; expiresAt?: unknown }>('clients.botLink', { clientId });
     const d = env.data;
     return { connected: d.connected === true, link: text(d.link) || null, expiresAt: text(d.expiresAt) || null };
+  }
+
+  async statementPdf(clientId: string): Promise<StatementPdf> {
+    const env = await this.rpc<{ url?: unknown; fileName?: unknown }>('clients.statementPdf', { clientId });
+    const url = text(env.data.url);
+    if (!/^https:\/\//.test(url)) throw new ApiError({ code: 'SERVER', message: 'Таблица не дала ссылку на выписку — попробуйте ещё раз' });
+    return { url, fileName: text(env.data.fileName) };
+  }
+
+  async statementPreview(clientId: string): Promise<StatementPreview> {
+    const env = await this.rpc<{ preview?: unknown; reason?: unknown; message?: unknown }>('clients.sendStatement', { clientId, preview: true });
+    const d = env.data;
+    const reason = d.reason === 'noBot' || d.reason === 'test' ? d.reason : null;
+    return { preview: text(d.preview) || null, reason, message: text(d.message) || null };
+  }
+
+  /** Как remindClient: ушло / не ушло / неизвестно / рано (RATE_LIMIT, retryAt). */
+  async sendStatement(clientId: string, requestId: string): Promise<StatementResult> {
+    try {
+      const env = await this.rpc<{ sent?: unknown; sentAt?: unknown; preview?: unknown; reason?: unknown; message?: unknown }>('clients.sendStatement', { clientId }, requestId);
+      const d = env.data;
+      if (d.sent === true) return { sent: true, sentAt: text(d.sentAt) || null, preview: text(d.preview) || null };
+      const reason = d.reason === 'noBot' || d.reason === 'test' ? d.reason : 'unknown';
+      return { sent: false, reason, message: text(d.message) || (reason === 'noBot' ? 'У клиента нет бота в Telegram' : reason === 'test' ? 'Тестовый режим — выписка не ушла' : 'Не знаю, ушло ли — проверьте в Telegram') };
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'RATE_LIMIT') {
+        const r: StatementResult = { sent: false, reason: 'rateLimit', message: e.message || 'Этому клиенту уже писали недавно' };
+        if (e.retryAt) r.retryAt = e.retryAt;
+        return r;
+      }
+      throw e;
+    }
   }
 
   /** «Не писать клиенту»: снять сообщение о закрытии срока, пока оно ждёт 2 мин. С requestId, мимо очереди —

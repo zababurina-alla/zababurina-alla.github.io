@@ -26,6 +26,7 @@ import { useRoute } from '../router';
 import { ConsultationsTab } from './Consultations';
 import { TemplateDialog } from './TemplateDialog';
 import { BotLink } from './BotLink';
+import { StatementBlock } from './Statement';
 import { roMessage } from '../ui/readonly';
 import { TASK_TEMPLATES } from '../lib/taskTemplates';
 import { addDays } from '../lib/dates';
@@ -305,6 +306,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                   <div><h3 className="cp__h">Ключ выпущен</h3><p>{c.keyIssuer ? <TableText text={c.keyIssuer} tidy /> : <span className="nil">не указано</span>}</p></div>
                   <div><h3 className="cp__h">Пароль от кабинета</h3><PasswordReveal clientId={c.id} /></div>
                 </section>
+                <StatementBlock key={`st-${c.id}`} clientId={c.id} />
                 <section className="cp__block">
                   <h3 className="cp__h">КВЕД</h3>
                   {c.kved.length ? <ul className="kved">{c.kved.map((k) => <li key={k.code}><span className="num kved__code">{k.code}</span>{k.title}</li>)}</ul> : <p className="nil">КВЕД в таблице не указан</p>}

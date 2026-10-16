@@ -108,6 +108,13 @@ export type ApplyTemplateResult =
 /** clients.botLink: подключён — ссылки нет; иначе одноразовая ссылка /start client_… на 7 дней (каждый вызов — новая). */
 export interface BotLinkResult { connected: boolean; link: string | null; expiresAt: string | null }
 
+/** clients.statementPdf: ссылка на новый PDF в Drive (каждый вызов — новый файл). */
+export interface StatementPdf { url: string; fileName: string }
+/** clients.sendStatement превью: подпись на языке клиента; нет бота / тестовый — preview null и причина. */
+export interface StatementPreview { preview: string | null; reason: 'noBot' | 'test' | null; message: string | null }
+/** clients.sendStatement отправка — как RemindResult (лимит 12 ч на клиента — общий с напоминаниями). */
+export type StatementResult = RemindResult;
+
 /** deadlines.cancelNotify: сообщение клиенту о закрытии снято (срок остаётся закрытым); снимать было нечего;
  *  уже забрано на отправку (sentAt — примерно когда ушло). */
 export type CancelNotifyResult = { status: 'cancelled' } | { status: 'nothing' } | { status: 'sent'; sentAt: string | null };
@@ -147,6 +154,11 @@ export interface CabinetApi {
   applyTemplate(clientId: string, template: DeadlineTemplate | undefined, requestId: string): Promise<ApplyTemplateResult>;
   /** Без requestId (токен — ключ входа, в листы не пишется). Ошибки — ApiError. */
   clientBotLink(clientId: string): Promise<BotLinkResult>;
+  /** Без requestId, собирается несколько секунд. В PDF есть логин клиента (не пароль) — как в меню таблицы. */
+  statementPdf(clientId: string): Promise<StatementPdf>;
+  statementPreview(clientId: string): Promise<StatementPreview>;
+  /** С requestId: повтор не шлёт второй раз. */
+  sendStatement(clientId: string, requestId: string): Promise<StatementResult>;
   /** clients.get — карточка целиком (п. 3) и история изменений клиента (п. 9). */
   clientCard(id: string): Promise<ClientCard>;
   /** reference.rates — ставки года из «⚙️ Справочники». Цифр ставок в коде сайта нет. */

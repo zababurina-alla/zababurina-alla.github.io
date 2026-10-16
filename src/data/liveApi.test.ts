@@ -416,6 +416,25 @@ describe('живой адаптер: чтение', () => {
     expect(await api.clientBotLink('C-2')).toEqual({ connected: true, link: null, expiresAt: null });
   });
 
+  it('выписка: PDF без requestId (не https — ошибка); превью; отправка с requestId; лимит 12 ч — RATE_LIMIT с retryAt', async () => {
+    const s = server(
+      ok({ clientId: 'C-1', url: 'https://drive.google.com/file/d/x', fileName: 'Виписка.pdf', fileId: 'x' }),
+      ok({ clientId: 'C-1', url: 'javascript:alert(1)', fileName: 'x' }),
+      ok({ preview: 'Ваша виписка', lang: 'uk' }),
+      ok({ sent: true, sentAt: '2026-10-16T16:00:00+03:00', preview: 'Ваша виписка', url: 'https://drive.google.com/file/d/y' }),
+      { ok: false, error: { code: 'RATE_LIMIT', message: 'Уже писали', retryable: false, field: null, retryAt: '2026-10-17T04:00:00+03:00' }, current: null },
+    );
+    const api = new LiveApi(URL_, auth(), s.fetchImpl);
+    expect(await api.statementPdf('C-1')).toEqual({ url: 'https://drive.google.com/file/d/x', fileName: 'Виписка.pdf' });
+    expect(s.sent[0]?.requestId).toBeUndefined();
+    await expect(api.statementPdf('C-1')).rejects.toThrow('ссылку');
+    expect(await api.statementPreview('C-1')).toEqual({ preview: 'Ваша виписка', reason: null, message: null });
+    expect(s.sent[2]).toMatchObject({ action: 'clients.sendStatement', payload: { clientId: 'C-1', preview: true } });
+    expect(await api.sendStatement('C-1', 'R1')).toEqual({ sent: true, sentAt: '2026-10-16T16:00:00+03:00', preview: 'Ваша виписка' });
+    expect(s.sent[3]).toMatchObject({ action: 'clients.sendStatement', requestId: 'R1', payload: { clientId: 'C-1' } });
+    expect(await api.sendStatement('C-1', 'R2')).toEqual({ sent: false, reason: 'rateLimit', message: 'Уже писали', retryAt: '2026-10-17T04:00:00+03:00' });
+  });
+
   it('«Не писать клиенту»: снято / снимать нечего / уже ушло (CONFLICT с sentAt); requestId — свой на нажатие', async () => {
     const s = server(ok({ id: 'D-1', cancelled: true }), ok({ id: 'D-1', cancelled: false }), fail('CONFLICT', 'Уже отправлено', {}, { id: 'D-1', sentAt: '2026-10-16T02:10:00+03:00' }));
     const api = new LiveApi(URL_, auth(), s.fetchImpl);
