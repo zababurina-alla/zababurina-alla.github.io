@@ -229,30 +229,24 @@
 
 /* ═════════ Уведомления ═════════
    Выезжают пружиной снизу, уходят быстро и без перелёта. Полоска внизу — сколько осталось («Отменить» — 10 с).
-   Стопка: новое — спереди, прежние — выше на 10 px и меньше на 5 %; наведение раскрывает стопку. */
+   Столбиком, новое — внизу (приёмка «Пользователя» С-1, 16.10): стопкой нижнее закрывало верхнее, и его «Отменить»
+   нельзя было нажать, пока шли 10 с. У каждого — своё место и свои кнопки. */
 .toasts {
   position: fixed;
   left: var(--space-3);
   right: var(--space-3);
   bottom: calc(4.25rem + var(--space-3) + env(safe-area-inset-bottom));
   z-index: 60;
-  display: grid;
-  justify-items: center;
-  align-items: end;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
   pointer-events: none;
 }
 
 .toasts > .toast {
-  grid-area: 1 / 1;
-  z-index: calc(10 - var(--i));
-  transform: translateX(var(--dx, 0px)) translateY(calc(var(--i) * -10px)) scale(calc(1 - var(--i) * 0.05));
-  transform-origin: 50% 0;
+  transform: translateX(var(--dx, 0px));
   transition: transform var(--dur-pop) var(--spring-pop), opacity var(--dur-base) var(--ease-out);
-}
-
-.toasts:hover > .toast {
-  transform: translateX(var(--dx, 0px)) translateY(calc(var(--i) * (-100% - 8px)));
-  transition: transform var(--dur-spring) var(--spring), opacity var(--dur-base) var(--ease-out);
 }
 
 @media (min-width: 1024px) {
@@ -260,7 +254,7 @@
     left: auto;
     right: var(--space-6);
     bottom: var(--space-6);
-    justify-items: end;
+    align-items: flex-end;
   }
 }
 
@@ -270,12 +264,7 @@
   .modal--dialog > .toasts {
     top: calc(var(--space-3) + env(safe-area-inset-top));
     bottom: auto;
-    align-items: start;
-  }
-
-  .modal--dialog > .toasts > .toast {
-    transform: translateX(var(--dx, 0px)) translateY(calc(var(--i) * 10px)) scale(calc(1 - var(--i) * 0.05));
-    transform-origin: 50% 100%;
+    flex-direction: column-reverse;
   }
 }
 
@@ -303,7 +292,7 @@
 
 .toasts > .toast.is-leaving {
   opacity: 0;
-  transform: translateX(var(--dx, 0px)) translateY(calc(var(--i) * -10px + 10px)) scale(calc(1 - var(--i) * 0.05 - 0.02));
+  transform: translateX(var(--dx, 0px)) translateY(10px) scale(0.98);
   transition: opacity 160ms var(--ease-out), transform 200ms var(--ease-out);
 }
 
