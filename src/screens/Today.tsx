@@ -5,7 +5,7 @@ import { InboxCard } from './Inbox';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { useStore } from '../data/store';
-import { TODAY, daysBetween, daysInMonth, daysLabel, fmtDate, monthName, plural, statusByDays, weekday, fmtDayMonth } from '../lib/dates';
+import { TODAY, daysBetween, daysInMonth, daysLabel, fmtDate, monthKey, monthName, plural, statusByDays, weekday, fmtDayMonth } from '../lib/dates';
 import { growthLabel, monthStats } from '../lib/monthStats';
 import { formatMoney } from '../lib/money';
 import { Icon } from '../ui/Icon';
@@ -103,6 +103,7 @@ export function Today() {
   const keysGone = keys.filter((c) => daysBetween(TODAY, c.keyUntil ?? TODAY) < 0).length;
   const keysSoon = keys.length - keysGone;
   const month = monthStats(store.payments, TODAY);
+  const noStatus = store.payments.filter((p) => p.status === 'expected' && p.date && (monthKey(p.date) === month.key || monthKey(p.date) === month.prevKey)).length;
   // Задачи на сегодня: просроченные и сегодняшние, самые важные — выше.
   const PRIO = { critical: 0, high: 1, medium: 2, low: 3 } as const;
   const todayTasks = store.tasks.filter((t) => !t.done && t.due && t.due <= TODAY)
@@ -262,7 +263,11 @@ export function Today() {
 
           <section className="panel reveal money-card" aria-labelledby="t-money">
             <header className="panel__head"><h2 id="t-money" className="panel__title">Получено в {monthName(month.key, 'prep')}</h2><a className="link" href="#/payments">Платежи</a></header>
-            {month.total === 0 && month.prevTotal === 0 ? (
+            {month.total === 0 && month.prevTotal === 0 && noStatus > 0 ? (
+              // Платежи есть, но без «✅ Получено» (сервер отдаёт пустой статус как «ожидается»): деньгами их не считаем —
+              // решение за мамой (координатор 16.10), до него честно говорим, что статусы уточняются.
+              <p className="panel__note sub">Статусы платежей уточняются: у {noStatus} {plural(noStatus, 'платежа', 'платежей', 'платежей')} за {monthName(month.prevKey, 'nom').toLowerCase()}–{monthName(month.key, 'nom').toLowerCase()} не отмечено «Получено» — сумму покажем, когда отметят.</p>
+            ) : month.total === 0 && month.prevTotal === 0 ? (
               <p className="panel__note sub">В таблице платежей за {monthName(month.key, 'nom').toLowerCase()} и {monthName(month.prevKey, 'nom').toLowerCase()} нет — суммы появятся, когда платёж запишут в таблицу, бота или здесь.</p>
             ) : (
             <div className="money-card__body">
