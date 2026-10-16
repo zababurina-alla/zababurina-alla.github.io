@@ -7,6 +7,7 @@ import { useStore } from '../data/store';
 import type { Client } from '../data/types';
 import { useKvedTitles } from '../data/reference';
 import { parseKvedCode } from '../lib/kvedCode';
+import { normalizeKved } from '../lib/kvedLookup';
 import { Icon } from '../ui/Icon';
 import { SaveBadge } from '../ui/kit';
 import { roAttrs } from '../ui/readonly';
@@ -27,7 +28,9 @@ export function KvedEdit({ c }: { c: Client }) {
     if (!edit) return;
     const code = parseKvedCode(input);
     if (!code) { setError('Код КВЕД — в виде 47.21 (две цифры, точка, две цифры)'); return; }
-    if (edit.includes(code)) { setError(`${code} уже в списке`); return; }
+    // Сервер хранит 47.20 как 47.2 (как таблица) — сравниваем без нулей в конце, иначе «47.20» рядом с «47.2» — дубль.
+    const same = edit.find((k) => normalizeKved(k) === normalizeKved(code));
+    if (same) { setError(`${same} уже в списке`); return; }
     if (edit.length >= MAX) { setError(`Не больше ${MAX} кодов`); return; }
     setEdit([...edit, code]); setInput(''); setError('');
   }
@@ -51,7 +54,7 @@ export function KvedEdit({ c }: { c: Client }) {
         <form className="kved-edit__add" onSubmit={(e) => { e.preventDefault(); add(); }}>
           <input className="input input--sm num" value={input} onChange={(e) => { setInput(e.target.value); setError(''); }} placeholder="47.21" inputMode="decimal" aria-label="Код КВЕД" autoComplete="off" />
           <button type="submit" className="btn btn--secondary btn--sm" disabled={!input.trim()}><Icon name="plus" size={16} />Добавить</button>
-          {code && !edit.includes(code) && <span className="sub">{title(code) || 'в листе «📑 КВЕДы» такого кода нет — проверьте'}</span>}
+          {code && !edit.some((k) => normalizeKved(k) === normalizeKved(code)) && <span className="sub">{title(code) || 'в листе «📑 КВЕДы» такого кода нет — проверьте'}</span>}
         </form>
         {error && <p className="field__error" role="alert">{error}</p>}
         {/* Главный по ставке — только у ФОП 1–2 группы; у 3 группы и других ЄП от оборота, главного нет (сервер 16.10) */}
