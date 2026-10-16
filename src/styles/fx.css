@@ -381,3 +381,12 @@
 .dgroup__title.is-stuck {
   background: var(--surface);
 }
+
+/* Календарь «Сроков» едет за списком — прилип: тень глубже, видно, что он «над» листом (пожелание «Пользователя») */
+.deadlines-grid > aside {
+  transition: box-shadow var(--dur-base) ease;
+}
+
+.deadlines-grid > aside.is-stuck {
+  box-shadow: inset 0 1px 0 var(--edge), 0 0 0 1px var(--line), var(--shadow-2);
+}

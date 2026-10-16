@@ -94,8 +94,16 @@ export function initials(name: string): string {
   return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase();
 }
 
-export function Avatar({ name, size = 'md', clientId }: { name: string; size?: 'sm' | 'md' | 'lg'; clientId?: string }) {
-  return <span className={`avatar avatar--${size}`} data-client-avatar={clientId} aria-hidden="true">{initials(name)}</span>;
+/** Кружок клиента: фото (если есть и загрузилось), под ним — буквы; не загрузилось — остаются буквы. */
+export function Avatar({ name, size = 'md', clientId, photo }: { name: string; size?: 'sm' | 'md' | 'lg'; clientId?: string; photo?: string | null }) {
+  const [failed, setFailed] = useState<string | null>(null);
+  const src = photo && photo !== failed ? photo : null;
+  return (
+    <span className={`avatar avatar--${size}${src ? ' has-photo' : ''}`} data-client-avatar={clientId} aria-hidden="true">
+      {initials(name)}
+      {src && <img className="avatar__photo" src={src} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(src)} />}
+    </span>
+  );
 }
 
 /** Честный статус записи: «сохраняется…» → «в таблице» → «не сохранилось». */

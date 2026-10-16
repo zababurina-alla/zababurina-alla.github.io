@@ -25,6 +25,7 @@ import { Hint } from '../ui/Hint';
 import { navigate } from '../router';
 import { AttentionPanel } from './Attention';
 import { useBalance } from './useBalance';
+import { greeting, kyivHour } from '../ui/greeting';
 
 type Filter = 'week' | 'month' | 'overdue' | 'burning' | 'soon';
 
@@ -156,8 +157,8 @@ export function Today() {
     else if (key === 'keys') navigate('#/keys');
   };
 
-  const hour = new Date().getHours();
-  const hello = hour < 12 ? 'Доброе утро' : hour < 18 ? 'Добрый день' : 'Добрый вечер';
+  // По часам Киева, а не компьютера; ночью — «Доброй ночи» (ui/greeting)
+  const hello = greeting(kyivHour());
 
   // Главная фраза дня — из чисел, без украшений: что горит сильнее всего. Находка «Пользователя» № 13: «что горит»
   // говорилось трижды (фраза, пересказ, плитки) — теперь фраза и под ней один план; плиток и пересказа нет.

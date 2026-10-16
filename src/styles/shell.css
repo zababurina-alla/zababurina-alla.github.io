@@ -172,12 +172,13 @@
       padding-top: var(--space-3);
     }
 
-    .nav__item {
-      min-height: 2.5rem;
+    /* .rail впереди: базовые .nav__item и .nav__group ниже по файлу перебивали это правило (Р-4 не срабатывал) */
+    .rail .nav__item {
+      min-height: 2.375rem;
     }
 
-    .nav__group {
-      margin-top: var(--space-3);
+    .rail .nav__group {
+      margin-top: var(--space-2);
     }
   }
 
@@ -405,25 +406,11 @@
   text-align: center;
 }
 
-/* ═════════ Низ меню: «Закрыто сегодня», тема, звук, кто вошёл ═════════ */
+/* ═════════ Низ меню: «Закрыто сегодня» и профиль ═════════ */
 .rail__foot {
   margin-top: auto;
   display: grid;
   gap: var(--space-2);
-}
-
-.rail__tools > .icon-btn,
-.rail__tools > .pop-wrap {
-  flex: none;
-}
-
-.rail__tools {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  min-width: 0;
-  padding-top: var(--space-2);
-  box-shadow: inset 0 1px 0 var(--line);
 }
 
 /* Счётчик «Закрыто сегодня»: сюда улетает закрытый срок; пока ноль — тихий, после первого — зелёный */
@@ -482,40 +469,89 @@
   display: none;
 }
 
+/* Профиль — карточка во всю ширину низа меню, как пункт меню: аватар · имя · значок выхода справа */
 .me {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: var(--space-2);
   min-width: 0;
-  margin-left: auto;
-  color: var(--ink-2);
+  min-height: 3rem;
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink);
   font-size: var(--text-sm);
+}
+
+.me__who {
+  flex: 1;
+  display: grid;
+  gap: 1px;
+  min-width: 0;
 }
 
 .me__text {
-  flex: 0 1 auto;
   min-width: 0;
-  line-height: 1.2;
-  /* Имя — до двух строк целиком, без «Выдуман…» (приёмка 16.10, М-2) */
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  overflow: hidden;
+  font-weight: var(--weight-semibold);
+  line-height: 1.25;
+  overflow-wrap: anywhere; /* имя целиком, длинное — второй строкой (М-2) */
 }
 
-/* Имя и «Выйти» — столбиком: в узком меню в строку не помещаются. */
-.me__who {
-  display: grid;
-  justify-items: start;
-  gap: 2px;
+.me__sub {
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  line-height: 1.2;
+}
+
+/* Тема и звук — тихими значками в карточке профиля, перед выходом */
+.me__tools {
+  display: flex;
+  flex: none;
+  margin-left: auto;
+}
+
+.me__tools .icon-btn,
+.me__out.icon-btn {
+  width: 2.125rem;
+  height: 2.125rem;
+  color: var(--ink-2);
+}
+
+/* Окошко звука из карточки — вверх, правым краем к краю карточки (за звуком — кнопка выхода, если вошли) */
+.rail .me .pop {
+  left: auto;
+  right: 0;
+  transform-origin: calc(100% - 1rem) 100%;
+}
+
+.rail .me:has(> .me__out) .pop {
+  right: calc(-2.125rem - var(--space-2));
 }
 
 .me__out {
-  color: var(--ink-2);
-  font-size: var(--text-sm);
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
+  flex: none;
+}
+
+/* Подтверждение «Выйти?» — на время прячет значки, имя не сжимается */
+.me:has(> .me__out.btn--danger) > .me__tools {
+  display: none;
+}
+
+.me:has(> .me__out.btn--danger) > .me__out {
+  margin-left: auto;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .me__out.icon-btn:hover {
+    background: var(--st-red-bg);
+    color: var(--st-red-ink);
+  }
+}
+
+.me__out.btn--danger {
+  min-height: 2.25rem;
+  padding: 0 var(--space-3);
 }
 
 /* ═════════ Окошко настроек звука ═════════ */

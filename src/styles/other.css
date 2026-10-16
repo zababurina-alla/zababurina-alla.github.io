@@ -374,11 +374,10 @@
 }
 
 .more--settings .me {
-  margin-left: 0;
-}
-
-.more--settings .me__text {
-  max-width: none;
+  flex: 1;
+  background: none;
+  box-shadow: none;
+  padding: 0;
 }
 
 /* «Входящие» (техника сайта): сообщения клиентов с кнопками решения. Оформление — за отделом дизайна. */
@@ -1789,20 +1788,10 @@
   }
 }
 
-/* Ноутбук 1024: колонка диалога узкая — «Ответить в Telegram» одним значком, имя клиента не сжимается до 68 px */
+/* Ноутбук 1024: колонка диалога узкая — кнопка короче: «↰ Ответить» словом (Н-2: один значок был непонятен),
+   «в Telegram» — только на широком; имя клиента не сжимается */
 @media (min-width: 900px) and (max-width: 1279px) {
-  .dialog__tg {
-    width: var(--tap);
-    padding: 0;
-    justify-content: center;
-  }
-
-  .dialog__tg-text {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
+  .dialog__tg-more {
+    display: none;
   }
 }

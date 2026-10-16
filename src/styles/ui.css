@@ -253,6 +253,37 @@
 .avatar--md { width: 2.375rem; height: 2.375rem; font-size: 0.9375rem; }
 .avatar--lg { width: 3.75rem; height: 3.75rem; font-size: 1.375rem; }
 
+/* Фото клиента (из Telegram, когда придёт): круг поверх букв; не загрузилось — остаются буквы.
+   Тонкое кольцо — чтобы светлое фото не сливалось с листом */
+.avatar {
+  position: relative;
+  overflow: hidden;
+}
+
+.avatar__photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--surface-sunk);
+}
+
+.avatar.has-photo {
+  color: transparent;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.avatar.has-photo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 12%, transparent);
+  pointer-events: none;
+}
+
 /* Пустое поле из таблицы: пустое остаётся пустым и называет причину («не указано в таблице») */
 .nil {
   color: var(--ink-2);

@@ -15,6 +15,7 @@ import { TODAY, daysBetween, daysLabel, fmtDate, statusByDays } from '../lib/dat
 import { formatMoney, formatPayMoney } from '../lib/money';
 import { Icon } from '../ui/Icon';
 import { Avatar, Money, SaveBadge, Tabs, reducedMotion } from '../ui/kit';
+import { clientPhoto } from '../ui/photo';
 import { Empty } from '../ui/Empty';
 import { URGENCY_ICON } from './DeadlineTable';
 import { Modal } from '../ui/Modal';
@@ -196,7 +197,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
         <div className="cp">
           <header className="cp__head">
             <button type="button" className="icon-btn cp__close" aria-label="Закрыть карточку" onClick={onClose}><Icon name="close" /></button>
-            <span className="vt-avatar"><Avatar name={c.name} size="lg" /></span>
+            <span className="vt-avatar"><Avatar name={c.name} size="lg" clientId={c.id} photo={clientPhoto(c)} /></span>
             <div className="cp__who">
               <h2 id="cp-name" className="cp__name"><span className="vt-name">{c.name}</span></h2>
               <p className="cp__kind"><span className="tag">{c.kind ? kindLabel(c.kind) : 'тип не указан'}</span>{c.employer && <span className="tag">работодатель</span>}{c.marks.map((m) => <span key={m} className="tag">{MARK_LABEL[m]}</span>)}
