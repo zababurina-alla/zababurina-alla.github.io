@@ -376,7 +376,7 @@ describe('живой адаптер: чтение', () => {
     const input = { clientId: 'C-1', obligation: 'ЄП за IV квартал', due: '2027-02-09', periodicity: 'quarter' as const, note: '' };
     expect(await api.createDeadline(input, 'R7')).toEqual({ ok: true, deadline: dl });
     expect(s.sent[0]).toMatchObject({ action: 'deadlines.create', requestId: 'R7', payload: { deadline: { id: 'R7', clientId: 'C-1', obligation: 'ЄП за IV квартал', due: '2027-02-09', periodicity: 'quarter' } } });
-    expect(Object.keys((s.sent[0] as { payload: { deadline: object } }).payload.deadline)).not.toContain('note');
+    expect(Object.keys((s.sent[0] as unknown as { payload: { deadline: object } }).payload.deadline)).not.toContain('note');
     const c = await api.createDeadline(input, 'R8');
     expect(!c.ok && [c.code, c.field, c.current?.id]).toEqual(['CONFLICT', 'obligation', 'D-3']);
     const v = await api.createDeadline({ ...input, due: '9.2.27' }, 'R9');
