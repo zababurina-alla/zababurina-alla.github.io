@@ -187,6 +187,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   /** Вопросы, убранные с экрана до ответа сервера, — вернуть, если ответ не записался. */
   const answering = useRef(new Map<string, Question>());
   const [closed, setClosed] = useState<ClosedEntry[]>([]);
+  // «Вернуть срок» зовут из уведомления, созданного в момент закрытия: его store видел список «закрыто» ДО этого срока.
+  // Поэтому reopenDeadline читает текущий список отсюда, а не из замыкания (находка «Пользователя» № 19).
+  const closedRef = useRef<ClosedEntry[]>([]);
+  useEffect(() => { closedRef.current = closed; }, [closed]);
   const [fresh, setFresh] = useState<string[]>([]);
   const [pending, setPending] = useState<OutboxItem[]>([]);
   const [counters, setCounters] = useState<Counters>({ entered: 0, sent: 0, accepted: 0, rejected: 0, applied: 0, seenInTable: 0 });
@@ -594,7 +598,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [deadlines, send, markFresh, putOpen]);
 
   const reopenDeadline = useCallback((id: string) => {
-    const entry = closed.find((c) => c.deadline.id === id);
+    const entry = closedRef.current.find((c) => c.deadline.id === id);
     if (!entry) return;
     setClosed((cs) => cs.filter((c) => c !== entry));
     setDeadlines((xs) => xs.filter((x) => x.id !== entry.next?.id));
@@ -603,7 +607,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // Из пакета так нельзя (уйдут и остальные): отмена встаёт в очередь следом за пакетом.
     if (!entry.batch && outboxRef.current?.has(entry.requestId)) { void outboxRef.current.discard(entry.requestId); return; }
     send({ kind: 'reopenDeadline', requestId: newRequestId(), id, undoOf: entry.requestId }, `Отменить закрытие «${entry.deadline.what}»`);
-  }, [closed, send, putOpen]);
+  }, [send, putOpen]);
 
   const addPayment = useCallback((p: Omit<Payment, 'id' | 'version' | 'source' | 'save'>, onSaved?: () => void) => {
     const requestId = newRequestId();
