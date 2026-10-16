@@ -25,6 +25,7 @@ import type { GroupBy } from './DayGroups';
 import { OBLIGATION_ICON } from '../ui/obligationIcon';
 import { useRoute } from '../router';
 import { useUi } from '../app/ui-context';
+import { WeekLoadBar } from './WeekLoad';
 
 type Range = 'month' | 'overdue' | 'week' | 'all';
 const RANK: Record<Status, number> = { red: 4, orange: 3, yellow: 2, green: 1, grey: 0 };
@@ -218,6 +219,7 @@ export function Deadlines() {
                 <button key={id} type="button" className="seg__opt" aria-pressed={by === id} onClick={() => { setBy(id); play('tick'); }}>{label}</button>
               ))}
             </div>
+            <WeekLoadBar />
             <div className="dfilters" role="group" aria-label="Фильтры сроков">
               <label><span className="sub">Статус</span>
                 <select className="input input--sm" value={statusF} onChange={(e) => setStatusF(e.target.value as OpenStatus | 'all')}>
