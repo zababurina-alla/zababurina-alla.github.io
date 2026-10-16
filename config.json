@@ -7,6 +7,11 @@
   ],
   "features": [
     "inbox",
-    "cancelNotify"
+    "cancelNotify",
+    "month",
+    "attention",
+    "weekLoad",
+    "epCalc",
+    "voice"
   ]
 }
