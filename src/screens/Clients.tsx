@@ -61,7 +61,7 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
   const isOther = (k: ClientKind | null) => !['fop1', 'fop2', 'fop3'].includes(k ?? '');
   const byKind = (k: ClientKind | null, f: KindFilter) => f === 'all' || k === f || (f === 'other' && isOther(k));
   const found = search(
-    store.clients.filter((c) => byKind(c.kind, kind) && (!noPhone || !c.phone.trim()) && (noPay === null || noPaymentFor(paidLast, c.id, noPay, TODAY))).map((c) => ({ ...c, extra: [...c.kved.map((k) => k.code), c.phone],
+    store.clients.filter((c) => byKind(c.kind, kind) && (!noPhone || !c.phone.trim()) && (noPay === null || paidLast.size === 0 || noPaymentFor(paidLast, c.id, noPay, TODAY))).map((c) => ({ ...c, extra: [...c.kved.map((k) => k.code), c.phone],
       words: [...c.kved.map((k) => k.title), c.keyIssuer, ...store.deadlines.filter((d) => d.clientId === c.id).map((d) => d.what)] })),
     q,
   );
@@ -103,14 +103,16 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
               <Icon name="call" size={16} />Без телефона<span className="chip__n num">{phoneless}</span>
             </button>
           )}
-          <div className="chips clients__nopay" role="group" aria-label="Без платежа">
+          {/* Ни одного полученного платежа в снимке (16.10 на живом: статус пустой → «ожидается») — фильтр показал бы
+              всех клиентов, это шум: не показываем, пока полученные платежи не появятся. */}
+          {paidLast.size > 0 && <div className="chips clients__nopay" role="group" aria-label="Без платежа">
             {NO_PAY_DAYS.map((n) => (
               <button key={n} type="button" className="chip" aria-pressed={noPay === n} onClick={() => { setNoPay((v) => (v === n ? null : n)); play('tick'); }}
                 title={n === 90 ? 'Ни одного полученного платежа за 90 дней (столько держит снимок)' : `Последний полученный платёж — больше ${n} дней назад`}>
                 <Icon name="payments" size={16} />Без платежа {n} дн.<span className="chip__n num">{unpaid(n)}</span>
               </button>
             ))}
-          </div>
+          </div>}
         </div>
 
         <div ref={table} className="ctable" role="table" aria-label="Клиенты">
