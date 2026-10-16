@@ -7,10 +7,12 @@ import { useVoiceInput, voiceSupported } from './voiceInput';
 
 // Подставной распознаватель браузера: запоминает себя, чтобы тест «сказал» фразу.
 let last: { lang: string; onresult: ((e: unknown) => void) | null; onerror: ((e: unknown) => void) | null; onend: (() => void) | null } | null = null;
+const made: FakeRec[] = [];
 class FakeRec {
   lang = ''; interimResults = false; maxAlternatives = 1; continuous = false;
   onresult: ((e: unknown) => void) | null = null; onerror: ((e: unknown) => void) | null = null; onend: (() => void) | null = null;
-  start() { last = this; }
+  constructor() { made.push(this); }
+  start() { last = made.at(-1) ?? null; }
   stop() { this.onend?.(); }
   abort() { this.onend?.(); }
 }
