@@ -322,11 +322,14 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
             )}
             {tab === 'deadlines' && (
               <>
-                <div className="cp__tools">
-                  <button type="button" className="btn btn--secondary btn--sm" onClick={() => ui.openNewDeadline(c.id)} {...roAttrs('deadlines')}><Icon name="plus" size={16} />Новый срок</button>
-                  <button type="button" className="btn btn--ghost btn--sm" onClick={openTemplates} {...roAttrs('deadlines')}
-                    title="Добавить сроки по шаблону системы налогообложения — только те, которых у клиента нет"><Icon name="sync" size={16} />Сроки по шаблону</button>
-                </div>
+                {/* Кнопки — только когда сервер это умеет и запись сроков включена (без них — лишь подсказка «пока в таблице») */}
+                {(store.createDeadline || store.templates) && (
+                  <div className="cp__tools">
+                    {store.createDeadline && <button type="button" className="btn btn--secondary btn--sm" onClick={() => ui.openNewDeadline(c.id)}><Icon name="plus" size={16} />Новый срок</button>}
+                    {store.templates && <button type="button" className="btn btn--ghost btn--sm" onClick={openTemplates}
+                      title="Добавить сроки по шаблону системы налогообложения — только те, которых у клиента нет"><Icon name="sync" size={16} />Сроки по шаблону</button>}
+                  </div>
+                )}
                 <TemplateDialog open={tplOpen} clientId={c.id} onClose={() => setTplOpen(false)} />
                 <DeadlineTable items={own} showClient={false} empty="Открытых сроков нет" />
               </>

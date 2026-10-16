@@ -168,7 +168,7 @@ export function Reference() {
       )}
       {r && <RateCards r={r} />}
       {r?.limitsSource === 'code' && <p className="sub rates__note">Пределы групп — по закону {r.year || ''}, не из таблицы.</p>}
-      {r && <EpCalc r={r} />}
+      {r && hasFeature('epCalc') && <EpCalc r={r} />}
       <KvedSearch />
     </div>
   );
@@ -188,7 +188,7 @@ export function Tasks() {
   const [line, setLine] = useState('');
   // Голосом: распознаёт браузер; текст ложится в строку — дальше тот же разбор «кто / что / когда».
   const voice = useVoiceInput(useCallback((text: string) => setLine(text), []));
-  const canVoice = voiceSupported() && canWrite('tasks');
+  const canVoice = hasFeature('voice') && voiceSupported() && canWrite('tasks');
   const parsed = line.trim() ? parseQuickTask(line, store.clients) : null;
   const client = parsed?.clientId ? store.client(parsed.clientId) : undefined;
 

@@ -11,8 +11,10 @@ export const WRITE_AREAS: readonly WriteArea[] = ['payments', 'tasks', 'question
 /** Возможности, которые включаются, когда их готов отдавать сервер. На выдуманных данных — все. */
 /** remindPreview — сервер умеет clients.remind { preview:true } (пробный, без отправки). Без флага не зовём:
  *  старый сервер флаг не знает и отправил бы настоящее сообщение. */
-export type Feature = 'inbox' | 'remindPreview' | 'cancelNotify' | 'deadlinesCreate' | 'applyTemplate' | 'botLink' | 'statementPdf' | 'sendStatement' | 'archive' | 'attention' | 'completeMany' | 'updateMany' | 'month';
-const FEATURES: readonly Feature[] = ['inbox', 'remindPreview', 'cancelNotify', 'deadlinesCreate', 'applyTemplate', 'botLink', 'statementPdf', 'sendStatement', 'archive', 'attention', 'completeMany', 'updateMany', 'month'];
+export type Feature = 'inbox' | 'remindPreview' | 'cancelNotify' | 'deadlinesCreate' | 'applyTemplate' | 'botLink' | 'statementPdf' | 'sendStatement' | 'archive' | 'attention' | 'completeMany' | 'updateMany' | 'month'
+  // Новое видимое без стилей и приёмки — на живом выключено до приёмки «Пользователя» (координатор 16.10)
+  | 'epCalc' | 'weekLoad' | 'voice' | 'kvedEdit';
+const FEATURES: readonly Feature[] = ['inbox', 'remindPreview', 'cancelNotify', 'deadlinesCreate', 'applyTemplate', 'botLink', 'statementPdf', 'sendStatement', 'archive', 'attention', 'completeMany', 'updateMany', 'month', 'epCalc', 'weekLoad', 'voice', 'kvedEdit'];
 
 /** OAuth client ID проекта Google Cloud «zababurina-alla» (…apps.googleusercontent.com). */
 export const GOOGLE_CLIENT_ID = '1078049272948-bnvonl9qah7npdq63gktbio1rm2lbgvb.apps.googleusercontent.com';

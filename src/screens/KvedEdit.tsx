@@ -2,7 +2,7 @@
 // Главный КВЕД («⭐ Расчёт ЄП по») сервер выбирает сам по максимальной ставке, как таблица: вручную не выбирается.
 // Код — в виде «NN.NN» (читалка parseKvedCode); название подсказывается из листа «📑 КВЕДы». Оформление — за дизайном.
 import { useState } from 'react';
-import { canWrite } from '../config';
+import { canWrite, hasFeature } from '../config';
 import { useStore } from '../data/store';
 import type { Client } from '../data/types';
 import { useKvedTitles } from '../data/reference';
@@ -65,10 +65,10 @@ export function KvedEdit({ c }: { c: Client }) {
   return (
     <>
       {c.kved.length ? <ul className="kved">{c.kved.map((k) => (
-        <li key={k.code}>{c.kvedMain === k.code && <Icon name="star" size={14} className="kv__star" label="Главный — по нему считается ЄП" />}
+        <li key={k.code}>{hasFeature('kvedEdit') && c.kvedMain === k.code && <Icon name="star" size={14} className="kv__star" label="Главный — по нему считается ЄП" />}
           <span className="num kved__code">{k.code}</span>{title(k.code) || <span className="nil">название не указано</span>}</li>
       ))}</ul> : <p className="nil">КВЕД в таблице не указан</p>}
-      {saving ? <SaveBadge state="saving" offline={!store.online} />
+      {!hasFeature('kvedEdit') ? null : saving ? <SaveBadge state="saving" offline={!store.online} />
         : canWrite('clients')
           ? <button type="button" className="link" onClick={() => { setEdit(c.kved.map((k) => k.code)); setBase(c.version); }}>Изменить КВЕД</button>
           : <span className="sub" {...roAttrs('clients')}>изменить — в таблице</span>}

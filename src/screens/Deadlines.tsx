@@ -1,7 +1,7 @@
 // «Сроки»: календарь месяца + список по дням; закрытие одним нажатием, «Закрыто сегодня» с честным статусом.
 // Месяц считается от сегодняшней даты и листается ‹ › (раньше был жёстко «Октябрь 2026»).
 import { useMemo, useRef, useState, useEffect } from 'react';
-import { canWrite } from '../config';
+import { canWrite, hasFeature } from '../config';
 import { roAttrs, roMessage } from '../ui/readonly';
 import { useToast } from '../ui/toast';
 import { SelectionCtx } from './selection';
@@ -189,7 +189,7 @@ export function Deadlines() {
         </div>
         <div className="page__actions">
           <button type="button" className="btn btn--secondary" onClick={printWeek}><Icon name="pdf" />Распечатать неделю</button>
-          <button type="button" className="btn btn--primary" onClick={() => ui.openNewDeadline()} {...roAttrs('deadlines')}><Icon name="plus" />Новый срок</button>
+          {store.createDeadline && <button type="button" className="btn btn--primary" onClick={() => ui.openNewDeadline()}><Icon name="plus" />Новый срок</button>}
         </div>
       </header>
       <p className="print-only print-head">Сроки на неделю · {fmtDayMonth(TODAY)} — {fmtDayMonth(addDays(TODAY, 7))} {TODAY.slice(0, 4)} · просрочено и горит</p>
@@ -219,7 +219,7 @@ export function Deadlines() {
                 <button key={id} type="button" className="seg__opt" aria-pressed={by === id} onClick={() => { setBy(id); play('tick'); }}>{label}</button>
               ))}
             </div>
-            <WeekLoadBar />
+            {hasFeature('weekLoad') && <WeekLoadBar />}
             <div className="dfilters" role="group" aria-label="Фильтры сроков">
               <label><span className="sub">Статус</span>
                 <select className="input input--sm" value={statusF} onChange={(e) => setStatusF(e.target.value as OpenStatus | 'all')}>
