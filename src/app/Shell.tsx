@@ -88,7 +88,7 @@ export function SoundSettings() {
 function ClosedCounter({ compact = false }: { compact?: boolean }) {
   const { closed } = useStore();
   return (
-    <a href="#/deadlines" className={`closed-chip${compact ? ' closed-chip--compact' : ''}${closed.length ? ' is-on' : ''}`} data-closed-counter
+    <a href="#/deadlines/closed" className={`closed-chip${compact ? ' closed-chip--compact' : ''}${closed.length ? ' is-on' : ''}`} data-closed-counter
       aria-label={`Закрыто сегодня: ${closed.length}`} title="Закрыто сегодня">
       <span className="closed-chip__tick" aria-hidden="true"><Icon name="check" size={14} /></span>
       {!compact && <span className="closed-chip__label">Закрыто сегодня</span>}
@@ -251,6 +251,8 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
               <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
             </button>
             <SoundSettings />
+            {/* «?» — помощь (находка № 17); на телефоне — пункт в «Ещё» */}
+            <a href="#/help" className="icon-btn" aria-label="Помощь" title="Помощь — F1"><Icon name="help" /></a>
             <Me />
           </div>
         </div>

@@ -6,6 +6,7 @@ import { UiCtx } from './app/ui-context';
 import type { UiApi } from './app/ui-context';
 import { ToastProvider } from './ui/toast';
 import { Today } from './screens/Today';
+import { Help } from './screens/Help';
 import { Clients } from './screens/Clients';
 import { ClientPanel } from './screens/ClientPanel';
 import { Deadlines } from './screens/Deadlines';
@@ -78,6 +79,7 @@ function Screens() {
         {route.name === 'icons' && <IconGallery />}
         {route.name === 'today-voice' && <TodayVoice />}
         {route.name === 'inbox' && (hasFeature('inbox') ? <Inbox /> : <Today />)}
+        {route.name === 'help' && <Help />}
         </ScreenBoundary>}
       </Shell>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />

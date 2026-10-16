@@ -1,6 +1,6 @@
 // «Сроки»: календарь месяца + список по дням; закрытие одним нажатием, «Закрыто сегодня» с честным статусом.
 // Месяц считается от сегодняшней даты и листается ‹ › (раньше был жёстко «Октябрь 2026»).
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, useEffect } from 'react';
 import { canWrite } from '../config';
 import { roAttrs, roMessage } from '../ui/readonly';
 import { useToast } from '../ui/toast';
@@ -23,6 +23,7 @@ import { TableText } from '../ui/TableText';
 import { DayGroups } from './DayGroups';
 import type { GroupBy } from './DayGroups';
 import { OBLIGATION_ICON } from '../ui/obligationIcon';
+import { useRoute } from '../router';
 
 type Range = 'month' | 'overdue' | 'week' | 'all';
 const RANK: Record<Status, number> = { red: 4, orange: 3, yellow: 2, green: 1, grey: 0 };
@@ -98,6 +99,19 @@ function clientGroup(kind: ClientKind | null): ClientGroup {
 export function Deadlines() {
   const store = useStore();
   const scope = useRef<HTMLDivElement>(null);
+  const route = useRoute();
+  // № 10: «Закрыто сегодня» в меню ведёт сюда (#/deadlines/closed) — к своему блоку, с короткой подсветкой.
+  const toClosed = route.params[0] === 'closed';
+  useEffect(() => {
+    if (!toClosed) return;
+    const el = document.getElementById('closed');
+    if (!el) return;
+    el.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' });
+    el.focus({ preventScroll: true });
+    el.classList.remove('is-flash');
+    void el.offsetWidth; // перезапуск подсветки при повторном нажатии
+    el.classList.add('is-flash');
+  }, [toClosed, store.closed.length]);
   const [range, setRange] = useState<Range>('month');
   const [picked, setPicked] = useState<string | null>(null);
   const [by, setBy] = useState<GroupBy>('day');
@@ -267,7 +281,7 @@ export function Deadlines() {
       )}
 
       {store.closed.length > 0 && (
-        <section className="panel reveal" aria-labelledby="closed-title">
+        <section id="closed" className="panel reveal closed-panel" aria-labelledby="closed-title" tabIndex={-1}>
           <header className="panel__head"><h2 id="closed-title" className="panel__title">Закрыто сегодня<span className="sub num">{store.closed.length}</span></h2></header>
           <ul className="closed">
             {store.closed.map(({ deadline, next, save, requestId }) => {
@@ -278,7 +292,8 @@ export function Deadlines() {
                   <span className="closed__text"><strong>{c ? shortName(c.name) : 'Клиент не указан'}</strong> — <TableText text={deadline.what} />
                     {next && <span className="sub">Система создала следующий: {next.what}, до {fmtDue(next.due)}</span>}</span>
                   <SaveBadge state={save} offline={!store.online} onRetry={() => store.retry(requestId)} />
-                  <button type="button" className="btn btn--ghost btn--sm" onClick={() => store.reopenDeadline(deadline.id)}><Icon name="undo" size={16} />Вернуть</button>
+                  {/* № 10: «Вернуть» — обычная кнопка сразу за текстом, а не серая в дальнем конце строки */}
+                  <button type="button" className="btn btn--secondary btn--sm closed__undo" onClick={() => store.reopenDeadline(deadline.id)}><Icon name="undo" size={16} />Вернуть срок</button>
                 </li>
               );
             })}
