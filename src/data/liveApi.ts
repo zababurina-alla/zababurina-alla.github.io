@@ -2,7 +2,7 @@
 // (docs/api-contract.md v2.1). Экраны и очередь записей не знают, с кем говорят.
 import { ApiError, call } from './transport';
 import type { Envelope } from './transport';
-import type { ApplyTemplateResult, CabinetApi, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
+import type { ApplyTemplateResult, BotLinkResult, CabinetApi, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
 import { RETRYABLE } from './api';
 import type { Activity, Client, Consultation, Deadline, InboxItem, InboxType, KvedItem, Payment, Question, RateGroup, Rates, Task } from './types';
 import { INBOX_TYPES } from './types';
@@ -370,6 +370,12 @@ export class LiveApi implements CabinetApi {
     } catch (e) {
       return this.refusal(e);
     }
+  }
+
+  async clientBotLink(clientId: string): Promise<BotLinkResult> {
+    const env = await this.rpc<{ connected?: unknown; link?: unknown; expiresAt?: unknown }>('clients.botLink', { clientId });
+    const d = env.data;
+    return { connected: d.connected === true, link: text(d.link) || null, expiresAt: text(d.expiresAt) || null };
   }
 
   /** «Не писать клиенту»: снять сообщение о закрытии срока, пока оно ждёт 2 мин. С requestId, мимо очереди —

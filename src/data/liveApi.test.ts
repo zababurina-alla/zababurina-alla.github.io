@@ -404,6 +404,18 @@ describe('живой адаптер: чтение', () => {
     expect(s.sent[2]).toMatchObject({ payload: { clientId: 'C-2', template: 'EXCISE', dryRun: true } });
   });
 
+  it('clients.botLink: без requestId; не подключён — ссылка и срок; подключён — ссылки нет', async () => {
+    const s = server(
+      ok({ clientId: 'C-1', connected: false, link: 'https://t.me/za_control_bot?start=client_abc', expiresAt: '2026-10-23T21:00:00+03:00' }),
+      ok({ clientId: 'C-2', connected: true, link: null, expiresAt: null }),
+    );
+    const api = new LiveApi(URL_, auth(), s.fetchImpl);
+    expect(await api.clientBotLink('C-1')).toEqual({ connected: false, link: 'https://t.me/za_control_bot?start=client_abc', expiresAt: '2026-10-23T21:00:00+03:00' });
+    expect(s.sent[0]).toMatchObject({ action: 'clients.botLink', payload: { clientId: 'C-1' } });
+    expect(s.sent[0]?.requestId).toBeUndefined();
+    expect(await api.clientBotLink('C-2')).toEqual({ connected: true, link: null, expiresAt: null });
+  });
+
   it('«Не писать клиенту»: снято / снимать нечего / уже ушло (CONFLICT с sentAt); requestId — свой на нажатие', async () => {
     const s = server(ok({ id: 'D-1', cancelled: true }), ok({ id: 'D-1', cancelled: false }), fail('CONFLICT', 'Уже отправлено', {}, { id: 'D-1', sentAt: '2026-10-16T02:10:00+03:00' }));
     const api = new LiveApi(URL_, auth(), s.fetchImpl);

@@ -25,6 +25,7 @@ import { DeadlineTable } from './DeadlineTable';
 import { useRoute } from '../router';
 import { ConsultationsTab } from './Consultations';
 import { TemplateDialog } from './TemplateDialog';
+import { BotLink } from './BotLink';
 import { roMessage } from '../ui/readonly';
 import { TASK_TEMPLATES } from '../lib/taskTemplates';
 import { addDays } from '../lib/dates';
@@ -289,7 +290,8 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                     {c.botConnected !== undefined && (
                       <li className="contact__row"><Icon name="bot" tile={c.botConnected ? 'green' : 'grey'} />
                         <div className="contact__body"><span className="contact__label">Telegram-бот</span>
-                          <p className={`contact__bot${c.botConnected ? ' is-on' : ''}`}>{c.botConnected ? 'подключён — уведомления уходят клиенту' : 'не подключён — уведомлений клиенту нет'}</p></div></li>
+                          <p className={`contact__bot${c.botConnected ? ' is-on' : ''}`}>{c.botConnected ? 'подключён — уведомления уходят клиенту' : 'не подключён — уведомлений клиенту нет'}</p>
+                          {!c.botConnected && <BotLink key={c.id} clientId={c.id} />}</div></li>
                     )}
                   </ul>
                 </section>

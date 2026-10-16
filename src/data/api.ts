@@ -105,6 +105,9 @@ export type ApplyTemplateResult =
   | { ok: true; template: DeadlineTemplate; added: Deadline[]; skipped: string[] }
   | { ok: false; code: ErrorCode; message: string; field: string | null };
 
+/** clients.botLink: подключён — ссылки нет; иначе одноразовая ссылка /start client_… на 7 дней (каждый вызов — новая). */
+export interface BotLinkResult { connected: boolean; link: string | null; expiresAt: string | null }
+
 /** deadlines.cancelNotify: сообщение клиенту о закрытии снято (срок остаётся закрытым); снимать было нечего;
  *  уже забрано на отправку (sentAt — примерно когда ушло). */
 export type CancelNotifyResult = { status: 'cancelled' } | { status: 'nothing' } | { status: 'sent'; sentAt: string | null };
@@ -142,6 +145,8 @@ export interface CabinetApi {
    *  клиента (это же «🔁 Пересчитать сроки»). Существующие сроки сервер не трогает. */
   previewTemplate(clientId: string, template?: DeadlineTemplate): Promise<TemplatePreview | { ok: false; code: ErrorCode; message: string; field: string | null }>;
   applyTemplate(clientId: string, template: DeadlineTemplate | undefined, requestId: string): Promise<ApplyTemplateResult>;
+  /** Без requestId (токен — ключ входа, в листы не пишется). Ошибки — ApiError. */
+  clientBotLink(clientId: string): Promise<BotLinkResult>;
   /** clients.get — карточка целиком (п. 3) и история изменений клиента (п. 9). */
   clientCard(id: string): Promise<ClientCard>;
   /** reference.rates — ставки года из «⚙️ Справочники». Цифр ставок в коде сайта нет. */

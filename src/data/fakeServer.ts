@@ -3,7 +3,7 @@
 // — версии записей и ошибка CONFLICT; — журнал изменений с курсором; — повтор того же requestId не создаёт дубль.
 // Рычаги отладки (обрыв связи, отказ, правка извне) — для кнопок в режиме отладки.
 import { ACTIVITY, CLIENTS, CONSULTATIONS, DEADLINES, INBOX, KVEDS, PAYMENTS, QUESTIONS, RATES, TASKS } from './fake';
-import type { ApplyTemplateResult, CabinetApi, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, TemplatePreview, ClientCard, Entity, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
+import type { ApplyTemplateResult, BotLinkResult, CabinetApi, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, TemplatePreview, ClientCard, Entity, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Consultation, Deadline, InboxItem, KvedItem, Payment, Question, Rates, Task } from './types';
 import { fold } from '../lib/search';
 import { TODAY, addDays, endOfMonth, fmtDate, fmtDue } from '../lib/dates';
@@ -411,6 +411,17 @@ class FakeServer implements CabinetApi {
     const res: ApplyTemplateResult = { ok: true, template: t, added, skipped };
     this.applied.set(requestId, res);
     return res;
+  }
+
+  async clientBotLink(clientId: string): Promise<BotLinkResult> {
+    await wait(READ_MS);
+    if (!this.online) throw new Error('NETWORK');
+    const c = this.clients.get(clientId);
+    if (!c) throw new Error('NOT_FOUND');
+    if (c.botConnected) return { connected: true, link: null, expiresAt: null };
+    // Учебная ссылка: токен выдуманный, бот его не узнает.
+    const token = Math.random().toString(36).slice(2, 12);
+    return { connected: false, link: `https://t.me/za_control_bot?start=client_demo${token}`, expiresAt: `${addDays(TODAY, 7)}T23:59:00+03:00` };
   }
 
   async cancelNotify(deadlineId: string, requestId: string): Promise<CancelNotifyResult> {
