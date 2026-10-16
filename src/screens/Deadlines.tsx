@@ -195,7 +195,8 @@ export function Deadlines() {
       <p className="print-only print-head">Сроки на неделю · {fmtDayMonth(TODAY)} — {fmtDayMonth(addDays(TODAY, 7))} {TODAY.slice(0, 4)} · просрочено и горит</p>
 
       <div className="deadlines-grid">
-        <aside className="panel panel--pad reveal"><Month picked={picked} onPick={setPicked} /></aside>
+        {/* Под календарём — нагрузка по неделям: левая колонка не стоит пустой рядом с длинным списком */}
+        <aside className="panel panel--pad reveal"><Month picked={picked} onPick={setPicked} />{hasFeature('weekLoad') && <WeekLoadBar />}</aside>
         <section className="panel reveal" aria-labelledby="dl-title">
           <header className="panel__head">
             <h2 id="dl-title" className="panel__title">{picked ? fmtDayMonth(picked) : 'Открытые сроки'}<span className="sub num">{items.length}</span></h2>
@@ -219,7 +220,6 @@ export function Deadlines() {
                 <button key={id} type="button" className="seg__opt" aria-pressed={by === id} onClick={() => { setBy(id); play('tick'); }}>{label}</button>
               ))}
             </div>
-            {hasFeature('weekLoad') && <WeekLoadBar />}
             <div className="dfilters" role="group" aria-label="Фильтры сроков">
               <label><span className="sub">Статус</span>
                 <select className="input input--sm" value={statusF} onChange={(e) => setStatusF(e.target.value as OpenStatus | 'all')}>

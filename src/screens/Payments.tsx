@@ -95,8 +95,11 @@ export function Payments() {
         <div>
           <h1 className="page__title">Платежи <em>{monthName(stats.key, 'nom').toLowerCase()} {stats.key.slice(0, 4)}</em></h1>
           <p className="month-nav">
-            <button type="button" className="icon-btn" onClick={() => setMonth(prevMonthKey(month))} aria-label={`Платежи за ${monthName(prevMonthKey(month), 'nom').toLowerCase()}`}><Icon name="chevronLeft" size={18} /></button>
-            <button type="button" className="icon-btn" onClick={() => setMonth(nextMonthKey(month))} disabled={month === current} aria-label={`Платежи за ${monthName(nextMonthKey(month), 'nom').toLowerCase()}`}><Icon name="chevronRight" size={18} /></button>
+            {/* Листание — словами: «‹ сентябрь», «ноябрь ›»; будущий месяц — с подсказкой, почему нельзя (приёмка М-4) */}
+            <button type="button" className="btn btn--ghost btn--sm month-nav__btn" onClick={() => setMonth(prevMonthKey(month))} aria-label={`Платежи за ${monthName(prevMonthKey(month), 'nom').toLowerCase()}`}><Icon name="chevronLeft" size={16} />{monthName(prevMonthKey(month), 'nom').toLowerCase()}</button>
+            <button type="button" className="btn btn--ghost btn--sm month-nav__btn" onClick={() => setMonth(nextMonthKey(month))} disabled={month === current}
+              title={month === current ? `${monthName(nextMonthKey(month), 'nom')} ещё не начался` : undefined}
+              aria-label={`Платежи за ${monthName(nextMonthKey(month), 'nom').toLowerCase()}`}>{monthName(nextMonthKey(month), 'nom').toLowerCase()}<Icon name="chevronRight" size={16} /></button>
             {month !== current && <button type="button" className="link" onClick={() => setMonth(current)}>к текущему месяцу</button>}
             {monthFailed && <span className="sub" role="alert">Не загрузилось из таблицы. <button type="button" className="link" onClick={retryMonth}>Ещё раз</button></span>}
           </p>

@@ -28,6 +28,8 @@ const NAV: { id: RouteName; label: string; icon: IconName; group: 'work' | 'ref'
   { id: 'tasks', label: 'Задачи', icon: 'tasks', group: 'work' },
   { id: 'keys', label: 'Ключи ЭЦП', icon: 'key', group: 'ref' },
   { id: 'reference', label: 'Справочник', icon: 'book', group: 'ref' },
+  // «Помощь» — словом в меню, а не значком внизу без подписи (приёмка 16.10, С-10)
+  { id: 'help', label: 'Помощь', icon: 'help', group: 'ref' },
 ];
 const PHONE_NAV: RouteName[] = ['today', 'clients', 'deadlines', 'payments'];
 
@@ -215,7 +217,8 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
     return () => { window.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf); };
   }, []);
 
-  const themeLabel = theme === 'dark' ? 'Светлая тема' : 'Тёмная тема';
+  // Подпись — действие, а не состояние: «Светлая тема» на светлой читалась как «сейчас светлая» (приёмка М-5)
+  const themeLabel = theme === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему';
   const navLink = (n: (typeof NAV)[number]) => (
     <a key={n.id} href={toHash({ name: n.id, params: [] })} className="nav__item" aria-current={route === n.id ? 'page' : undefined}>
       <Icon name={n.icon} />
@@ -253,8 +256,6 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
               <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
             </button>
             <SoundSettings />
-            {/* «?» — помощь (находка № 17); на телефоне — пункт в «Ещё» */}
-            <a href="#/help" className="icon-btn" aria-label="Помощь" title="Помощь — F1"><Icon name="help" /></a>
             <Me />
           </div>
         </div>

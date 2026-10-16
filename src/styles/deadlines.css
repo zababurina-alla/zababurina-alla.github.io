@@ -15,7 +15,9 @@
   justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-4) var(--space-5) var(--space-2);
-  background: linear-gradient(var(--surface) 70%, color-mix(in srgb, var(--surface) 0%, transparent));
+  /* Сплошной лист: прозрачный низ градиента пропускал строку под заголовком — имя «срезано» сверху (приёмка М-6) */
+  background: var(--surface);
+  box-shadow: 0 1px 0 var(--line);
   font-size: var(--text-md);
   font-weight: var(--weight-semibold);
 }
@@ -47,6 +49,11 @@
 }
 
 .dgroup .dtable__head {
+  display: none;
+}
+
+/* Свёрнутые строки группы («Показать ещё N») — на экране скрыты, в печати видны (print.css) */
+.dtable > .dtable__row.is-folded {
   display: none;
 }
 
@@ -389,7 +396,7 @@
   right: 3px;
   bottom: 2px;
   font-family: var(--font);
-  font-size: 0.6875rem;
+  font-size: var(--text-xs); /* 14 px — не мельче нижней границы (приёмка 16.10, М-1: было 11 px) */
   font-weight: var(--weight-bold);
   line-height: 1;
   opacity: 0.85;
@@ -958,4 +965,93 @@
     opacity: 1;
     pointer-events: auto;
   }
+}
+
+/* ═════════ «Сроки»: нагрузка по неделям — под календарём (техника 16.10, оформление) ═════════ */
+/* Шесть недель столбиками: высота — доля от самой загруженной недели, текущая — цветом акцента */
+.wload {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  box-shadow: inset 0 1px 0 var(--line);
+}
+
+.wload__title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+
+.wload__over {
+  color: var(--st-red-ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+.wload__weeks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.wload__week {
+  display: grid;
+  grid-template-rows: 4.5rem auto auto; /* полоса — в дорожке постоянной высоты: проценты считаются от неё */
+  justify-items: center;
+  gap: 4px;
+}
+
+.wload__bar {
+  align-self: end;
+  width: 100%;
+  max-width: 2.25rem;
+  height: max(var(--h, 0%), 4px);
+  border-radius: var(--radius-xs) var(--radius-xs) 3px 3px;
+  background: color-mix(in srgb, var(--accent) 28%, var(--surface-sunk));
+  transform-origin: 50% 100%;
+}
+
+.wload__week.is-now .wload__bar {
+  background: var(--accent);
+}
+
+.wload__n {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.wload__label {
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.wload__week.is-now .wload__label {
+  color: var(--accent);
+  font-weight: var(--weight-semibold);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .wload__bar {
+    animation: wload-grow 520ms var(--ease-out) both;
+    animation-delay: calc(var(--i, 0) * 40ms + 200ms);
+  }
+
+  .wload__week:nth-child(2) .wload__bar { --i: 1; }
+  .wload__week:nth-child(3) .wload__bar { --i: 2; }
+  .wload__week:nth-child(4) .wload__bar { --i: 3; }
+  .wload__week:nth-child(5) .wload__bar { --i: 4; }
+  .wload__week:nth-child(6) .wload__bar { --i: 5; }
+}
+
+@keyframes wload-grow {
+  from { transform: scaleY(0); }
 }

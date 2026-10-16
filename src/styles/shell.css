@@ -477,12 +477,14 @@
 
 .me__text {
   flex: 0 1 auto;
-  min-width: 0; /* сжимается, когда в строке ещё и «?» (помощь) — без полосы прокрутки в меню */
-  max-width: 6.5rem;
+  min-width: 0;
   line-height: 1.2;
+  /* Имя — до двух строк целиком, без «Выдуман…» (приёмка 16.10, М-2) */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* Имя и «Выйти» — столбиком: в узком меню в строку не помещаются. */

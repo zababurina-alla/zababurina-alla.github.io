@@ -4,7 +4,8 @@
 //   высоты     — ряды, где соседние карточки / кнопки разной высоты (> 4 px);
 //   колесо     — блоки с прокруткой, которые не крутятся колесом мыши;
 //   подписи    — кнопки, фишки, метки, заголовки колонок, у которых текст перенёсся или обрезан без многоточия.
-// Запуск: node scripts/layout-audit.mjs [адрес] [--json путь] [--only сегодня,клиенты] [--strict]
+// Печать (--print): экраны на листе A4 — обрезанные подписи, пустая ширина справа в % (по строкам таблиц), листов.
+// Запуск: node scripts/layout-audit.mjs [адрес] [--json путь] [--only сегодня,клиенты] [--strict] [--print]
 //   адрес — по умолчанию учебный режим локального сайта http://localhost:5183/ (?demo=1 добавляется сам).
 //   --strict — код выхода 1, если хоть одно число больше нуля (для проверок перед сдачей).
 import { writeFileSync } from 'node:fs';
@@ -16,6 +17,85 @@ const BASE = args.find((a) => /^https?:/.test(a)) ?? 'http://localhost:5183/';
 const ONLY = flag('--only')?.split(',');
 const JSON_OUT = flag('--json');
 const STRICT = args.includes('--strict');
+const PRINT = args.includes('--print');
+
+// Экраны, которые печатают (или могут): A4, поля 14 × 12 мм — как в print.css
+const PRINT_SCREENS = [
+  { name: 'сроки', hash: '#/deadlines' },
+  { name: 'сегодня', hash: '#/today' },
+  { name: 'платежи', hash: '#/payments' },
+  { name: 'задачи', hash: '#/tasks' },
+  { name: 'клиенты', hash: '#/clients' },
+  { name: 'карточка', hash: '#/clients', open: (p) => p.locator('.ctable__row .ctable__open').first().click() },
+  { name: 'ключи', hash: '#/keys' },
+  { name: 'месяц', hash: '#/month' },
+];
+
+/** На листе: обрезанные подписи и пустая ширина справа (медиана по строкам таблиц и списков). */
+function measurePrint() {
+  const W = document.documentElement.clientWidth;
+  const visible = (el) => { const cs = getComputedStyle(el); const r = el.getBoundingClientRect(); return cs.display !== 'none' && cs.visibility !== 'hidden' && r.width > 0 && r.height > 0; };
+  const label = (el) => (typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : el.tagName.toLowerCase()) + ' «' + (el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 30) + '»';
+  const clippedList = [];
+  for (const el of document.querySelectorAll('body *')) {
+    if (!visible(el) || el.children.length > 3 || !(el.textContent || '').trim()) continue;
+    const cs = getComputedStyle(el);
+    if (cs.overflowX === 'visible' && cs.textOverflow !== 'ellipsis') continue;
+    if (el.scrollWidth > el.clientWidth + 1) clippedList.push(`${label(el)} — ${cs.textOverflow === 'ellipsis' ? 'многоточие' : 'обрезано'}`);
+  }
+  const rights = [];
+  for (const row of document.querySelectorAll('.dtable__row, .ctable__row, .paylist__row, .tasks__row, .mini__row, .feed__item, .kgrid__row, .mcheck__row, li')) {
+    if (!visible(row)) continue;
+    let maxR = -Infinity;
+    const tw = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
+    for (let n = tw.nextNode(); n; n = tw.nextNode()) {
+      if (!n.textContent.trim() || !n.parentElement || !visible(n.parentElement)) continue;
+      const rg = document.createRange(); rg.selectNodeContents(n); for (const r of rg.getClientRects()) if (r.width > 0) maxR = Math.max(maxR, r.right);
+    }
+    if (maxR > -Infinity) rights.push(maxR);
+  }
+  rights.sort((a, b) => a - b);
+  const median = rights.length ? rights[Math.floor(rights.length / 2)] : W;
+  return { clipped: clippedList.length, clippedList: clippedList.slice(0, 12), emptyPct: Math.max(0, Math.round((1 - median / W) * 100)), rows: rights.length };
+}
+
+if (PRINT) {
+  const browser = await chromium.launch();
+  const out = [];
+  try {
+    for (const theme of ['light', 'dark']) {
+      // Ширина листа A4 без полей: 210 − 2 × 12 мм = 186 мм ≈ 703 px
+      const ctx = await browser.newContext({ viewport: { width: 703, height: 1000 } });
+      const page = await ctx.newPage();
+      for (const s of PRINT_SCREENS) {
+        if (ONLY && !ONLY.includes(s.name)) continue;
+        await page.goto('about:blank');
+        await page.goto(`${BASE}${BASE.includes('?') ? '&' : '?'}demo=1&theme=${theme}`, { waitUntil: 'load' });
+        await page.waitForTimeout(1800);
+        await page.evaluate((h) => { location.hash = h; }, s.hash);
+        await page.waitForTimeout(1200);
+        try { if (s.open) { await s.open(page); await page.waitForTimeout(900); } } catch { /* окна нет — печатаем экран */ }
+        await page.emulateMedia({ media: 'print' });
+        await page.waitForTimeout(300);
+        const m = await page.evaluate(measurePrint);
+        const pdf = await page.pdf({ format: 'A4', preferCSSPageSize: true, printBackground: false });
+        const sheets = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length;
+        await page.emulateMedia({ media: 'screen' });
+        out.push({ screen: s.name, view: theme === 'light' ? 'свет' : 'тьма', clipped: m.clipped, emptyPct: m.emptyPct, rows: m.rows, sheets, details: m.clippedList });
+      }
+      await ctx.close();
+    }
+  } finally {
+    await browser.close();
+  }
+  const pad = (v, n) => String(v).padEnd(n);
+  console.log(`${pad('печать', 12)}${pad('тема', 7)}обрезано  пусто справа  строк  листов`);
+  for (const r of out) console.log(`${pad(r.screen, 12)}${pad(r.view, 7)}${pad(r.clipped, 10)}${pad(r.emptyPct + ' %', 13)}${pad(r.rows, 7)}${r.sheets}`);
+  console.log(`\nИтого: обрезано ${out.reduce((a, r) => a + r.clipped, 0)} · пусто справа больше 25 % — ${out.filter((r) => r.emptyPct > 25).length} экр.`);
+  if (JSON_OUT) writeFileSync(JSON_OUT, JSON.stringify(out, null, 1));
+  if (STRICT && out.some((r) => r.clipped > 0 || r.emptyPct > 25)) process.exit(1);
+  process.exit(0);
+}
 
 const VIEWS = [
   { w: 1280, h: 860, theme: 'light' }, { w: 1280, h: 860, theme: 'dark' },

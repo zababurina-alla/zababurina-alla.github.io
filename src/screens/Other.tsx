@@ -24,6 +24,7 @@ import { URGENCY_ICON } from './DeadlineTable';
 import { Me, SoundSettings, useTheme } from '../app/Shell';
 import { useFlipRows } from '../ui/flip';
 import { EpCalc } from './EpCalc';
+import { epAmount, parseEpRule } from '../lib/epRule';
 import { useVoiceInput, voiceSupported } from '../lib/voiceInput';
 
 // Группы ключей — шкала словаря (п. 1): просрочен, горит 0–7, скоро 8–30, в порядке; «нет ключа» — ⚪ (п. 3, № 79).
@@ -102,11 +103,15 @@ function RateCards({ r }: { r: Rates }) {
     ['Минимальная зарплата (МЗП)', <Money text={money(r.mzpKopecks)} />, `с 1 января ${r.year}`, 'salary'],
     ['Прожиточный минимум (ПМ)', <Money text={money(r.pmKopecks)} />, 'для трудоспособных', 'person'],
     ['ЄСВ в месяц', <Money text={money(r.esvMonthlyKopecks)} />, r.esvRatePct !== null ? `${r.esvRatePct} % МЗП` : 'минимальный взнос', 'esv'],
-    ...r.groups.map((g): [string, ReactNode, string, IconName] => [
-      `ЄП ${g.group} группа`, g.epRule || '—',
-      g.limitKopecks !== null ? `доход до ${formatMoney(g.limitKopecks)}${g.limitMzp !== null ? ` (${g.limitMzp} МЗП)` : ''}` : 'предел дохода не указан',
-      'taxEp',
-    ]),
+    ...r.groups.map((g): [string, ReactNode, string, IconName] => {
+      // 1–2 группа — сумма в месяц по ставке листа («10 % ПМ» → ₴), правило — подписью (приёмка 16.10, С-9);
+      // 3 группа (процент дохода) и непонятная ставка — как в листе
+      const rule = parseEpRule(g.epRule);
+      const amount = rule && rule.base !== 'income' ? epAmount(rule, { pmKopecks: r.pmKopecks, mzpKopecks: r.mzpKopecks, incomeKopecks: null }) : null;
+      const limit = g.limitKopecks !== null ? `доход до ${formatMoney(g.limitKopecks)}${g.limitMzp !== null ? ` (${g.limitMzp} МЗП)` : ''}` : 'предел дохода не указан';
+      return [`ЄП ${g.group} группа`, amount !== null ? <Money text={formatMoney(amount)} /> : g.epRule || '—',
+        amount !== null ? `${g.epRule} в месяц · ${limit}` : limit, 'taxEp'];
+    }),
   ];
   return (
     <section className="rates" aria-label="Ставки">

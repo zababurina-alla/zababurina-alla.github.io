@@ -88,7 +88,7 @@ export function Clients({ focusSearch }: { focusSearch: boolean }) {
             <Icon name="search" size={22} />
             <span className="visually-hidden">Поиск клиента</span>
             <input ref={input} type="search" value={q} onChange={(e) => setQ(e.target.value)}
-              placeholder="Фамилия, КВЕД, телефон, банк ключа, отчёт…" spellCheck={false} autoComplete="off" />
+              placeholder="Фамилия, КВЕД, телефон…" title="Ищет по фамилии, КВЕД, телефону, банку ключа и отчёту" spellCheck={false} autoComplete="off" />
             {q ? <span className="search-input__count num" role="status">{found.length} из {total}</span> : <kbd className="kbd">/</kbd>}
           </label>
           {/* Отбор (владелец 16.10: «фильтры в две строки, справа пустая полоса»): две ровные строки во всю ширину —

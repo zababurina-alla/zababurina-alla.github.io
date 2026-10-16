@@ -74,7 +74,8 @@ export function PaymentDialog({ open, clientId, onClose }: { open: boolean; clie
     amountRef.current?.focus();
     setWho(id);
   }
-  const recent = [...new Set(store.payments.map((p) => p.clientId))].slice(0, 5).map((id) => store.client(id)).filter(Boolean);
+  // Недавних — трое: на ноутбуке 1280×800 период и способ оплаты видны без прокрутки окна (приёмка 16.10, С-4)
+  const recent = [...new Set(store.payments.map((p) => p.clientId))].slice(0, 3).map((id) => store.client(id)).filter(Boolean);
   const suggestions = (q ? search(store.clients.map((c) => ({ ...c, extra: [c.phone] })), q) : recent).slice(0, 5);
   // Набрали фамилию, нашёлся ровно один клиент — он и выбран, даже если по строке не щёлкнули (находка «Пользователя» № 5).
   const only = !picked && q.trim() && suggestions.length === 1 ? suggestions[0] : undefined;

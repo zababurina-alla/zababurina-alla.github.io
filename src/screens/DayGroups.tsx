@@ -31,14 +31,14 @@ function Group({ title, tone = '', icon, items, showClient = true }: {
 }) {
   const [open, setOpen] = useState(false);
   const folded = items.length > FOLD_AT && !open;
-  const shown = folded ? items.slice(0, FOLD_SHOW) : items;
   return (
     <section className={`dgroup ${tone}`} aria-label={title}>
       <h3 className="dgroup__title">
         <span className="dgroup__name">{icon && <Icon name={icon} size={18} />}{title}</span>
         <span className="dgroup__count num">{items.length} {plural(items.length, 'срок', 'срока', 'сроков')}</span>
       </h3>
-      <DeadlineTable items={shown} showClient={showClient} />
+      {/* Свёрнутые строки в разметке есть, но скрыты (is-folded): на печать уходят все сроки группы */}
+      <DeadlineTable items={items} showClient={showClient} foldFrom={folded ? FOLD_SHOW : undefined} />
       {folded && (
         <button type="button" className="dgroup__more" onClick={() => setOpen(true)}>
           Показать ещё {items.length - FOLD_SHOW} {plural(items.length - FOLD_SHOW, 'срок', 'срока', 'сроков')}
@@ -68,6 +68,10 @@ export function DayGroups({ items, empty, by = 'day' }: { items: DatedDeadline[]
   }
   return (
     <div ref={box} className="dgroups">
+      {/* Шапка колонок для бумаги: повторяется на каждом листе (display: table-header-group в print.css) */}
+      <div className="dgroups__head print-only" aria-hidden="true">
+        {by !== 'client' && <span className="c-client">Клиент</span>}<span className="c-what">Что сдать или оплатить</span><span className="c-due">Срок</span>
+      </div>
       {entries.map(([k, list]) => {
         if (by === 'kind') {
           return <Group key={k} title={OBLIGATION_LABEL[k as ObligationKind]} icon={OBLIGATION_ICON[k as ObligationKind]} items={list} />;

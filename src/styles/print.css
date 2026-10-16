@@ -83,41 +83,225 @@
     overflow: visible;
   }
 
+  /* ═══ Сроки на бумаге (владелец 16.10: «клиент 50 px, фамилии обрезаны, таблица в левой половине листа»).
+     Причина: лист A4 ≈ 700 px попадал в экранное правило «@container 640–899 px» (4 колонки), а скрытая в печати
+     галочка сдвигала клиента в её колонку 2,75rem. На бумаге таблица — настоящая таблица (display: table):
+     шапка колонок повторяется на каждом листе, строка не рвётся между листами, всё по одному левому краю. ═══ */
+  .panel__head,
+  .dtable,
+  .dgroups {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .panel__head {
+    padding-top: 0;
+  }
+
+  .dgroups {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+  }
+
+  .dgroups__head.print-only {
+    display: table-header-group;
+  }
+
+  .dgroups__head > span,
+  .dtable__head > span {
+    display: table-cell;
+    padding: 0 3mm 1.5mm 0;
+    border-bottom: 0.4mm solid #000000;
+    color: #000000;
+    font-size: 9.5pt;
+    font-weight: 600;
+    text-align: left;
+  }
+
+  .dgroup {
+    display: table-row-group;
+  }
+
   .dgroup__title {
+    display: table-row;
     position: static;
-    padding: 3mm 0 1mm;
     background: none;
     break-after: avoid;
   }
 
-  .dtable {
-    padding: 0;
+  .dgroup__title > .dgroup__name {
+    display: table-cell;
+    padding: 4mm 0 1mm;
+    color: #000000 !important;
+    font-size: 11pt;
+    font-weight: 700;
+    white-space: nowrap; /* название дня шире колонки клиента — уходит в пустые соседние ячейки строки */
+  }
+
+  .dgroup__title > .dgroup__count,
+  .dgroup__name > .icon {
+    display: none;
+  }
+
+  /* Строки групп — прямо в группу таблицы; одиночная таблица (карточка клиента) — своя таблица со своей шапкой */
+  .dgroup > .dtable {
+    display: contents;
+  }
+
+  .dtable:not(.dgroup > .dtable) {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+  }
+
+  .dtable:not(.dgroup > .dtable) > .dtable__head {
+    display: table-header-group;
   }
 
   .dtable__row,
-  .dtable--noclient .dtable__row {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 44mm;
-    min-height: 0;
-    padding: 1.5mm 0;
+  .dtable--noclient .dtable__row,
+  .dtable:not(.dtable--noclient) .dtable__row,
+  .dtable > .dtable__row.is-folded {
+    display: table-row;
     break-inside: avoid;
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
   }
 
-  .dtable__row + .dtable__row::before {
-    left: 0;
-    right: 0;
-  }
-
-  .dtable__row .avatar {
+  .dtable__row::before {
     display: none;
   }
 
-  .dtable__row .c-client,
-  .dtable__row .c-what,
-  .dtable__row .c-due {
-    grid-column: auto;
-    grid-row: auto;
+  .dtable__row > .c-client,
+  .dtable__row > .c-what,
+  .dtable__row > .c-due {
+    display: table-cell;
+    padding: 1.6mm 3mm 1.6mm 0;
+    border-top: 0.2mm solid #999999;
+    vertical-align: top;
+  }
+
+  /* Ширины колонок: клиент 34 %, срок 34 мм, остальное — «что сдать» */
+  .dgroups__head > .c-client,
+  .dtable__head > .c-client {
+    width: 34%;
+  }
+
+  .dgroups__head > .c-due,
+  .dtable__head > .c-due {
+    width: 34mm;
+  }
+
+  .dtable__head > .c-act {
+    display: none;
+  }
+
+  /* Клиент — полное имя, перенос можно; кружок с буквами не нужен */
+  .dtable__row .avatar,
+  .dtable__name {
+    display: none;
+  }
+
+  .dtable__fullname.print-only {
+    display: inline;
+  }
+
+  .dtable__client .linklike {
+    display: inline;
+    padding: 0;
+    color: #000000;
+    font-weight: 600;
+    text-align: left;
+  }
+
+  /* Что сдать — одной фразой во всю колонку, без значков; срок — словами и датой */
+  .dtable__line,
+  .dtable__line > .ttext,
+  .dtable__line > .ttext > span:not(.icon) {
+    display: inline;
+    overflow: visible !important;
+    white-space: normal !important;
+    text-overflow: clip !important;
+  }
+
+  .dtable__row .c-what .icon,
+  .dtable__row .c-due > .icon {
+    display: none;
+  }
+
+  .dtable__when {
+    display: block;
+  }
+
+  .dtable__when > span {
+    display: block;
+  }
+
+  /* ═══ Все экраны на бумаге: без движения, кнопок и многоточий ═══ */
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .btn,
+  .icon-btn,
+  .tabs,
+  .seg,
+  .chips,
+  .chip,
+  .toolbar,
+  .search-input,
+  .check-btn,
+  .dsel,
+  .kv__more,
+  .feed__more,
+  .inbox__act,
+  .panel__head .link,
+  .kbd {
+    display: none !important;
+  }
+
+  /* Обрезка многоточием на бумаге прячет текст навсегда — переносим */
+  .plan__text > *,
+  .ctable__row *,
+  .paylist__row *,
+  .tasks__text *,
+  .mini__text * {
+    overflow: visible !important;
+    white-space: normal !important;
+    text-overflow: clip !important;
+  }
+
+  .today-grid,
+  .today-main,
+  .today-side {
+    display: block;
+  }
+
+  .today-grid > *,
+  .today-main > *,
+  .today-side > * {
+    margin-bottom: 6mm;
+    break-inside: avoid-page;
+  }
+
+  .panel,
+  .today-list {
+    break-inside: auto;
+  }
+
+  .page {
+    max-width: none;
   }
 }

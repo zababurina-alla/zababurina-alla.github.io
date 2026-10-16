@@ -16,6 +16,19 @@ export const MONTH_LABEL: Record<MonthCheck, string> = {
   timesheet: 'Табель', payroll: 'Ведомость', report: 'Отчёт / квитанции',
 };
 
+// Месяц в шапке — по-русски: лист отдаёт «жовтень 2026» (приёмка 16.10, Г-1); незнакомое слово оставляем как есть
+const UK_MONTH: Record<string, string> = {
+  січень: 'январь', лютий: 'февраль', березень: 'март', квітень: 'апрель', травень: 'май', червень: 'июнь',
+  липень: 'июль', серпень: 'август', вересень: 'сентябрь', жовтень: 'октябрь', листопад: 'ноябрь', грудень: 'декабрь',
+};
+const ruPeriod = (p: string) => p.replace(/\p{L}+/gu, (w) => UK_MONTH[w.toLowerCase()] ?? w);
+
+// Заголовки колонок — коротко, в одну строку (девять колонок на ноутбуке); полное название — в подсказке
+const MONTH_SHORT: Record<MonthCheck, string> = {
+  advance: 'Аванс', advanceTax: 'Налог ав.', salary: 'Зарплата', salaryTax: 'Налог ЗП',
+  timesheet: 'Табель', payroll: 'Ведомость', report: 'Отчёт',
+};
+
 export function Month() {
   const { month } = useStore();
   const ui = useUi();
@@ -31,7 +44,7 @@ export function Month() {
     return () => { alive = false; };
   }, [month]);
 
-  if (!month) return <div className="page"><Empty pic="calm" title="Месяц пока в таблице">Лист «🗓 Месяц» появится здесь, когда его откроет сервер.</Empty></div>;
+  if (!month) return <div className="page"><Empty pic="calm" title="Месяц пока в таблице">Лист «Месяц» появится здесь, когда его откроет сервер.</Empty></div>;
 
   async function toggle(it: MonthItem, k: MonthCheck) {
     if (!month || !it.clientId) return;
@@ -55,28 +68,28 @@ export function Month() {
   return (
     <div className="page">
       <header className="page__head"><div>
-        <h1 className="page__title">Месяц <em>{sheet?.period ?? ''}</em></h1>
-        <p className="page__sub">Чек-лист по клиентам со штатом — как лист «🗓 Месяц» в таблице. Отметьте сделанное.</p>
+        <h1 className="page__title">Месяц <em>{sheet?.period ? ruPeriod(sheet.period) : ''}</em></h1>
+        <p className="page__sub">Чек-лист по клиентам со штатом — как лист «Месяц» в таблице. Отметьте сделанное.</p>
       </div></header>
       {error && <p className="offline" role="alert"><Icon name="warning" /><span>Месяц не загрузился: {error}</span></p>}
       {!sheet && !error && <p className="sub" role="status">Загружаем лист «Месяц»…</p>}
       {sheet && (sheet.items.length ? (
-        <section className="panel month" aria-label="Чек-лист месяца">
-          <div className="month__table" role="table" aria-label="Клиенты со штатом">
-            <div className="month__head" role="row">
+        <section className="panel mcheck" aria-label="Чек-лист месяца">
+          <div className="mcheck__table" role="table" aria-label="Клиенты со штатом">
+            <div className="mcheck__head" role="row">
               <span role="columnheader">Клиент</span>
-              {MONTH_CHECKS.map((k) => <span key={k} role="columnheader">{MONTH_LABEL[k]}</span>)}
+              {MONTH_CHECKS.map((k) => <span key={k} role="columnheader" title={MONTH_LABEL[k]} aria-label={MONTH_LABEL[k]}>{MONTH_SHORT[k]}</span>)}
               <span role="columnheader" className="ta-r">Готово</span>
             </div>
             {sheet.items.map((it, i) => (
-              <div key={it.clientId ?? `n-${i}`} className="month__row" role="row">
-                <span role="cell" className="month__who">
+              <div key={it.clientId ?? `n-${i}`} className="mcheck__row" role="row">
+                <span role="cell" className="mcheck__who">
                   {it.clientId ? <button type="button" className="linklike" onClick={() => ui.openClient(it.clientId ?? '')}>{it.name}</button> : <span>{it.name} <span className="sub">— нет в «Клиентах»</span></span>}
                   {(it.status || it.comment) && <span className="sub">{[it.status, it.comment].filter(Boolean).join(' · ')}</span>}
                 </span>
                 {MONTH_CHECKS.map((k) => (
                   <span key={k} role="cell">
-                    <input type="checkbox" checked={it.checks[k]} disabled={!it.clientId || saving.has(`${it.clientId}|${k}`)}
+                    <input type="checkbox" className="mcheck__box" checked={it.checks[k]} disabled={!it.clientId || saving.has(`${it.clientId}|${k}`)}
                       aria-label={`${MONTH_LABEL[k]}: ${it.name}`} onChange={() => { void toggle(it, k); }} />
                   </span>
                 ))}

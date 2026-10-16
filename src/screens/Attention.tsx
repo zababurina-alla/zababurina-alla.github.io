@@ -34,7 +34,6 @@ export function AttentionPanel() {
     <section className="panel attention reveal" aria-labelledby="t-att">
       <header className="panel__head">
         <h2 id="t-att" className="panel__title"><Icon name="attention" tile="orange" />Требуют внимания</h2>
-        <span className="sub">как в боте по слову «внимание»</span>
       </header>
       <ul className="attention__list">
         {shown.map((i) => (
@@ -42,7 +41,8 @@ export function AttentionPanel() {
             <button type="button" className="linklike attention__who" onClick={() => ui.openClient(i.clientId)}>
               <Avatar name={i.name} clientId={i.clientId} size="sm" /><strong>{shortName(i.name)}</strong>
             </button>
-            <span className="tag" title={`Балл риска ${i.score} из 100`}>{LEVEL[i.level]} · {i.score}</span>
+            {/* Уровень словами («риск средний»), балл — в подсказке: «средний · 45» маме ничего не говорило (приёмка С-2) */}
+            <span className="tag" title={`Балл риска ${i.score} из 100 — по просрочкам, ключу и платежам`}>риск {LEVEL[i.level]}</span>
             <span className="sub attention__why">{i.factors.filter((f) => f.weight > 0).map((f) => f.label).join(', ')}</span>
           </li>
         ))}

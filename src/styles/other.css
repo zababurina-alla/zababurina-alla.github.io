@@ -243,6 +243,7 @@
 }
 
 .tasks__text {
+  position: relative;
   flex: 1;
   display: inline-flex;
   align-items: center;
@@ -290,6 +291,25 @@
   gap: 6px;
   font-size: var(--text-sm);
   white-space: nowrap;
+}
+
+/* В списке, где у части задач есть значок важности, место под него — у всех строк: текст с одного отступа (М-3) */
+.tasks:has(.prio) .tasks__text {
+  padding-left: 1.625rem;
+}
+
+.tasks__text > .prio {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  translate: 0 -50%;
+}
+
+@media (max-width: 559px) {
+  .tasks__text > .prio {
+    top: 0.2em;
+    translate: none;
+  }
 }
 
 .prio--critical { color: var(--dot-red); }
@@ -403,6 +423,17 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
+}
+
+/* Кнопки тянутся по строке: перенеслись — новая строка тоже во всю ширину, без «Не нужно» одной на строке
+   (автопроверка вёрстки 16.10: справа от переноса пусто 215–406 px) */
+.inbox__act > .btn,
+.inbox__act > .inbox__pick {
+  flex: 1 1 auto;
+}
+
+.inbox__pick > .btn {
+  flex: 1 1 auto;
 }
 
 .inbox__done {
@@ -1218,10 +1249,20 @@
 
 /* ═════════ Новые места техники (16.10): оформление ═════════ */
 /* Карточка: быстрые задачи по шаблону — ряд мягких «таблеток» с плюсом */
+.cp__tpl-label {
+  margin: 0 0 calc(-1 * var(--space-1));
+}
+
 .cp__tpl {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)); /* шесть шаблонов — 3 × 2 ровно, без одной «таблетки» в строке */
   gap: var(--space-2);
+}
+
+@media (max-width: 479px) {
+  .cp__tpl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .cp__tpl > .btn {
@@ -1462,5 +1503,210 @@
   .consult__form {
     grid-template-columns: minmax(0, 1fr);
     padding: var(--space-3);
+  }
+}
+
+/* ═════════ «Справочник»: сколько ЄП при доходе (техника 16.10, оформление) ═════════ */
+.epcalc {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.epcalc .field {
+  max-width: 20rem;
+}
+
+/* Подсказка в поле дохода — бледнее и мельче ввода: «150 000» крупным шрифтом выглядело уже введённой суммой (С-9) */
+.epcalc .input::placeholder {
+  color: var(--ink-2);
+  font-family: var(--font);
+  font-size: var(--text-md);
+  font-weight: var(--weight-regular);
+}
+
+.epcalc__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* Группа слева, сумма за квартал крупно справа от неё, правило ставки — строкой ниже */
+.epcalc__list > li {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  align-items: baseline;
+  gap: 2px var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunk);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.epcalc__list > li > .num {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+}
+
+.epcalc__list > li > .num > .sub {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-regular);
+}
+
+.epcalc__list > li > .field__error,
+.epcalc__list > li > .nil {
+  grid-column: 2;
+}
+
+@media (max-width: 479px) {
+  .epcalc__list > li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .epcalc__list > li > .field__error,
+  .epcalc__list > li > .nil {
+    grid-column: 1;
+  }
+}
+
+/* ═════════ «Задачи»: микрофон в строке задачи (техника 16.10, оформление) ═════════ */
+/* Слушает — красный кружок с мягкой пульсацией (как запись в диктофоне); снова нажать — стоп */
+.quick__mic {
+  border-radius: 50%;
+  color: var(--ink-2);
+}
+
+.quick__mic.is-on {
+  background: var(--st-red-bg);
+  color: var(--st-red-ink);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .quick__mic.is-on {
+    animation: mic-pulse 1.4s var(--ease-out) infinite;
+  }
+}
+
+@keyframes mic-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--st-red-ink) 35%, transparent); }
+  100% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--st-red-ink) 0%, transparent); }
+}
+
+.quick > .sub[role='status'],
+.quick > .field__error {
+  margin: 0;
+  padding: 0 var(--space-3) var(--space-1) calc(var(--tap) + var(--space-3));
+}
+
+/* ═════════ «Месяц»: чек-лист по клиентам со штатом (техника 16.10, оформление) ═════════ */
+/* Классы mcheck, а не month: .month и .month__head уже у календаря «Сроков» — стили смешивались */
+/* Девять колонок: клиент, семь галочек, «Готово». Не помещается (1024, телефон) — лист листается вбок, имя клиента
+   остаётся на месте (липкая первая колонка) */
+.panel.mcheck {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.mcheck__table {
+  display: grid;
+  min-width: 56rem;
+}
+
+.mcheck__head,
+.mcheck__row {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1fr) repeat(7, 5.25rem) 4.5rem;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-5);
+}
+
+.mcheck__head {
+  min-height: 3rem;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+
+.mcheck__head > :not(:first-child),
+.mcheck__row > :not(:first-child) {
+  justify-self: center;
+  text-align: center;
+}
+
+.mcheck__head > .ta-r,
+.mcheck__row > .ta-r {
+  justify-self: end;
+  text-align: right;
+}
+
+.mcheck__row {
+  min-height: 3.5rem;
+  padding-top: var(--space-2);
+  padding-bottom: var(--space-2);
+}
+
+.mcheck__row + .mcheck__row {
+  box-shadow: inset 0 1px 0 var(--line);
+}
+
+.mcheck__head > :first-child,
+.mcheck__who {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--surface);
+}
+
+.mcheck__who {
+  display: grid;
+  min-width: 0;
+}
+
+.mcheck__who > .sub {
+  font-size: var(--text-sm);
+}
+
+/* Своя галочка (не системная): квадрат со скруглением, отмечено — заливка акцентом и белая галка */
+.mcheck__box {
+  appearance: none;
+  display: inline-grid;
+  place-items: center;
+  width: 1.625rem;
+  height: 1.625rem;
+  margin: 0;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1.5px var(--field-border);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, transform var(--dur-press) var(--ease-out);
+}
+
+.mcheck__box:checked {
+  background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / 1.125rem no-repeat;
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+.mcheck__box:active:not(:disabled) {
+  transform: scale(0.9);
+}
+
+.mcheck__box:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.mcheck__box:disabled {
+  cursor: progress;
+  opacity: 0.5;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .mcheck__box:hover:not(:checked):not(:disabled) {
+    box-shadow: inset 0 0 0 1.5px var(--accent);
   }
 }
