@@ -341,6 +341,22 @@ describe('живой адаптер: чтение', () => {
     const c = await api.write({ kind: 'decideInbox', requestId: 'R2', id: 'I-1', action: 'accept' });
     expect(!c.ok && [c.code, c.current && 'status' in c.current ? c.current.status : null]).toEqual(['CONFLICT', 'accepted']);
   });
+  it('консультации v5.87: снимок и карточка нормализуются; skipped — флаг; create шлёт только заполненное', async () => {
+    const raw = { id: 'K-1', version: 2, clientId: 'C-1', at: '', topic: 'Третья группа', minutes: 15.5, note: null };
+    const s = server(
+      ok({ clients: [], deadlines: [], payments: [], tasks: [], activity: [], consultations: [raw], consultationsSkipped: true, cursor: 1 }),
+      ok({ consultation: { ...raw, id: 'K-2', at: '2026-10-16T21:00:00+03:00', minutes: 20, note: 'ок' } }, 7),
+    );
+    const api = new LiveApi(URL_, auth(), s.fetchImpl);
+    const snap = await api.snapshot();
+    expect(snap.consultations).toEqual([{ id: 'K-1', version: 2, clientId: 'C-1', at: null, topic: 'Третья группа', minutes: null, note: '' }]);
+    expect(snap.consultationsSkipped).toBe(true);
+    const r = await api.write({ kind: 'createConsultation', requestId: 'R5', consultation: { id: 'R5', version: 0, clientId: 'C-1', at: null, topic: 'Тема', minutes: null, note: '' } });
+    expect(s.sent[1]).toMatchObject({ action: 'consultations.create', requestId: 'R5', payload: { clientId: 'C-1', topic: 'Тема' } });
+    expect(Object.keys((s.sent[1] as { payload: object }).payload)).toEqual(['clientId', 'topic']);
+    expect(r.ok && r.changes.map((c) => [c.entity, c.id, (c.record as { minutes: number }).minutes])).toEqual([['consultation', 'K-2', 20]]);
+  });
+
   it('«Не писать клиенту»: снято / снимать нечего / уже ушло (CONFLICT с sentAt); requestId — свой на нажатие', async () => {
     const s = server(ok({ id: 'D-1', cancelled: true }), ok({ id: 'D-1', cancelled: false }), fail('CONFLICT', 'Уже отправлено', {}, { id: 'D-1', sentAt: '2026-10-16T02:10:00+03:00' }));
     const api = new LiveApi(URL_, auth(), s.fetchImpl);

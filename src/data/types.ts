@@ -141,6 +141,19 @@ export interface InboxItem {
   repliedAt?: string | null;
 }
 
+/** Лист «📞 Консультации» (API v5.87): разговор с клиентом — тема, сколько минут, заметка. */
+export interface Consultation {
+  id: string;
+  version: number;
+  clientId: string;
+  /** ISO; null — дата в таблице пустая. */
+  at: string | null;
+  topic: string;
+  /** Целое 1–1440; null — не указано. */
+  minutes: number | null;
+  note: string;
+}
+
 export interface Activity {
   id: string;
   when: string; // ISO date-time

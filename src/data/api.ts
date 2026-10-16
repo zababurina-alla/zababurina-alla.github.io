@@ -1,6 +1,6 @@
 // Интерфейс данных кабинета — тот же, что будет у JSON-API в Apps Script (контракт: docs/api-contract.md, этап 3).
 // Сейчас его реализует fakeServer.ts (выдуманная «таблица»); на этапе 4 — живой адаптер. Экраны знают только это.
-import type { Activity, Client, Deadline, DeadlineStatus, InboxItem, KvedItem, Payment, Priority, Question, Rates, Task, TaskType } from './types';
+import type { Activity, Client, Consultation, Deadline, DeadlineStatus, InboxItem, KvedItem, Payment, Priority, Question, Rates, Task, TaskType } from './types';
 
 /** Снимок данных при открытии кабинета. cursor — номер последнего изменения в таблице (выдаёт сервер, не часы браузера). */
 export interface Snapshot {
@@ -13,10 +13,14 @@ export interface Snapshot {
   questions: Question[];
   /** «Входящие» — пусто, пока сервер их не отдаёт. */
   inbox: InboxItem[];
+  /** Консультации за 90 дней (v5.87). */
+  consultations?: Consultation[];
+  /** Сервер не успел собрать консультации — свой список не затирать. */
+  consultationsSkipped?: boolean;
   cursor: number;
 }
 
-export type Entity = 'client' | 'deadline' | 'payment' | 'activity' | 'task' | 'question' | 'inbox';
+export type Entity = 'client' | 'deadline' | 'payment' | 'activity' | 'task' | 'question' | 'inbox' | 'consultation';
 
 /** Одно изменение в таблице после курсора: запись появилась/изменилась или удалена (закрыта). */
 export interface Change {
@@ -24,7 +28,7 @@ export interface Change {
   entity: Entity;
   op: 'upsert' | 'delete';
   id: string;
-  record?: Client | Deadline | Payment | Activity | Task | Question | InboxItem;
+  record?: Client | Deadline | Payment | Activity | Task | Question | InboxItem | Consultation;
   /** Откуда изменение: requestId записи с этого сайта, или 'таблица' / 'бот'. */
   origin: string;
 }
@@ -44,6 +48,8 @@ export type WriteOp =
   /** deadlines.update (контракт 8.3): дата, статус (кроме done — закрытие только close), заметка. */
   | { kind: 'updateDeadline'; requestId: string; id: string; baseVersion: number; patch: DeadlinePatch }
   | { kind: 'createTask'; requestId: string; task: Task }
+  /** consultations.create: id — временный (= requestId), сервер выдаёт свой. */
+  | { kind: 'createConsultation'; requestId: string; consultation: Consultation }
   | { kind: 'completeTask'; requestId: string; id: string; done: boolean }
   | { kind: 'answerQuestion'; requestId: string; id: string; text: string }
   /** inbox.decide: принять (платёж — записать с суммой), сделать задачей, отклонить. */
@@ -74,7 +80,7 @@ export interface TaskPatch { text?: string; due?: string | null; type?: TaskType
 export interface DeadlinePatch { due?: string; status?: Exclude<DeadlineStatus, 'done'>; note?: string }
 
 /** clients.get — всё о клиенте: строка целиком, его сроки, платежи (не только 90 дней), задачи и история изменений. */
-export interface ClientCard { client: Client; deadlines: Deadline[]; payments: Payment[]; tasks: Task[]; history: Activity[] }
+export interface ClientCard { client: Client; deadlines: Deadline[]; payments: Payment[]; tasks: Task[]; history: Activity[]; consultations: Consultation[] }
 
 /** clients.remind — напоминание клиенту в Telegram. text — ровно то, что мама видела в превью и отправила. */
 export interface RemindRequest { clientId: string; kind: 'deadline' | 'key' | 'docs' | 'custom'; deadlineId?: string; period?: string; text: string }

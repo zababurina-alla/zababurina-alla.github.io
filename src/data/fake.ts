@@ -1,7 +1,7 @@
 // Выдуманные данные прототипа. Ни один клиент не взят из таблицы; совпадения фамилий случайны.
 // Начисления посчитаны по ставкам 2026 из брифа (МЗП 8 647, ПМ 3 328, ЄСВ 22 % МЗП = 1 902,34) — только для вида;
 // на живых данных их считает сервер.
-import type { Activity, Client, Deadline, InboxItem, KvedItem, Payment, Question, Rates, Task } from './types';
+import type { Activity, Client, Consultation, Deadline, InboxItem, KvedItem, Payment, Question, Rates, Task } from './types';
 
 const ESV = { name: 'ЄСВ', kopecks: 190234, note: '22 % МЗП' };
 const EP1 = { name: 'ЄП', kopecks: 33280, note: '10 % ПМ' };
@@ -77,6 +77,12 @@ export const ACTIVITY: Activity[] = [
   { id: 'a2', when: '2026-10-14T08:40', source: 'таблица', text: 'Ключ ЭЦП Ясенко Миколы продлён до 26.10.2026' },
   { id: 'a3', when: '2026-10-13T17:05', source: 'сайт', text: 'Закрыт срок «ЄСВ за III кв.» — Вербицький Андрій. Следующий создан: до 20.01.2027' },
   { id: 'a4', when: '2026-10-13T11:30', source: 'сайт', text: 'Платёж 4 200,00 ₴ от Вербицкого Андрея записан' },
+];
+
+export const CONSULTATIONS: Consultation[] = [
+  { id: 'k1', version: 1, clientId: 'c1', at: '2026-10-09T11:20', topic: 'Как продлить ключ ЕЦП через Дію', minutes: 15, note: 'Скинула инструкцию в Telegram' },
+  { id: 'k2', version: 1, clientId: 'c12', at: '2026-10-12T15:00', topic: 'Переход на третью группу с листопада', minutes: 40, note: 'Заявление до 20 числа, ЄСВ не меняется' },
+  { id: 'k3', version: 1, clientId: 'c1', at: '2026-09-28T10:05', topic: 'ЄП за III квартал', minutes: null, note: '' },
 ];
 
 export const TASKS: Task[] = [

@@ -17,7 +17,7 @@ import { Outbox } from './outbox';
 import type { Counters, OutboxEvent, OutboxItem } from './outbox';
 import { newRequestId } from './api';
 import type { CancelNotifyResult, Change, DeadlinePatch, InboxAction, RemindPreview, RemindRequest, RemindResult, Snapshot, TaskPatch, WriteOp, WriteResult } from './api';
-import type { Activity, Client, DatedDeadline, Deadline, InboxItem, Payment, Question, SaveState, Task } from './types';
+import type { Activity, Client, Consultation, DatedDeadline, Deadline, InboxItem, Payment, Question, SaveState, Task } from './types';
 import { isDated } from './types';
 import { TODAY, addDays, fmtDate, plural } from '../lib/dates';
 import { play } from '../lib/sound';
@@ -65,6 +65,8 @@ interface Store {
   questions: Question[];
   /** «Входящие» — сообщения клиентов из Telegram, превращённые в предложения. */
   inbox: InboxItem[];
+  /** Консультации за 90 дней (снимок) и подгруженные карточкой; свежие сверху. */
+  consultations: Consultation[];
   notices: Notice[];
   /** Таблица не отдала данные при открытии (живой режим): текст для мамы; null — всё в порядке. */
   loadError: string | null;
@@ -91,6 +93,8 @@ interface Store {
   /** Почта клиента (clients.update { email }). */
   updateEmail: (clientId: string, email: string, baseVersion: number) => void;
   addTask: (t: Omit<Task, 'id' | 'version' | 'done'>) => void;
+  /** consultations.create: на экране сразу («сохраняется…»), id заменит ответ сервера. */
+  addConsultation: (k: { clientId: string; topic: string; minutes: number | null; note: string }) => void;
   /** Срок: в работе / ожидание / отложить до / перенести дату (deadlines.update). */
   updateDeadline: (id: string, patch: DeadlinePatch, label: string) => void;
   /** Ключ ЭЦП продлён: новый срок, дата выпуска и кто выдал (clients.update). */
@@ -140,6 +144,7 @@ interface Store {
 const Ctx = createContext<Store | null>(null);
 
 const AREA_OF: Record<WriteOp['kind'], WriteArea> = {
+  createConsultation: 'consultations',
   closeDeadline: 'deadlines', closeDeadlines: 'deadlines', updateTask: 'tasks', deleteTask: 'tasks', reopenDeadline: 'deadlines', addPayment: 'payments', cancelPayment: 'payments',
   updateDeadline: 'deadlines', addClient: 'clients', updateClient: 'clients', createTask: 'tasks', completeTask: 'tasks', answerQuestion: 'questions', decideInbox: 'inbox',
 };
@@ -172,6 +177,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [inbox, setInbox] = useState<InboxItem[]>([]);
+  const [consultations, setConsultations] = useState<Consultation[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   /** На экране снимок из прошлой загрузки этой вкладки, свежий ещё не пришёл. */
@@ -246,6 +252,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       } else if (ch.entity === 'task') {
         if (ch.op === 'delete') setTasks((xs) => xs.filter((x) => x.id !== ch.id));
         else setTasks((xs) => upsert(xs, ch.record as Task));
+      } else if (ch.entity === 'consultation') {
+        if (ch.op === 'delete') setConsultations((xs) => xs.filter((x) => x.id !== ch.id));
+        else setConsultations((xs) => upsert(xs, ch.record as Consultation));
       } else if (ch.entity === 'inbox') {
         // Решено здесь или в Telegram — приходит upsert со статусом; удалено — delete.
         if (ch.op === 'delete') setInbox((xs) => xs.filter((x) => x.id !== ch.id));
@@ -306,6 +315,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setDeadlines((xs) => xs.map((d) => (d.id === op.id ? { ...d, ...patch } : d)));
     } else if (op.kind === 'createTask') {
       setTasks((xs) => upsert(xs, op.task));
+    } else if (op.kind === 'createConsultation') {
+      setConsultations((xs) => upsert(xs, op.consultation));
     } else if (op.kind === 'updateTask') {
       setTasks((xs) => xs.map((t) => (t.id === op.id ? { ...t, ...op.patch } : t)));
     } else if (op.kind === 'deleteTask') {
@@ -397,6 +408,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // Задачу таблица не приняла окончательно (VALIDATION: «Выберите клиента», клиента нет) — убрать её с экрана, иначе
       // она стоит в списке как записанная при «Всё сохранено» (вечерняя проверка 15.10, тестовый клиент удалён).
       if (op.kind === 'createTask' && final) setTasks((xs) => xs.filter((t) => t.id !== op.task.id));
+      if (op.kind === 'createConsultation' && final) setConsultations((xs) => xs.filter((k) => k.id !== op.consultation.id));
       // «Сделано» не принято — галочка возвращается.
       if (op.kind === 'completeTask' && final) setTasks((xs) => xs.map((t) => (t.id === op.id ? { ...t, done: !op.done } : t)));
       // Ответ не записался: вопрос возвращается, если он всё ещё открыт (уже отвечен в Telegram — не возвращаем).
@@ -427,6 +439,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // ready = false — снимок из прошлой загрузки этой вкладки: показываем, но изменения от его курсора не тянем.
   const applySnapshot = useCallback((snap: Snapshot, ready = true) => {
     setClients(snap.clients); setPayments(snap.payments); setActivity(snap.activity); setTasks(snap.tasks); setQuestions(snap.questions); setInbox(snap.inbox);
+    // Сервер не собрал консультации (consultationsSkipped) — свой список не затираем.
+    if (!snap.consultationsSkipped) setConsultations(snap.consultations ?? []);
     const open = snap.deadlines.filter((d) => d.status !== 'done');
     setDeadlines(open.filter(isDated));
     setUndated(open.filter((d) => !isDated(d)));
@@ -638,6 +652,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     send({ kind: 'createTask', requestId, task: { ...t, id: requestId, version: 1, done: false } }, `Задача «${t.text}»`);
   }, [send]);
 
+  const addConsultation = useCallback((k: { clientId: string; topic: string; minutes: number | null; note: string }) => {
+    const requestId = newRequestId();
+    // Временный id = requestId: ответ сервера (новая строка со своим id) заменит его в onApplied.
+    send({ kind: 'createConsultation', requestId, consultation: { ...k, id: requestId, version: 0, at: null } }, `Консультация: ${k.topic}`,
+      () => setConsultations((xs) => xs.filter((x) => x.id !== requestId)));
+  }, [send]);
+
   /** tasks.update / tasks.delete (п. 14). До ответа — задача уже изменена/убрана на экране; отказ возвращает её. */
   const tasksBefore = useRef(new Map<string, Task>());
   const updateTask = useCallback((id: string, patch: TaskPatch) => {
@@ -730,6 +751,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setClients((xs) => xs.map((x) => (x.id === id && (card.client.version ?? 0) >= (x.version ?? 0) ? card.client : x)));
     setPayments((xs) => add(xs, card.payments));
     setTasks((xs) => add(xs, card.tasks));
+    setConsultations((xs) => add(xs, card.consultations ?? []));
     return card.history;
   }, []);
 
@@ -786,11 +808,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const setMaintenance = useCallback((on: boolean) => { fakeServer.maintenance = on; if (!on) void outboxRef.current?.kick(true); }, []);
 
   const value = useMemo<Store>(() => ({
-    loaded, online, syncedAt, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice,
+    loaded, online, syncedAt, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, consultations, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, addConsultation, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance,
-  }), [loaded, online, syncedAt, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice,
+  }), [loaded, online, syncedAt, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, consultations, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateEmail, addTask, addConsultation, toggleTask, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

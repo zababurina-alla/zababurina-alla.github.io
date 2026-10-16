@@ -3,7 +3,7 @@
 import { ApiError, call } from './transport';
 import type { Envelope } from './transport';
 import type { CabinetApi, CancelNotifyResult, Change, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
-import type { Activity, Client, Deadline, InboxItem, InboxType, KvedItem, Payment, Question, RateGroup, Rates, Task } from './types';
+import type { Activity, Client, Consultation, Deadline, InboxItem, InboxType, KvedItem, Payment, Question, RateGroup, Rates, Task } from './types';
 import { INBOX_TYPES } from './types';
 
 /** Откуда брать сеанс и как тихо войти заново (auth.ts). */
@@ -23,7 +23,7 @@ export interface DiagCounters {
 
 interface ServerChange { rev: number; entity: string; op: 'upsert' | 'delete'; id: string; origin: string; record?: unknown }
 
-const ENTITIES: ReadonlySet<string> = new Set<Entity>(['client', 'deadline', 'payment', 'activity', 'task', 'question', 'inbox']);
+const ENTITIES: ReadonlySet<string> = new Set<Entity>(['client', 'deadline', 'payment', 'activity', 'task', 'question', 'inbox', 'consultation']);
 const SITE_CODES: ReadonlySet<string> = new Set<ErrorCode>(['NETWORK', 'CONFLICT', 'PERIOD_OPEN', 'NOT_FOUND', 'SERVER', 'VALIDATION',
   'UNDO_TOO_LATE', 'DUPLICATE', 'BUSY', 'MAINTENANCE', 'QUOTA', 'RATE_LIMIT', 'AUTH_EXPIRED', 'AUTH_REQUIRED', 'FORBIDDEN']);
 const MAX_PAGES = 20;
@@ -77,8 +77,17 @@ export function normKved(raw: unknown): KvedItem {
   return { code: text(k.code), title: text(k.title), epByGroup: ep, councilDecision: text(k.councilDecision) || null };
 }
 
+/** Консультация: пустая дата → null, минуты — только целое, тема и заметка — строки. */
+function normConsultation(raw: unknown): Consultation {
+  const r = raw as Record<string, unknown>;
+  const m = num(r.minutes);
+  return { id: text(r.id), version: num(r.version) ?? 0, clientId: text(r.clientId), at: text(r.at) || null,
+    topic: text(r.topic), minutes: m !== null && Number.isInteger(m) ? m : null, note: text(r.note) };
+}
+
 function normRecord(entity: Entity, raw: unknown): NonNullable<Change['record']> {
   if (entity === 'client') return normClient(raw);
+  if (entity === 'consultation') return normConsultation(raw);
   if (entity === 'payment') return normPayment(raw);
   // Срок, чьего клиента нет в «Клиентах», сервер отдаёт с clientId: null.
   if (entity === 'deadline') { const d = raw as Deadline & { clientId: string | null }; return { ...d, clientId: d.clientId ?? '' }; }
@@ -120,7 +129,8 @@ export class LiveApi implements CabinetApi {
   }
 
   async snapshot(): Promise<Snapshot> {
-    const env = await this.rpc<{ clients: unknown[]; deadlines: Deadline[]; payments: Payment[]; tasks: Task[]; activity: Activity[]; questions?: Question[]; inbox?: InboxItem[]; cursor: number }>('sync.snapshot', {});
+    const env = await this.rpc<{ clients: unknown[]; deadlines: Deadline[]; payments: Payment[]; tasks: Task[]; activity: Activity[]; questions?: Question[]; inbox?: InboxItem[];
+      consultations?: unknown[]; consultationsSkipped?: unknown; cursor: number }>('sync.snapshot', {});
     const d = env.data;
     return {
       clients: d.clients.map(normClient),
@@ -130,6 +140,8 @@ export class LiveApi implements CabinetApi {
       activity: d.activity.map((x) => normRecord('activity', x) as Activity),
       questions: d.questions ?? [],
       inbox: (d.inbox ?? []).map((x) => normRecord('inbox', x) as InboxItem),
+      consultations: (d.consultations ?? []).map(normConsultation),
+      consultationsSkipped: d.consultationsSkipped === true,
       cursor: d.cursor ?? env.cursor,
     };
   }
@@ -234,6 +246,14 @@ export class LiveApi implements CabinetApi {
           }, o);
           return { ok: true, changes: [up('task', env.data.task, env.cursor)], cursor: env.cursor };
         }
+        case 'createConsultation': {
+          const c = op.consultation;
+          const payload: Record<string, unknown> = { clientId: c.clientId, topic: c.topic };
+          if (c.minutes !== null) payload.minutes = c.minutes;
+          if (c.note) payload.note = c.note;
+          const env = await this.rpc<{ consultation: unknown }>('consultations.create', payload, o);
+          return { ok: true, changes: [up('consultation', env.data.consultation as { id: string }, env.cursor)], cursor: env.cursor };
+        }
         case 'updateDeadline': {
           const env = await this.rpc<{ deadline: Deadline }>('deadlines.update', { id: op.id, baseVersion: op.baseVersion, patch: op.patch }, o);
           return { ok: true, changes: [up('deadline', env.data.deadline, env.cursor)], cursor: env.cursor };
@@ -328,7 +348,7 @@ export class LiveApi implements CabinetApi {
 
   /** Карточка целиком: чтение, без requestId. Пустые клетки нормализуются, как в снимке. */
   async clientCard(id: string): Promise<ClientCard> {
-    const env = await this.rpc<{ client: unknown; deadlines?: unknown[]; payments?: unknown[]; tasks?: unknown[]; history?: unknown[] }>('clients.get', { id });
+    const env = await this.rpc<{ client: unknown; deadlines?: unknown[]; payments?: unknown[]; tasks?: unknown[]; history?: unknown[]; consultations?: unknown[] }>('clients.get', { id });
     const d = env.data;
     return {
       client: normClient(d.client),
@@ -336,6 +356,7 @@ export class LiveApi implements CabinetApi {
       payments: (d.payments ?? []).map(normPayment),
       tasks: (d.tasks ?? []).map((x) => normRecord('task', x) as Task),
       history: (d.history ?? []).map((x) => normRecord('activity', x) as Activity),
+      consultations: (d.consultations ?? []).map(normConsultation),
     };
   }
 
