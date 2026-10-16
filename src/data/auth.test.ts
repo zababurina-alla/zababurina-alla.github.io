@@ -57,6 +57,25 @@ describe('вход: одноразовый код (nonce)', () => {
     expect(a.getState().status).toBe('signedIn');
   });
 
+  it('код входа не пришёл (обрыв) — ещё попытка сама, кнопка появляется; три обрыва подряд — «нет связи»', async () => {
+    let fails = 1;
+    const fetchImpl = vi.fn(async () => {
+      if (fails-- > 0) throw new TypeError('Failed to fetch');
+      return new Response(JSON.stringify({ ok: true, data: { nonce: 'N1' }, cursor: null }), { status: 200 });
+    }) as unknown as typeof fetch;
+    const a = new Auth('https://x/exec', 'cid', fetchImpl);
+    await a.mountButton(document.createElement('div'));
+    expect([cfg?.nonce, renders, a.getState().error]).toEqual(['N1', 1, null]);
+
+    cfg = null; renders = 0;
+    const down = vi.fn(async () => { throw new TypeError('Failed to fetch'); }) as unknown as typeof fetch;
+    const b = new Auth('https://x/exec', 'cid', down);
+    await b.mountButton(document.createElement('div'));
+    expect(down).toHaveBeenCalledTimes(3);
+    expect([cfg, renders]).toEqual([null, 0]);
+    expect(b.getState().error).toContain('Нет связи');
+  });
+
   it('тот же код второй раз не отправляется', async () => {
     const s = server([invalid]);
     const a = new Auth('https://x/exec', 'cid', s.fetchImpl);

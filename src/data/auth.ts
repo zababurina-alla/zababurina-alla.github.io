@@ -5,6 +5,7 @@
 // на сервере (apiRevokeAllSessions). Снимок таблицы — отдельно и только в sessionStorage (snapCache.ts).
 // Справка GIS: https://developers.google.com/identity/gsi/web/reference/js-reference
 import { ApiError, call } from './transport';
+import type { Envelope } from './transport';
 import { clearSnap } from './snapCache';
 import { getTheme } from '../lib/theme';
 
@@ -75,6 +76,9 @@ function loginMessage(e: unknown): string {
   return e.message || 'Не получилось войти — попробуйте ещё раз';
 }
 
+const NONCE_TIMEOUT_MS = 15_000;
+const NONCE_TRIES = 3;
+
 export class Auth {
   private stored: Stored | null = readStored();
   private state: AuthState = this.stored ? { status: 'signedIn', user: this.stored.user, error: null } : { status: 'signedOut', user: null, error: null };
@@ -116,7 +120,17 @@ export class Auth {
   /** Новый nonce и настройка GIS под него: initialize помнит только последний вызов, поэтому — перед каждой попыткой. */
   private async arm(): Promise<Gis> {
     const g = await loadGis();
-    const env = await call<{ nonce: string }>({ url: this.url, action: 'auth.nonce', fetchImpl: this.fetchImpl });
+    // Код входа иногда отвечает 30 с и обрывается (16.10: 2 из 5 открытий; следующая попытка — 5 с). Без кода нет кнопки
+    // Google, а повторить маме нечем — поэтому до 3 попыток по 15 с, «нет связи» — только после третьей.
+    let env: Envelope<{ nonce: string }> | null = null;
+    for (let attempt = 1; !env; attempt++) {
+      try {
+        env = await call<{ nonce: string }>({ url: this.url, action: 'auth.nonce', fetchImpl: this.fetchImpl, timeoutMs: NONCE_TIMEOUT_MS });
+      } catch (e) {
+        if (attempt >= NONCE_TRIES || !(e instanceof ApiError) || e.code !== 'NETWORK') throw e;
+        console.info(`Вход: код входа не пришёл (попытка ${attempt}), прошу ещё раз`);
+      }
+    }
     const nonce = env.data.nonce;
     const issuedAt = Date.now();
     this.arms += 1;
