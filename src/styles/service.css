@@ -301,6 +301,42 @@
   box-shadow: 0 0 0 1px var(--line);
 }
 
+/* Учебный режим (находка № 3): плашка яркая, цвета «море», на каждом экране — спутать с настоящей таблицей нельзя */
+.offline--demo {
+  align-items: center;
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: var(--shadow-1);
+}
+
+.offline--demo a,
+.offline--demo .link {
+  color: var(--on-accent);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  font-weight: var(--weight-semibold);
+}
+
+/* Телефон: ссылка под текстом, поля уже — плашка в 3 строки, а не на треть экрана */
+@media (max-width: 32rem) {
+  .offline--demo {
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--text-sm);
+  }
+
+  .offline--demo > span {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .offline--demo > a {
+    flex-basis: 100%;
+    padding-left: calc(20px + var(--space-2));
+  }
+}
+
 /* Таблица не отдала данные при открытии — вместо пустых экранов. */
 .server-down {
   max-width: 40rem;

@@ -438,7 +438,7 @@
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); /* 14rem: «просроченные» помещается рядом со значком (без плиток план — единственный блок, 5 шагов → 3 + 2) */
   gap: var(--space-3);
 }
 

@@ -5,7 +5,7 @@ import { InboxCard } from './Inbox';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { useStore } from '../data/store';
-import { TODAY, addDays, daysBetween, daysInMonth, daysLabel, fmtDate, monthName, plural, statusByDays, weekday, fmtDayMonth } from '../lib/dates';
+import { TODAY, daysBetween, daysInMonth, daysLabel, fmtDate, monthName, plural, statusByDays, weekday, fmtDayMonth } from '../lib/dates';
 import { growthLabel, monthStats } from '../lib/monthStats';
 import { formatMoney } from '../lib/money';
 import { Icon } from '../ui/Icon';
@@ -20,7 +20,7 @@ import { URGENCY_ICON } from './DeadlineTable';
 import { TableText } from '../ui/TableText';
 import { DayGroups } from './DayGroups';
 import { QuestionsPanel } from './Questions';
-import { Hint, dismissHint } from '../ui/Hint';
+import { Hint } from '../ui/Hint';
 import { navigate } from '../router';
 
 type Filter = 'week' | 'month' | 'overdue' | 'burning' | 'soon';
@@ -80,22 +80,6 @@ const FILTER_TITLE: Record<Filter, string> = {
   week: 'На этой неделе', overdue: 'Просрочено', burning: 'Горит — 0–7 дней', soon: 'Скоро — 8–30 дней', month: 'До 30 дней',
 };
 
-/** Плашка-фильтр первого экрана: значок срочности (цвет + форма), крупное число, подпись и шкала дней. */
-function Tally({ icon, tone, n, label, note, pressed, onClick, href }: {
-  icon: IconName; tone: string; n: number; label: string; note: string; pressed?: boolean; onClick?: () => void; href?: string;
-}) {
-  const inner = (
-    <>
-      <span className="tally__top"><Icon name={icon} size={22} className={`urgency--${tone}`} /><span className="tally__n display"><RollingNumber value={n} /></span></span>
-      <span className="tally__l">{label}</span>
-      <span className="tally__note">{note}</span>
-    </>
-  );
-  const cls = `tally tally--${tone}${n === 0 ? ' is-zero' : ''}`;
-  if (href) return <a className={cls} href={href}>{inner}</a>;
-  return <button type="button" className={cls} aria-pressed={pressed} onClick={onClick}>{inner}</button>;
-}
-
 export function Today() {
   const store = useStore();
   // Новые вопросы от Дмитрия — при открытии «Сегодня» (не чаще раза в 2 мин, см. store.refreshQuestions).
@@ -140,7 +124,6 @@ export function Today() {
   const toggle = (f: Filter) => {
     setFilter((cur) => (cur === f ? 'week' : f));
     play('tick');
-    dismissHint('today.tally');
     // На узком экране список ниже плашек — показать его.
     window.requestAnimationFrame(() => {
       const top = listRef.current?.getBoundingClientRect().top ?? 0;
@@ -169,38 +152,19 @@ export function Today() {
 
   const hour = new Date().getHours();
   const hello = hour < 12 ? 'Доброе утро' : hour < 18 ? 'Добрый день' : 'Добрый вечер';
-  const weekEnd = addDays(TODAY, 7);
 
-  // Главная фраза дня — из чисел, без украшений: что горит сильнее всего.
+  // Главная фраза дня — из чисел, без украшений: что горит сильнее всего. Находка «Пользователя» № 13: «что горит»
+  // говорилось трижды (фраза, пересказ, плитки) — теперь фраза и под ней один план; плиток и пересказа нет.
   const headline = overdue.length
     ? `${overdue.length} ${plural(overdue.length, 'срок просрочен', 'срока просрочены', 'сроков просрочено')}`
     : burning.length
       ? `${burning.length} ${plural(burning.length, 'срок горит', 'срока горят', 'сроков горят')} на неделе`
       : 'всё спокойно';
-  const lede: string[] = [];
-  if (overdue.length && burning.length) lede.push(`Ещё ${burning.length} ${plural(burning.length, 'горит', 'горят', 'горят')} до ${fmtDayMonth(weekEnd)}.`);
-  if (!overdue.length && !burning.length) lede.push(soon.length ? `Ближайшие сроки — через 8–30 дней, их ${soon.length}.` : 'Открытых сроков на месяц вперёд нет.');
-  if (keysGone) lede.push(`${keysGone} ${plural(keysGone, 'ключ ЭЦП уже закончился', 'ключа ЭЦП уже закончились', 'ключей ЭЦП уже закончились')}.`);
-  if (keysSoon) lede.push(`${keysSoon} ${plural(keysSoon, 'ключ ЭЦП заканчивается', 'ключа ЭЦП заканчиваются', 'ключей ЭЦП заканчиваются')} в ближайшие ${KEY_DAYS} дней.`);
-  if (tasksLate) lede.push(`${tasksLate} ${plural(tasksLate, 'задача просрочена', 'задачи просрочены', 'задач просрочено')}.`);
-  if (tasksToday) lede.push(`${tasksToday} ${plural(tasksToday, 'задача', 'задачи', 'задач')} на сегодня.`);
-  if (store.questions.length) lede.push(`Дмитрий ждёт ответа на ${store.questions.length} ${plural(store.questions.length, 'вопрос', 'вопроса', 'вопросов')}.`);
-  if (overdue.length) lede.push('Начните с красных.');
-
   return (
     <div ref={scope} className="page today">
       <section className="hero reveal" aria-labelledby="t-hello">
         <p className="eyebrow">{weekday(TODAY)} · {fmtDayMonth(TODAY)} {TODAY.slice(0, 4)}</p>
         <h1 id="t-hello" className="hero__title">{hello},<br /><em className={overdue.length ? 'is-red' : undefined}>{headline}</em></h1>
-        <p className="hero__lede">{lede.join(' ')}</p>
-        <Hint id="today.tally">Нажмите плашку — в списке останутся только эти сроки, ещё раз — вся неделя.</Hint>
-        <div className="tallies" role="group" aria-label="Сроки по срочности — нажмите, чтобы показать">
-          <Tally icon="overdue" tone="red" n={overdue.length} label="Просрочено" note="срок прошёл" pressed={filter === 'overdue'} onClick={() => toggle('overdue')} />
-          <Tally icon="burning" tone="orange" n={burning.length} label="Горит" note="0–7 дней" pressed={filter === 'burning'} onClick={() => toggle('burning')} />
-          <Tally icon="soon" tone="yellow" n={soon.length} label="Скоро" note="8–30 дней" pressed={filter === 'soon'} onClick={() => toggle('soon')} />
-          <Tally icon="keys" tone={keysGone ? 'red' : 'accent'} n={keys.length} label="Ключи ЭЦП"
-            note={keysGone ? `${keysGone} ${plural(keysGone, 'закончился', 'закончились', 'закончились')}, ещё ${keysSoon} — до ${KEY_DAYS} дн.` : `до ${KEY_DAYS} дней`} href="#/keys" />
-        </div>
       </section>
 
       <section className="plan reveal" aria-labelledby="t-plan">
@@ -229,7 +193,7 @@ export function Today() {
               { id: 'month', label: '30 дней', count: withDays.filter((x) => x.days <= 30).length },
             ]} />
           </header>
-          {list.length > 0 && <Hint id="today.tick" after="today.tally">Круг слева — «сдано и оплачено». Ошиблись — «Отменить» 10 секунд. <span className="only-hover">Наведите на строку — появятся «Позвонить», «Платёж» и «Действия».</span><span className="only-touch">Звонок и платёж — в «Действия».</span></Hint>}
+          {list.length > 0 && <Hint id="today.tick">Круг слева — «сдано и оплачено». Ошиблись — «Отменить» 10 секунд. <span className="only-hover">Наведите на строку — появятся «Позвонить», «Платёж» и «Действия».</span><span className="only-touch">Звонок и платёж — в «Действия».</span></Hint>}
           <DayGroups items={list} empty={
             <Empty pic="calm" title={filter === 'week' ? 'На этой неделе сдавать нечего' : 'Здесь пусто'}>
               {filter === 'week' ? 'Ни просроченных, ни горящих сроков. Можно выдохнуть.' : 'Сроков с такой срочностью нет.'}

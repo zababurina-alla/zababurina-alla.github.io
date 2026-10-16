@@ -395,10 +395,16 @@
   gap: var(--space-2);
 }
 
+.rail__tools > .icon-btn,
+.rail__tools > .pop-wrap {
+  flex: none;
+}
+
 .rail__tools {
   display: flex;
   align-items: center;
   gap: 2px;
+  min-width: 0;
   padding-top: var(--space-2);
   box-shadow: inset 0 1px 0 var(--line);
 }
@@ -470,6 +476,8 @@
 }
 
 .me__text {
+  flex: 0 1 auto;
+  min-width: 0; /* сжимается, когда в строке ещё и «?» (помощь) — без полосы прокрутки в меню */
   max-width: 6.5rem;
   line-height: 1.2;
   overflow: hidden;

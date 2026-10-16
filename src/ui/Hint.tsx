@@ -28,6 +28,13 @@ export function dismissHint(id: string): void {
 }
 
 /** after — id подсказки, после которой показывать эту: на экране одна подсказка за раз (п. 57). */
+/** «Вернуть подсказки» (помощь, находка № 17): все закрытые подсказки снова видны. */
+export function resetHints(): void {
+  cache = [];
+  try { window.localStorage.removeItem(KEY); } catch { /* частный режим — до перезагрузки */ }
+  listeners.forEach((l) => l());
+}
+
 export function Hint({ id, after, children }: { id: string; after?: string; children: ReactNode }) {
   const seen = useSyncExternalStore((l) => { listeners.add(l); return () => listeners.delete(l); }, read, () => []);
   if (seen.includes(id) || (after && !seen.includes(after))) return null;

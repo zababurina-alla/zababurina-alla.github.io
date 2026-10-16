@@ -57,9 +57,12 @@ export function DeadlineActions({ d }: { d: DatedDeadline }) {
         <input type="date" className="input input--sm" value={date} min={TODAY} disabled={!can} onChange={(e) => setDate(e.target.value)} />
       </label>
       <button type="button" className="btn btn--secondary btn--sm" disabled={!can || !dateOk}
-        onClick={() => { store.updateDeadline(d.id, { status: 'postponed', due: date }, `Отложить ${what} до ${fmtDate(date)}`); done(); }}>Отложить до этой даты</button>
+        onClick={() => { store.updateDeadline(d.id, { status: 'postponed', due: date }, `Отложить ${what} до ${fmtDate(date)}`); done(); }}>
+        {/* № 18: чем отличаются — словами под кнопкой (обе ставят эту дату; «Отложить» ещё и помечает «отложено») */}
+        <span className="dactions__btn"><span>Отложить</span><span className="dactions__hint">с пометкой «отложено» до этой даты</span></span></button>
       <button type="button" className="btn btn--secondary btn--sm" disabled={!can || !dateOk}
-        onClick={() => { store.updateDeadline(d.id, { due: date }, `Перенести ${what} на ${fmtDate(date)}`); done(); }}>Перенести срок</button>
+        onClick={() => { store.updateDeadline(d.id, { due: date }, `Перенести ${what} на ${fmtDate(date)}`); done(); }}>
+        <span className="dactions__btn"><span>Перенести срок</span><span className="dactions__hint">новая дата сдачи, без пометки</span></span></button>
       {client && <button type="button" className="btn btn--secondary btn--sm" disabled={!canWrite('remind')} title={canWrite('remind') ? undefined : roMessage('remind')}
         onClick={() => { setRemindOpen(true); done(); }}>Напомнить клиенту</button>}
       <button type="button" className="btn btn--ghost btn--sm" onClick={done}>{can ? 'Отмена' : 'Закрыть'}</button>
