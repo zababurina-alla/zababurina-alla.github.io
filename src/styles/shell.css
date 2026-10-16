@@ -182,6 +182,13 @@
     }
   }
 
+  /* Окно 768 px (видно 720): пункты ещё плотнее — 34 px, меню целиком и здесь */
+  @media (max-height: 790px) {
+    .rail .nav__item {
+      min-height: 2.125rem;
+    }
+  }
+
   .topbar,
   .tabbar,
   .fab {
