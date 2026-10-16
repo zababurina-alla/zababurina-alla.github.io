@@ -1,6 +1,7 @@
 // Вопросы Дмитрия маме: ответ кнопками или полем, «Позже» (только на сайте, localStorage — ui/later.ts),
 // весь список — по клиентам. Одна деталь на «Сегодня»; ответ на вопрос — и в карточке клиента.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { questionBotLink } from '../lib/botLink';
 import { BOT_URL, canWrite } from '../config';
 import { HOLD_MS } from '../data/store';
 import { useStore } from '../data/store';
@@ -17,12 +18,21 @@ export function QuestionAnswer({ q }: { q: Question }) {
   const store = useStore();
   const toast = useToast();
   const [text, setText] = useState('');
+  // Ссылка сразу на этот вопрос: бот пришлёт его заново с кнопками (формат отдела «Бот»). Пока ключ считается — просто бот.
+  const [href, setHref] = useState(BOT_URL);
+  const ro = !canWrite('questions');
+  useEffect(() => {
+    if (!ro) return;
+    let alive = true;
+    questionBotLink(q.id).then((h) => { if (alive) setHref(h); }, () => undefined);
+    return () => { alive = false; };
+  }, [ro, q.id]);
   // Запись ответов выключена — не пустота, а куда идти (находка «Пользователя» № 1).
-  if (!canWrite('questions')) {
+  if (ro) {
     return (
       <div className="question__answers question__answers--ro">
         <span className="sub">На сайте ответить пока нельзя.</span>
-        <a className="btn btn--secondary btn--sm" href={BOT_URL} target="_blank" rel="noopener noreferrer"><Icon name="bot" size={16} />Ответить в Telegram</a>
+        <a className="btn btn--secondary btn--sm" href={href} target="_blank" rel="noopener noreferrer"><Icon name="bot" size={16} />Ответить в Telegram</a>
       </div>
     );
   }
