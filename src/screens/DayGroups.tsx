@@ -1,7 +1,7 @@
 // Сроки по дням: «Просрочено», «Сегодня», «Завтра», «Пятница, 16 октября». Десятки сроков в один день не растягивают
 // экран: в группе видно первые 6, остальное — «Показать ещё N». Одна деталь на «Сегодня» и «Сроки».
 // На «Сроках» можно сгруппировать по виду отчёта или по клиенту.
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { DatedDeadline } from '../data/types';
 import { TODAY, addDays, daysBetween, fmtDayMonth, plural, weekday } from '../lib/dates';
 import { DeadlineTable } from './DeadlineTable';
@@ -10,6 +10,7 @@ import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
 import { OBLIGATION_ICON } from '../ui/obligationIcon';
 import { OBLIGATION_LABEL, obligationKind } from '../lib/obligation';
+import { useFlipRows } from '../ui/flip';
 import type { ObligationKind } from '../lib/obligation';
 
 const FOLD_AT = 8; // порог наш: больше 8 строк в дне — сворачиваем до 6
@@ -52,6 +53,9 @@ export type GroupBy = 'day' | 'kind' | 'client';
 /** Сроки группами: по дням (по умолчанию), по виду отчёта или по клиенту. Внутри группы — по дате. */
 export function DayGroups({ items, empty, by = 'day' }: { items: DatedDeadline[]; empty: React.ReactNode; by?: GroupBy }) {
   const store = useStore();
+  // Фильтр, группировка, закрытие — строки сроков переезжают плавно (FLIP)
+  const box = useRef<HTMLDivElement>(null);
+  useFlipRows(box, '.dtable__row', `${by}|${items.map((d) => d.id).join(',')}`);
   if (items.length === 0) return <>{empty}</>;
   const sorted = [...items].sort((a, b) => a.due.localeCompare(b.due));
   const groups = new Map<string, DatedDeadline[]>();
@@ -63,7 +67,7 @@ export function DayGroups({ items, empty, by = 'day' }: { items: DatedDeadline[]
     entries = entries.sort((x, y) => (x[1][0]?.due ?? '').localeCompare(y[1][0]?.due ?? ''));
   }
   return (
-    <div className="dgroups">
+    <div ref={box} className="dgroups">
       {entries.map(([k, list]) => {
         if (by === 'kind') {
           return <Group key={k} title={OBLIGATION_LABEL[k as ObligationKind]} icon={OBLIGATION_ICON[k as ObligationKind]} items={list} />;

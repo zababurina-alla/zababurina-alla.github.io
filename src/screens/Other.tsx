@@ -1,5 +1,5 @@
 // Ключи ЭЦП, Справочник, Задачи и «Ещё» (телефон). Короче основных экранов, но рабочие.
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { canWrite } from '../config';
 import { useStore } from '../data/store';
@@ -22,6 +22,7 @@ import { useToast } from '../ui/toast';
 import { roAttrs, roMessage } from '../ui/readonly';
 import { URGENCY_ICON } from './DeadlineTable';
 import { Me, SoundSettings, useTheme } from '../app/Shell';
+import { useFlipRows } from '../ui/flip';
 
 // Группы ключей — шкала словаря (п. 1): просрочен, горит 0–7, скоро 8–30, в порядке; «нет ключа» — ⚪ (п. 3, № 79).
 const KEY_GROUPS: { st: Status; title: string }[] = [
@@ -178,6 +179,9 @@ const DONE_SHOWN = 20;
 export function Tasks() {
   const store = useStore();
   const ui = useUi();
+  // «Сделано» и новые задачи — строки переезжают плавно (FLIP), а не прыгают между группами
+  const listRef = useRef<HTMLElement>(null);
+  useFlipRows(listRef, '.tasks__row', store.tasks.map((t) => `${t.id}${t.done ? '+' : ''}`).join(','));
   const [line, setLine] = useState('');
   const parsed = line.trim() ? parseQuickTask(line, store.clients) : null;
   const client = parsed?.clientId ? store.client(parsed.clientId) : undefined;
@@ -250,7 +254,7 @@ export function Tasks() {
           </p>
         )}
       </form>
-      <section className="panel" aria-label="Список задач">
+      <section ref={listRef} className="panel" aria-label="Список задач">
         {open.length > 1 && (
           <div className="tasks__select" role="group" aria-label="Несколько задач">
             {selecting ? (
@@ -271,12 +275,12 @@ export function Tasks() {
               <button type="button" className="dgroup__more" onClick={() => setShowDone(true)}>Показать сделанные: {done.length}</button>
             ) : (
             <ul className="tasks">
-              {xs.map((t) => {
+              {xs.map((t, i) => {
                 const c = t.clientId ? store.client(t.clientId) : undefined;
                 const saving = store.pending.some((p) => (p.op.kind === 'createTask' && p.op.task.id === t.id) || (p.op.kind === 'completeTask' && p.op.id === t.id));
                 const st = t.due ? statusByDays(daysBetween(TODAY, t.due)) : null;
                 return (
-                  <li key={t.id} className={`tasks__row${t.done ? ' is-done' : ''}${store.fresh.includes(t.id) ? ' is-fresh' : ''}`}>
+                  <li key={t.id} style={{ '--i': i } as React.CSSProperties} className={`tasks__row${t.done ? ' is-done' : ''}${store.fresh.includes(t.id) ? ' is-fresh' : ''}`}>
                     <button type="button" className={`check-btn tasks__check${selecting && !t.done ? ' is-choosing' : ''}`}
                       aria-pressed={selecting && !t.done ? chosen.has(t.id) : t.done}
                       aria-label={selecting && !t.done ? `Выбрать: ${t.text}` : `Сделано: ${t.text}`}

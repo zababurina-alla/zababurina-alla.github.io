@@ -858,3 +858,24 @@
 .dtable__row:has(.dsel:checked) {
   background: color-mix(in srgb, var(--accent) 7%, transparent);
 }
+
+/* Закрытая строка — «призрак» 3 с на своём месте (находка № 24): бледная, зачёркнутая, не нажимается */
+.dtable__row.is-ghost {
+  pointer-events: none;
+}
+
+.dtable__row.is-ghost .dtable__what,
+.dtable__row.is-ghost .dtable__due,
+.dtable__row.is-ghost .dtable__client {
+  opacity: 0.45;
+  transition: opacity var(--dur-base) ease;
+}
+
+.dtable__row.is-ghost .dtable__line .ttext {
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--ink-2) 60%, transparent);
+}
+
+.dtable__row.is-ghost .dtable__tools {
+  visibility: hidden;
+}

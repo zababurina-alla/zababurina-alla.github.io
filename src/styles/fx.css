@@ -79,7 +79,9 @@
 .vt-name { display: inline-block; }
 
 /* ═════════ Строки появляются по очереди: шаг 30 мс, первые 20 (как в образце) ═════════ */
-.screen .dtable__row:nth-child(-n + 21) {
+.screen .dtable__row:nth-child(-n + 21),
+.screen .paylist__row:nth-child(-n + 21),
+.screen .tasks__row:nth-child(-n + 21) {
   animation: row-in 420ms var(--ease-out) both;
   animation-delay: calc(min(var(--i, 0), 20) * var(--stagger) + 120ms);
 }
@@ -364,4 +366,18 @@
     transition-delay: 0ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ═════════ Прилипшие шапки таблиц и групп — мягкая тень снизу (fx.ts ставит .is-stuck) ═════════ */
+.ctable__head.is-stuck,
+.dgroup__title.is-stuck {
+  box-shadow: inset 0 -1px 0 var(--line), 0 10px 16px -12px color-mix(in srgb, var(--ink) 30%, transparent);
+}
+
+.dgroup__title {
+  transition: box-shadow var(--dur-base) ease;
+}
+
+.dgroup__title.is-stuck {
+  background: var(--surface);
 }
