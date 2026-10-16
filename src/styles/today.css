@@ -146,9 +146,11 @@
   align-items: start;
 }
 
+.today-main,
 .today-side {
   display: grid;
   gap: var(--space-5);
+  min-width: 0;
 }
 
 @media (min-width: 1280px) {
@@ -162,9 +164,18 @@
   }
 }
 
+/* Между телефоном и ноутбуком карточки — в две колонки «кирпичами»: каждая встаёт в ту колонку, что короче, —
+   без пустот под низкими соседями (раньше сетка 1fr 1fr выравнивала пары по высоте строки) */
 @media (min-width: 760px) and (max-width: 1279px) {
   .today-side {
-    grid-template-columns: 1fr 1fr;
+    display: block;
+    columns: 2;
+    column-gap: var(--space-5);
+  }
+
+  .today-side > * {
+    break-inside: avoid;
+    margin-bottom: var(--space-5);
   }
 }
 
@@ -398,6 +409,13 @@
   line-height: 1.4;
 }
 
+/* «Ещё N» — лента показывает 3 последних, остальное по нажатию (колонка не вырастает ниже соседней) */
+.feed__more {
+  justify-self: start;
+  margin: calc(-1 * var(--space-2)) var(--space-5) var(--space-4) calc(var(--space-5) + 2rem + var(--space-3));
+  min-height: var(--tap);
+}
+
 /* ═════════ Телефон ═════════ */
 @media (max-width: 759px) {
   .hero {
@@ -439,13 +457,19 @@
   padding: 0;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); /* 14rem: «просроченные» помещается рядом со значком (без плиток план — единственный блок, 5 шагов → 3 + 2) */
+  grid-auto-rows: 1fr; /* одна высота у всех плиток (владелец 16.10: «Ключи ЭЦП в две строки — плитки разной высоты») */
   gap: var(--space-3);
+}
+
+.plan__steps > li {
+  display: grid;
+  min-width: 0;
 }
 
 .plan__step {
   position: relative;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: 1.5rem minmax(0, 1fr) 1.25rem; /* цифра и значок — в колонках одной ширины: у всех плиток на одной линии */
   align-items: center;
   gap: var(--space-3);
   width: 100%;
@@ -483,14 +507,30 @@
 .plan__step--orange .plan__n { color: var(--st-orange-ink); }
 .plan__step--wheat .plan__n { color: var(--wheat-ink); }
 
+.plan__n {
+  text-align: center;
+}
+
 .plan__text {
   display: grid;
   min-width: 0;
   line-height: 1.3;
 }
 
+/* Подпись и число — по одной строке: длинное («Ключи ЭЦП: закончились, ещё 3 — до 14 дн.») — с многоточием,
+   целиком — во всплывающей подсказке */
+.plan__text > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .plan__text strong {
   font-weight: var(--weight-semibold);
+}
+
+.plan__step > .icon {
+  justify-self: center;
 }
 
 .plan__done {
@@ -617,4 +657,74 @@
   top: 0;
   z-index: 1;
   background: color-mix(in srgb, var(--wheat-soft) 92%, var(--surface));
+}
+
+/* ═════════ «Сегодня»: «Требуют внимания» (техника 16.10, оформление) ═════════ */
+/* Клиент и уровень риска — строкой, причины — под именем; высокий риск — красная метка, средний — оранжевая */
+.attention .panel__head {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
+.attention .panel__title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.attention__list {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--space-5) var(--space-4);
+  display: grid;
+}
+
+.attention__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px var(--space-2);
+  padding: var(--space-2) 0;
+}
+
+.attention__row + .attention__row {
+  box-shadow: inset 0 1px 0 var(--line);
+}
+
+.attention__who {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: var(--tap);
+  text-align: left;
+}
+
+.attention__who > strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attention__row > .tag {
+  min-height: 1.625rem;
+  padding: 0 9px;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.attention__row--high > .tag {
+  background: var(--st-red-bg);
+  color: var(--st-red-ink);
+}
+
+.attention__row--mid > .tag {
+  background: var(--st-orange-bg);
+  color: var(--st-orange-ink);
+}
+
+.attention__why {
+  grid-column: 1 / -1;
+  padding-left: calc(2rem + var(--space-2)); /* под именем, не под кружком с буквами */
+  font-size: var(--text-sm);
 }

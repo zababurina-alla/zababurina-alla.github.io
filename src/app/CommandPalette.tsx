@@ -1,5 +1,7 @@
 // Командная строка (Ctrl+K): найти клиента, раздел или действие и выполнить с клавиатуры.
 // Открывается мгновенно, без анимации: действие частое и с клавиатуры (правило навыка animate).
+// Пустая строка (владелец 16.10: «Найти клиента» открывает смесь действий и разделов) — сначала клиенты: недавно
+// открытые отсюда, потом те, по кому последние платежи; ниже два частых действия. Разделы — только при наборе.
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../data/store';
 import { kindLabel } from '../data/fake';
@@ -8,7 +10,6 @@ import { splitFieldQuery } from '../lib/fieldQuery';
 import type { ClientField } from '../lib/fieldQuery';
 import type { Client } from '../data/types';
 import { navigate } from '../router';
-import { toggleTheme } from '../lib/theme';
 import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
 import { useUi } from './ui-context';
@@ -21,6 +22,16 @@ import { splitEmoji } from '../ui/TableText';
 
 
 interface Item { id: string; group: string; label: string; hint?: string | undefined; icon: IconName; run: () => void }
+
+// Недавно открытые из поиска клиенты — только в этом браузере, только номера строк (не данные клиента)
+const RECENT_KEY = 'palette.recent';
+const RECENT_MAX = 6;
+function readRecent(): string[] {
+  try { const v: unknown = JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]'); return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []; } catch { return []; }
+}
+function rememberRecent(id: string): void {
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify([id, ...readRecent().filter((x) => x !== id)].slice(0, RECENT_MAX))); } catch { /* хранилище закрыто — без «недавних» */ }
+}
 
 /** «ромашко ключ» — в строке клиента сразу нужное поле (пароль не показываем: только «Показать» в карточке). */
 function fieldHint(c: Client, f: ClientField): string {
@@ -52,7 +63,6 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const actions: Item[] = [
     { id: 'pay', group: 'Действия', label: 'Записать платёж', hint: 'Alt N', icon: 'plus', run: () => ui.openPayment() },
     { id: 'add', group: 'Действия', label: 'Добавить клиента', icon: 'userPlus', run: ui.openAddClient },
-    { id: 'theme', group: 'Действия', label: 'Сменить тему', icon: 'moon', run: toggleTheme },
     { id: 'r-today', group: 'Разделы', label: 'Сегодня', icon: 'today', run: () => navigate('#/today') },
     { id: 'r-clients', group: 'Разделы', label: 'Клиенты', icon: 'clients', run: () => navigate('#/clients') },
     { id: 'r-deadlines', group: 'Разделы', label: 'Сроки', icon: 'deadlines', run: () => navigate('#/deadlines') },
@@ -66,10 +76,13 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     words: [...c.kved.map((k) => k.title), c.keyIssuer, ...store.deadlines.filter((d) => d.clientId === c.id).map((d) => d.what)] }));
   const byField = fq.field ? search(clientItems, fq.name) : [];
   const field = byField.length ? fq.field : null;
-  const clients: Item[] = q
-    ? (field ? byField : search(clientItems, q)).slice(0, 6)
-      .map((c) => ({ id: c.id, group: 'Клиенты', label: c.name, hint: field ? fieldHint(c, field) : kindLabel(c.kind), icon: 'fop' as IconName, run: () => ui.openClient(c.id) }))
-    : [];
+  const openClient = (id: string) => { rememberRecent(id); ui.openClient(id); };
+  const firstClients = (): Client[] => {
+    const ids = [...readRecent(), ...store.payments.map((p) => p.clientId), ...store.clients.map((c) => c.id)];
+    return [...new Set(ids)].map((id) => store.client(id)).filter((c): c is Client => Boolean(c)).slice(0, RECENT_MAX);
+  };
+  const clients: Item[] = (q ? (field ? byField : search(clientItems, q)).slice(0, 6) : firstClients())
+    .map((c) => ({ id: c.id, group: 'Клиенты', label: c.name, hint: field ? fieldHint(c, field) : kindLabel(c.kind), icon: 'fop' as IconName, run: () => openClient(c.id) }));
   // Сроки, задачи и платежи — по имени клиента и тексту («ромашко єсв», «первичка», «1500»), от 2 букв.
   // Ищем той же читалкой, что и клиентов (search техники сайта): имя клиента + текст записи.
   const who = (id: string | null) => (id ? store.client(id)?.name ?? '' : '');
@@ -78,20 +91,21 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     ? search(store.deadlines.map((d) => ({ ...d, name: `${who(d.clientId)} ${d.what}` })), q)
       .sort((a, b) => a.due.localeCompare(b.due)).slice(0, 5)
       .map((d) => ({ id: `d-${d.id}`, group: 'Сроки', label: `${shortName(who(d.clientId)) || 'Клиент не указан'} — ${splitEmoji(d.what).rest}`,
-        hint: daysLabel(daysBetween(TODAY, d.due)), icon: OBLIGATION_ICON[obligationKind(d.what)], run: () => ui.openClient(d.clientId) }))
+        hint: daysLabel(daysBetween(TODAY, d.due)), icon: OBLIGATION_ICON[obligationKind(d.what)], run: () => openClient(d.clientId) }))
     : [];
   const tasks: Item[] = deep
     ? search(store.tasks.filter((t) => !t.done).map((t) => ({ ...t, name: `${who(t.clientId)} ${t.text}` })), q).slice(0, 4)
       .map((t) => ({ id: `t-${t.id}`, group: 'Задачи', label: splitEmoji(t.text).rest, hint: t.clientId ? shortName(who(t.clientId)) : undefined,
-        icon: 'tasks' as IconName, run: () => (t.clientId ? ui.openClient(t.clientId) : navigate('#/tasks')) }))
+        icon: 'tasks' as IconName, run: () => (t.clientId ? openClient(t.clientId) : navigate('#/tasks')) }))
     : [];
   const payments: Item[] = deep
     ? search(store.payments.map((p) => ({ ...p, name: `${who(p.clientId)} ${p.period}`, extra: [String(Math.round((p.kopecks ?? 0) / 100))] })), q)
       .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '')).slice(0, 4)
       .map((p) => ({ id: `p-${p.id}`, group: 'Платежи', label: `${shortName(who(p.clientId)) || 'Клиент не указан'} — ${p.period}`,
-        hint: formatPayMoney(p.kopecks), icon: 'payments' as IconName, run: () => (p.clientId ? ui.openClient(p.clientId) : navigate('#/payments')) }))
+        hint: formatPayMoney(p.kopecks), icon: 'payments' as IconName, run: () => (p.clientId ? openClient(p.clientId) : navigate('#/payments')) }))
     : [];
-  const items = [...clients, ...deadlines, ...tasks, ...payments, ...actions.filter((a) => !q || fold(a.label).includes(fold(q)))];
+  const shortcuts = q ? actions.filter((a) => fold(a.label).includes(fold(q))) : actions.filter((a) => a.group === 'Действия');
+  const items = [...clients, ...deadlines, ...tasks, ...payments, ...shortcuts];
 
   function run(it: Item | undefined) {
     if (!it) return;
@@ -108,7 +122,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         <label className="palette__search">
           <Icon name="search" />
           <span className="visually-hidden">Что найти</span>
-          <input ref={input} value={q} placeholder="Клиент, срок, задача, платёж или раздел…" autoComplete="off"
+          <input ref={input} value={q} placeholder="Фамилия клиента, срок, платёж или раздел…" autoComplete="off"
             role="combobox" aria-expanded={items.length > 0} aria-controls="palette-list" aria-activedescendant={items[active] ? `pal-${active}` : undefined}
             onChange={(e) => { setQ(e.target.value); setActive(0); }}
             onKeyDown={(e) => {

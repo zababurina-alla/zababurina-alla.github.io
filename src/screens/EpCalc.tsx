@@ -24,7 +24,7 @@ export function EpCalc({ r }: { r: Rates }) {
       <h2 id={`${ids}-t`} className="panel__title">Сколько ЄП при доходе</h2>
       <div className="field">
         <label className="field__label" htmlFor={`${ids}-sum`}>Доход за квартал, ₴</label>
-        <input id={`${ids}-sum`} className="input input--money num" inputMode="decimal" value={sum} onChange={(e) => setSum(e.target.value)} placeholder="150 000" autoComplete="off" />
+        <input id={`${ids}-sum`} className="input input--money num" inputMode="decimal" value={sum} onChange={(e) => setSum(e.target.value)} placeholder="например, 150 000" autoComplete="off" />
         {sum.trim() && !money.ok && <p className="field__error" role="alert">{money.error}</p>}
       </div>
       {income !== null && (

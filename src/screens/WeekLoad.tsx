@@ -9,15 +9,17 @@ export function WeekLoadBar() {
   const { overdue, weeks } = weekLoad(deadlines.map((d) => d.due), TODAY);
   const max = Math.max(1, ...weeks.map((w) => w.count));
   return (
-    <section className="wload" aria-label="Нагрузка по неделям">
-      {overdue > 0 && <p className="wload__over sub">Просрочено: <strong className="num">{overdue}</strong></p>}
+    <section className="wload" aria-labelledby="wload-t">
+      <h3 id="wload-t" className="wload__title">Нагрузка по неделям
+        {overdue > 0 && <span className="wload__over">просрочено <strong className="num">{overdue}</strong></span>}</h3>
       <ol className="wload__weeks">
         {weeks.map((w, i) => (
           <li key={w.start} className={`wload__week${i === 0 ? ' is-now' : ''}`}
             title={`${fmtDayMonth(w.start)} — ${fmtDayMonth(w.end)}: ${w.count} ${plural(w.count, 'срок', 'срока', 'сроков')}`}>
             <span className="wload__bar" style={{ '--h': `${Math.round((w.count / max) * 100)}%` } as React.CSSProperties} aria-hidden="true" />
             <span className="wload__n num">{w.count}</span>
-            <span className="wload__label sub">{i === 0 ? 'эта неделя' : fmtDayMonth(w.start)}</span>
+            {/* Подпись — понедельник недели «20.10»: шесть колонок по 47 px, «20 октября» не помещалось */}
+            <span className="wload__label num">{`${w.start.slice(8, 10)}.${w.start.slice(5, 7)}`}</span>
           </li>
         ))}
       </ol>

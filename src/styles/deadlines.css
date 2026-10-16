@@ -15,7 +15,9 @@
   justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-4) var(--space-5) var(--space-2);
-  background: linear-gradient(var(--surface) 70%, color-mix(in srgb, var(--surface) 0%, transparent));
+  /* Сплошной лист: прозрачный низ градиента пропускал строку под заголовком — имя «срезано» сверху (приёмка М-6) */
+  background: var(--surface);
+  box-shadow: 0 1px 0 var(--line);
   font-size: var(--text-md);
   font-weight: var(--weight-semibold);
 }
@@ -23,6 +25,15 @@
 @media (max-width: 1023px) {
   .dgroup__title {
     top: 3.75rem;
+  }
+}
+
+@media (max-width: 479px) {
+  .dgroup__title {
+    gap: var(--space-2);
+    padding-inline: var(--space-4);
+    font-size: var(--text-md);
+    letter-spacing: -0.01em;
   }
 }
 
@@ -47,6 +58,11 @@
 }
 
 .dgroup .dtable__head {
+  display: none;
+}
+
+/* Свёрнутые строки группы («Показать ещё N») — на экране скрыты, в печати видны (print.css) */
+.dtable > .dtable__row.is-folded {
   display: none;
 }
 
@@ -389,7 +405,7 @@
   right: 3px;
   bottom: 2px;
   font-family: var(--font);
-  font-size: 0.6875rem;
+  font-size: var(--text-xs); /* 14 px — не мельче нижней границы (приёмка 16.10, М-1: было 11 px) */
   font-weight: var(--weight-bold);
   line-height: 1;
   opacity: 0.85;
@@ -545,7 +561,16 @@
 }
 
 .dl-tools__by {
-  flex: none;
+  flex: 1 0 auto; /* строка инструментов без пустого хвоста справа (автопроверка: 264 px на 1024) */
+}
+
+.dl-tools > .dfilters {
+  flex: 1 1 auto;
+}
+
+/* «Выбрать несколько» — высотой с соседний переключатель «По дням / По виду / По клиенту» (46 px) */
+.dl-tools__select {
+  min-height: calc(2.5rem + 6px);
 }
 
 .dl-tools__by .seg__opt {
@@ -878,4 +903,168 @@
 
 .dtable__row.is-ghost .dtable__tools {
   visibility: hidden;
+}
+
+/* Сверка колонок (16.10): на широком экране с мышью название срока — одной строкой с многоточием, кнопки строки —
+   справа в той же строке. Раньше невидимые до наведения кнопки держали под названием пустую строку, а у длинного
+   названия переносились — строка росла до 117 px. Меню «Действия» открыто — переносы снова можно. */
+@media (hover: hover) and (pointer: fine) and (min-width: 40rem) {
+  .dtable__line {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .dtable__line > .ttext {
+    flex: 0 1 auto;
+    min-width: 0;
+    align-items: center;
+  }
+
+  .dtable__line > .ttext > span:not(.icon) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dtable__line > .tag {
+    flex: none;
+  }
+
+  /* Кнопки строки не держат место: появляются при наведении поверх правого края строки, на подложке цвета строки */
+  .dtable__line {
+    position: relative;
+  }
+
+  .dtable__line > .dtable__tools {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    z-index: 1;
+    flex-wrap: nowrap;
+    margin: 0;
+    padding-left: var(--space-6);
+    background: linear-gradient(to right, transparent, var(--surface-sunk) var(--space-5));
+    transform: translateY(-50%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-fast) ease;
+  }
+
+  .dtable__row:hover .dtable__line > .dtable__tools,
+  .dtable__row:focus-within .dtable__line > .dtable__tools {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .dtable__line > .dtable__tools > .icon-btn,
+  .dtable__line > .dtable__tools > .dactions__toggle {
+    opacity: 1;
+  }
+
+  .dtable__line:has(.dactions) {
+    flex-wrap: wrap;
+  }
+
+  .dtable__line:has(.dactions) > .dtable__tools {
+    position: static;
+    flex-wrap: wrap;
+    flex-basis: 100%;
+    padding-left: 0;
+    background: none;
+    transform: none;
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* ═════════ «Сроки»: нагрузка по неделям — под календарём (техника 16.10, оформление) ═════════ */
+/* Шесть недель столбиками: высота — доля от самой загруженной недели, текущая — цветом акцента */
+.wload {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  box-shadow: inset 0 1px 0 var(--line);
+}
+
+.wload__title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+
+.wload__over {
+  color: var(--st-red-ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+.wload__weeks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.wload__week {
+  display: grid;
+  grid-template-rows: 4.5rem auto auto; /* полоса — в дорожке постоянной высоты: проценты считаются от неё */
+  justify-items: center;
+  gap: 4px;
+}
+
+.wload__bar {
+  align-self: end;
+  width: 100%;
+  max-width: 2.25rem;
+  height: max(var(--h, 0%), 4px);
+  border-radius: var(--radius-xs) var(--radius-xs) 3px 3px;
+  background: color-mix(in srgb, var(--accent) 28%, var(--surface-sunk));
+  transform-origin: 50% 100%;
+}
+
+.wload__week.is-now .wload__bar {
+  background: var(--accent);
+}
+
+.wload__n {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.wload__label {
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.wload__week.is-now .wload__label {
+  color: var(--accent);
+  font-weight: var(--weight-semibold);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .wload__bar {
+    animation: wload-grow 520ms var(--ease-out) both;
+    animation-delay: calc(var(--i, 0) * 40ms + 200ms);
+  }
+
+  .wload__week:nth-child(2) .wload__bar { --i: 1; }
+  .wload__week:nth-child(3) .wload__bar { --i: 2; }
+  .wload__week:nth-child(4) .wload__bar { --i: 3; }
+  .wload__week:nth-child(5) .wload__bar { --i: 4; }
+  .wload__week:nth-child(6) .wload__bar { --i: 5; }
+}
+
+@keyframes wload-grow {
+  from { transform: scaleY(0); }
 }

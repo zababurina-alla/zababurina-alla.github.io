@@ -39,8 +39,10 @@ function useFlipRows(scope: React.RefObject<HTMLElement | null>, key: string) {
   }, [key, scope]);
 }
 
-export function DeadlineTable({ items, showClient = true, empty = 'Сроков нет' }: {
+export function DeadlineTable({ items, showClient = true, empty = 'Сроков нет', foldFrom }: {
   items: DatedDeadline[]; showClient?: boolean; empty?: string;
+  /** Строки с этого номера свёрнуты («Показать ещё N»): на экране скрыты, на бумаге печатаются все */
+  foldFrom?: number | undefined;
 }) {
   const store = useStore();
   const ui = useUi();
@@ -64,7 +66,7 @@ export function DeadlineTable({ items, showClient = true, empty = 'Сроков 
         const name = c ? shortName(c.name) : 'Клиент не указан';
         return (
           <div key={d.id} data-row data-id={d.id} data-flip-id={d.id} role="row" style={{ '--i': i } as React.CSSProperties}
-            className={`dtable__row dtable__row--${st}${store.fresh.includes(d.id) ? ' is-fresh' : ''}`}>
+            className={`dtable__row dtable__row--${st}${store.fresh.includes(d.id) ? ' is-fresh' : ''}${foldFrom !== undefined && i >= foldFrom ? ' is-folded' : ''}`}>
             <span role="cell" className="c-act">
               {sel.on ? (
                 <input type="checkbox" className="dsel" checked={sel.picked.has(d.id)} onChange={() => sel.toggle(d.id)}
@@ -82,6 +84,7 @@ export function DeadlineTable({ items, showClient = true, empty = 'Сроков 
                   <button type="button" className="linklike" onClick={() => ui.openClient(c.id)}>
                     <Avatar name={c.name} clientId={c.id} />
                     <span className="dtable__name" data-client-name={c.id}>{name}</span>
+                    <span className="dtable__fullname print-only">{c.name}</span>
                   </button>
                 ) : <span className="nil">{name}</span>}
               </span>

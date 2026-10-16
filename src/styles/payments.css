@@ -282,12 +282,66 @@
 
   .paylist__cancel {
     grid-column: 2;
+    grid-row: 2;
     justify-self: end;
+  }
+
+  /* «Отменить» — во второй строке, рядом со способом, а не третьей строкой (сверка колонок: строка была 135 px) */
+  .paylist__row:has(> .paylist__cancel) > .paylist__how {
+    grid-column: 1;
+  }
+
+  .paylist__row:has(> .pill) > .paylist__cancel {
+    grid-row: 3;
   }
 
   /* На касании «Отменить» видна всегда — без пустого места: строка короче на мыши не станет */
   .paylist__cancel:not(.is-sure) {
     opacity: 1;
+  }
+}
+
+/* Планшет и ноутбук 1024 (лист 560–759 px): строка как на широком экране — имя, способ и откуда записано, сумма;
+   «Отменить» — своей колонкой, на мыши проступает при наведении. Было: три этажа по 130–190 px и «Отменить» на каждом
+   (приёмка 16.10, С-7) */
+@container (min-width: 560px) and (max-width: 759px) {
+  .paylist__row {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) auto auto 6.5rem;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .paylist__row > *,
+  .paylist__row:has(> .pill) > .paylist__how,
+  .paylist__row:has(> .paylist__cancel) > .paylist__how,
+  .paylist__row > .pill,
+  .paylist__row:has(> .pill) > .paylist__cancel {
+    grid-row: 1;
+    grid-column: auto;
+    padding-left: 0;
+  }
+
+  .paylist__row > :nth-child(3):empty {
+    display: block;
+  }
+
+  .paylist__src {
+    display: inline-flex;
+  }
+
+  .paylist__sum {
+    font-size: 1.25rem;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .paylist__cancel:not(.is-sure) {
+      opacity: 0;
+    }
+
+    .paylist__row:hover .paylist__cancel,
+    .paylist__cancel:focus-visible {
+      opacity: 1;
+    }
   }
 }
 
@@ -299,6 +353,17 @@
 
 .month-nav .icon-btn:disabled {
   opacity: 0.35;
+  cursor: default;
+}
+
+.month-nav__btn {
+  gap: 4px;
+  padding: 0 var(--space-2);
+  color: var(--ink-2);
+}
+
+.month-nav__btn:disabled {
+  opacity: 0.55;
   cursor: default;
 }
 
