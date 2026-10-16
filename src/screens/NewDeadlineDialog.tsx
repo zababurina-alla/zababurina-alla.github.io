@@ -11,6 +11,8 @@ import { Icon } from '../ui/Icon';
 import { Modal } from '../ui/Modal';
 import { useToast } from '../ui/toast';
 import { useUi } from '../app/ui-context';
+import { ClientCombo } from './ClientCombo';
+import { fold } from '../lib/search';
 
 const PERIODS: [Deadline['periodicity'], string][] = [['once', 'Разово'], ['month', 'Каждый месяц'], ['quarter', 'Каждый квартал'], ['year', 'Каждый год']];
 
@@ -41,7 +43,8 @@ export function NewDeadlineDialog({ open, clientId, onClose }: { open: boolean; 
   const whoError = who ? '' : 'Выберите клиента';
   // Подсказки «что сдать» — обязательства, которые уже есть в сроках (как пишет таблица).
   const known = [...new Set(store.deadlines.map((d) => d.what))].sort((a, b) => a.localeCompare(b, 'uk')).slice(0, 200);
-  const clients = [...store.clients].sort((a, b) => a.name.localeCompare(b.name, 'uk'));
+  const typed = fold(what);
+  const hints = typed.length >= 2 ? known.filter((k) => fold(k).includes(typed) && k !== what).slice(0, 5) : [];
   const create = store.createDeadline;
 
   async function submit(e: React.FormEvent) {
@@ -80,19 +83,21 @@ export function NewDeadlineDialog({ open, clientId, onClose }: { open: boolean; 
       <form id={`${ids}-form`} className="form" onSubmit={(e) => { void submit(e); }} noValidate>
         {!clientId && (
           <div className="field">
-            <label className="field__label" htmlFor={`${ids}-who`}>Клиент</label>
-            <select id={`${ids}-who`} className="input" value={who} onChange={(e) => setWho(e.target.value)}>
-              <option value="">— выберите —</option>
-              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <span className="field__label">Клиент</span>
+            <ClientCombo value={who} onChange={setWho} error={tried ? whoError || fieldErr('clientId') : ''} />
             {tried && (whoError || fieldErr('clientId')) && <p className="field__error" role="alert">{whoError || fieldErr('clientId')}</p>}
           </div>
         )}
         <div className="field">
           <label className="field__label" htmlFor={`${ids}-what`}>Что сдать или оплатить</label>
-          <input id={`${ids}-what`} className="input" list={`${ids}-known`} value={what} maxLength={300} autoComplete="off"
+          <input id={`${ids}-what`} className="input" value={what} maxLength={300} autoComplete="off"
             onChange={(e) => { setWhat(e.target.value); if (err?.current) setErr(null); }} aria-invalid={Boolean(tried && (whatError || fieldErr('obligation')))} />
-          <datalist id={`${ids}-known`}>{known.map((k) => <option key={k} value={k} />)}</datalist>
+          {/* Подсказки — своими кнопками, а не системной стрелкой (С-3: два разных вида выбора в одной форме) */}
+          {hints.length > 0 && (
+            <div className="chips" role="group" aria-label="Как это называется в таблице">
+              {hints.map((k) => <button key={k} type="button" className="chip" onClick={() => setWhat(k)}>{k}</button>)}
+            </div>
+          )}
           {tried && (whatError || fieldErr('obligation')) && <p className="field__error" role="alert">{whatError || fieldErr('obligation')}</p>}
         </div>
         <div className="field">
