@@ -8,6 +8,7 @@ import { searchKved } from '../lib/kvedLocal';
 import { api } from './session';
 import type { Rates } from './types';
 import { kvedQuery } from '../lib/kvedQuery';
+import { kvedLookup, kvedMap } from '../lib/kvedLookup';
 
 export type Loaded<T> = { state: 'idle' } | { state: 'loading' } | { state: 'ok'; data: T } | { state: 'error'; message: string };
 
@@ -101,9 +102,13 @@ function useKvedAll(): KvedAll | null {
 
 /** Названия КВЕД по коду из листа «📑 КВЕДы» (тот же весь лист, что для поиска): у клиента в карточке названия часто нет
  *  («название не указано», владелец 16.10) — берём отсюда. Лист ещё не пришёл — пустая карта. */
-export function useKvedTitles(): ReadonlyMap<string, string> {
+export function useKvedTitles(): { get: (code: string) => string | undefined } {
   const all = useKvedAll();
-  return useMemo(() => new Map((all?.items ?? []).filter((k) => k.title).map((k) => [k.code, k.title])), [all]);
+  // Тем же откатом, что таблица: точный код → группа «XX.X» → раздел «XX» (lib/kvedLookup) — в листе многие коды группами.
+  return useMemo(() => {
+    const map = kvedMap((all?.items ?? []).filter((k) => k.title), (k) => k.code);
+    return { get: (code: string) => kvedLookup(map, code)?.title };
+  }, [all]);
 }
 
 /** Поиск КВЕД на сервере: ждём паузу в наборе 300 мс; меньше двух знаков — не ищем. Запрос приводится к виду листа
