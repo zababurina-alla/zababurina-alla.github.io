@@ -219,7 +219,7 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
       <Icon name={n.icon} />
       <span>{n.label}</span>
       {n.id === 'deadlines' && overdue > 0 && <span className="nav__badge num" title="Просрочено"><span aria-hidden="true">{overdue}</span><span className="visually-hidden">, просрочено: {overdue}</span></span>}
-      {n.id === 'inbox' && inboxNew > 0 && <span className="nav__badge num" title="Новые сообщения"><span aria-hidden="true">{inboxNew}</span><span className="visually-hidden">, новых: {inboxNew}</span></span>}
+      {n.id === 'inbox' && inboxNew > 0 && <span className="nav__badge num" title="Ждут решения"><span aria-hidden="true">{inboxNew}</span><span className="visually-hidden">, ждут решения: {inboxNew}</span></span>}
     </a>
   );
 
