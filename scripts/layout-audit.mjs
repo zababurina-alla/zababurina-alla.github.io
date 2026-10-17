@@ -166,7 +166,7 @@ if (CHECKS) {
       await ctx2.close();
     }
     // ── Меню целиком в окне ноутбука: ничего не уходит под нижний край (Р-4: 816 → 792 из 776 px) ──
-    for (const [w, h] of [[1280, 800], [1024, 768]]) {
+    for (const [w, h] of [[1280, 800], [1280, 720], [1024, 768]]) {
       const c3 = await browser.newContext({ viewport: { width: w, height: h - 24 } }); // 24 px — рамка окна браузера
       const p3 = await c3.newPage();
       await open(p3, '#/today');

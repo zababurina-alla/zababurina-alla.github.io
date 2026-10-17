@@ -193,7 +193,7 @@ function Bubble({ it, i }: { it: InboxItem; i: number }) {
         {it.taxKopecks ? <p className="bubble__tax">В сообщении и налог: <span className="num">{formatMoney(it.taxKopecks)}</span></p> : null}
         <time className="bubble__time num" dateTime={it.at}>{hhmm(it.at)}</time>
         {hide && <button type="button" className="icon-btn bubble__hide" aria-label="Убрать сообщение с сайта" title="Убрать с сайта (в Telegram останется)"
-          onClick={() => hide([it.id], it.clientName)}><Icon name="archive" size={14} /></button>}
+          onClick={() => hide([it.id], it.clientName)}><Icon name="eyeOff" size={16} /></button>}
       </div>
       {it.status === 'new' && <InboxActions it={it} />}
     </li>
@@ -241,7 +241,7 @@ function Dialog({ chat, visible }: { chat: Thread; visible: boolean }) {
           title={tg ? 'Откроет чат с клиентом в Telegram по телефону из карточки' : 'Телефона клиента нет в таблице — откроется Telegram'}>
           <Icon name="reply" size={16} /><span className="dialog__tg-text">{tg ? 'Ответить' : 'Открыть'}<span className="dialog__tg-more">{tg ? ' в Telegram' : ' Telegram'}</span></span></a>
         {hide && <button type="button" className="icon-btn dialog__hide" aria-label="Убрать переписку с сайта" title="Убрать переписку с сайта (в Telegram останется)"
-          onClick={() => hide(chat.items.map((x) => x.id), chat.name)}><Icon name="archive" size={18} /></button>}
+          onClick={() => hide(chat.items.map((x) => x.id), chat.name)}><Icon name="eyeOff" size={18} /></button>}
       </header>
       <ol ref={feed} className="dfeed" key={chat.key}>
         {days.map((g) => (
@@ -313,7 +313,7 @@ function ClearRead() {
       <button type="button" className="btn btn--primary btn--sm" disabled={busy} onClick={() => { void run(); }}>{busy ? 'Убираю…' : 'Убрать'}</button>
       <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={() => setAsking(false)}>Отмена</button>
     </div>
-  ) : <button type="button" className="btn btn--ghost btn--sm inbox__clear" onClick={() => setAsking(true)}><Icon name="archive" size={16} />Очистить прочитанное</button>;
+  ) : <button type="button" className="btn btn--ghost btn--sm inbox__clear" onClick={() => setAsking(true)}><Icon name="eyeOff" size={16} />Очистить прочитанное</button>;
 }
 
 export function Inbox() {
@@ -356,7 +356,7 @@ export function Inbox() {
                     </span>
                   </a>
                   {hide && <button type="button" className="icon-btn chat__hide" aria-label={`Убрать переписку с сайта: ${c.name}`} title="Убрать с сайта (в Telegram останется)"
-                    onClick={() => hide(c.items.map((x) => x.id), c.name)}><Icon name="archive" size={16} /></button>}
+                    onClick={() => hide(c.items.map((x) => x.id), c.name)}><Icon name="eyeOff" size={16} /></button>}
                 </li>
               ))}
             </ul>

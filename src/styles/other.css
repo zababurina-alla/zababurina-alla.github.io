@@ -1795,3 +1795,147 @@
     display: none;
   }
 }
+
+/* ═════════ «Входящие»: «Убрать с сайта» и «Очистить прочитанное» (техника 17.10, оформление) ═════════
+   Значок — зачёркнутый глаз: «не показывать здесь», а не «удалить» (в Telegram всё остаётся).
+   Мышь: кнопка проступает при наведении на сообщение или строку чата — ничего не загромождает.
+   Палец: у сообщения — тихий значок в его нижнем углу; в списке чатов кнопки нет — «убрать» в шапке переписки. */
+.bubble__box {
+  position: relative;
+}
+
+.bubble__hide,
+.chat__hide,
+.dialog__hide {
+  color: var(--ink-2);
+}
+
+/* Сообщение: снаружи пузыря, справа от его верхнего угла — текст не перекрывает */
+.bubble__hide {
+  position: absolute;
+  top: 2px;
+  left: calc(100% + var(--space-1));
+  width: 2rem;
+  height: 2rem;
+}
+
+/* Строка чата: справа поверх времени и счётчика, на подложке цвета наведённой строки */
+.chats__list li {
+  position: relative;
+}
+
+.chat__hide {
+  position: absolute;
+  top: 50%;
+  right: var(--space-2);
+  width: 2.25rem;
+  height: 2.25rem;
+  translate: 0 -50%;
+  background: var(--surface-sunk);
+  box-shadow: -14px 0 12px -2px var(--surface-sunk);
+}
+
+.chat[aria-current='true'] + .chat__hide {
+  background: var(--accent-soft);
+  box-shadow: -14px 0 12px -2px var(--accent-soft);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .bubble__hide,
+  .chat__hide {
+    opacity: 0;
+    transition: opacity var(--dur-fast) ease;
+  }
+
+  .bubble:hover .bubble__hide,
+  .bubble__hide:focus-visible,
+  .chats__list li:hover > .chat__hide,
+  .chat__hide:focus-visible {
+    opacity: 1;
+  }
+
+  /* Значок встаёт на место времени и счётчика — они на это время прячутся, ничего не выглядывает */
+  .chats__list li:is(:hover, :focus-within) .chat__time,
+  .chats__list li:is(:hover, :focus-within) .chat__badge {
+    opacity: 0;
+  }
+
+  .chat__time,
+  .chat__badge {
+    transition: opacity var(--dur-fast) ease;
+  }
+
+  .bubble__hide:hover,
+  .chat__hide:hover,
+  .dialog__hide:hover {
+    color: var(--ink);
+  }
+}
+
+/* Палец: у сообщения — в нижнем левом углу пузыря (справа — время); в списке чатов — нет */
+@media (hover: none), (pointer: coarse) {
+  .bubble__hide {
+    top: auto;
+    bottom: 0;
+    left: var(--space-1);
+    width: 1.75rem;
+    height: 1.75rem;
+    opacity: 0.7;
+  }
+
+  .chat__hide {
+    display: none;
+  }
+}
+
+/* «Очистить прочитанное» — тихая кнопка в шапке страницы; спросили — плашка в стиле окон сайта */
+.page__head > .inbox__clear {
+  flex: none;
+}
+
+.inbox__clear[role='group'] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  max-width: 30rem;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--edge), 0 0 0 1px var(--line), var(--shadow-2);
+}
+
+.inbox__clear[role='group'] > .sub {
+  flex: 1 1 100%;
+  color: var(--ink);
+  font-size: var(--text-md);
+}
+
+.inbox__clear[role='group'] > .btn {
+  flex: 1 1 auto;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .inbox__clear[role='group'] {
+    animation: warn-in var(--dur-pop) var(--spring-pop);
+  }
+}
+
+/* Телефон: в шапке переписки «Назад», имя, «Ответить» и «Убрать» — без кружка с буквами, имени нужнее место */
+@media (max-width: 479px) {
+  .dialog__head > .avatar {
+    display: none;
+  }
+
+  .dialog__hide {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+}
+
+@media (max-width: 559px) {
+  .page__head > .inbox__clear {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+}

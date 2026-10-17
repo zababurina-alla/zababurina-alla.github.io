@@ -189,6 +189,23 @@
     }
   }
 
+  /* Окно 720 px (видно 696): «Справка» — тонкой чертой вместо подписи (для чтеца экрана текст остаётся),
+     отступы меню плотнее — меню целиком и здесь (приёмка-4: было на 11 px выше окна) */
+  @media (max-height: 740px) {
+    .rail {
+      gap: var(--space-1);
+    }
+
+    .rail .nav__group {
+      height: 1px;
+      margin: var(--space-2) var(--space-3);
+      overflow: hidden;
+      background: var(--line);
+      color: transparent;
+      font-size: 1px;
+    }
+  }
+
   .topbar,
   .tabbar,
   .fab {
