@@ -165,6 +165,35 @@ if (CHECKS) {
       lines.push(`кнопки под краем окна ${w}×${h}: чатов ${n}, с кнопками под краем ${chatsWith}, кнопок под краем ${below}`);
       await ctx2.close();
     }
+    // ── Лента приподнимается над уведомлением — и после смены переписки (повторная приёмка-5, Н-5) ──
+    {
+      const c4 = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+      const p4 = await c4.newPage();
+      await open(p4, '#/inbox');
+      const n = await p4.locator('.chats__list .chat').count();
+      const res = [];
+      for (let i = 0; i < n && res.length < 2; i++) {
+        await p4.locator('.chats__list .chat').nth(i).click();
+        await p4.waitForTimeout(900);
+        const btn = p4.locator('.bubble:not(.is-new) .bubble__hide').last();
+        if (!(await btn.count())) continue;
+        await p4.locator('.bubble:not(.is-new)').last().hover();
+        await btn.click();
+        await p4.waitForFunction(() => document.querySelectorAll('body > .toasts > .toast').length > 0, null, { timeout: 5000 }).catch(() => {});
+        await p4.waitForTimeout(500);
+        res.push(await p4.evaluate(() => {
+          const f = document.querySelector('.dfeed');
+          const t = document.querySelector('body > .toasts')?.getBoundingClientRect();
+          const r = f.getBoundingClientRect();
+          const covers = t && t.height > 0 && t.left < r.right && t.top < r.bottom;
+          return covers ? (parseFloat(f.style.getPropertyValue('--lift')) > 0 ? 'да' : 'нет') : 'не перекрывает';
+        }));
+        await p4.locator('body > .toasts .toast__action').first().click().catch(() => {}); // «Отменить» — вернуть как было
+        await p4.waitForTimeout(400);
+      }
+      lines.push(`лента над уведомлением: ${res.map((r, i) => `${i + 1}-я переписка — ${r}`).join(', ') || 'решённых сообщений нет'}`);
+      await c4.close();
+    }
     // ── Меню целиком в окне ноутбука: ничего не уходит под нижний край (Р-4: 816 → 792 из 776 px) ──
     for (const [w, h] of [[1280, 800], [1280, 720], [1024, 768]]) {
       const c3 = await browser.newContext({ viewport: { width: w, height: h - 24 } }); // 24 px — рамка окна браузера
