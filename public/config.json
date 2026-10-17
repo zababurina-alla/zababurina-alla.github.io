@@ -12,6 +12,14 @@
     "attention",
     "weekLoad",
     "epCalc",
-    "voice"
+    "voice",
+    "deadlinesCreate",
+    "applyTemplate",
+    "completeMany",
+    "updateMany",
+    "monthWrite",
+    "botLink",
+    "statementPdf",
+    "photos"
   ]
 }

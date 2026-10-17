@@ -31,6 +31,14 @@ export async function prepare(page: Page, info: TestInfo, session: unknown | nul
       sessionStorage.clear();
     } catch { /* приватное окно — тема из colorScheme */ }
     document.documentElement.dataset.theme = t as string;
+    // Кнопка помощника (флаг aiChat) — пока без стилей, её ведёт дизайнер; в эталоны не фиксируем (техника, 17.10.2026).
+    // Вернуть в снимки — убрать эти строки и переснять, когда стили будут в main.
+    document.addEventListener('DOMContentLoaded', () => {
+      const st = document.createElement('style');
+      st.dataset.qa = 'hide-ai';
+      st.textContent = '.ai-fab, .ai-panel { display: none !important; }';
+      document.head.appendChild(st);
+    });
   }, [theme, session] as const);
   // Часы — с 14.10.2026 10:00, но идут: setFixedTime останавливал Date.now, и анимации появления (GSAP считает по нему)
   // замирали на первом кадре — содержимое карточки клиента оставалось невидимым.
