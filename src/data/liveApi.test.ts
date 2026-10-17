@@ -538,6 +538,23 @@ describe('живой адаптер: чтение', () => {
     expect(s.sent[2]).toMatchObject({ action: 'inbox.hideAll', payload: {} });
   });
 
+  it('ai.ask: q и clientId; ответ и источники; RATE_LIMIT — «лимит», *DISABLED — «выключен», пустой ответ — сбой', async () => {
+    const s = server(
+      ok({ answer: 'Сдать декларацию до 9 ноября', sources: ['⏰ Сроки'], usage: { in: 100, out: 20 } }),
+      fail('RATE_LIMIT', 'Лимит на сегодня'),
+      fail('AI_DISABLED', 'Помощник выключен'),
+      ok({ answer: '  ' }),
+    );
+    const api = new LiveApi(URL_, auth(), s.fetchImpl);
+    expect(await api.aiAsk('Что сдать?', 'C-1')).toEqual({ ok: true, answer: 'Сдать декларацию до 9 ноября', sources: ['⏰ Сроки'] });
+    expect(s.sent[0]).toMatchObject({ action: 'ai.ask', payload: { q: 'Что сдать?', clientId: 'C-1' } });
+    expect(s.sent[0]?.requestId).toBeUndefined();
+    expect(await api.aiAsk('a', null)).toEqual({ ok: false, reason: 'limit', message: 'Лимит на сегодня' });
+    expect(Object.keys((s.sent[1] as unknown as { payload: object }).payload)).toEqual(['q']);
+    expect(await api.aiAsk('b', null)).toEqual({ ok: false, reason: 'off', message: 'Помощник выключен' });
+    expect(await api.aiAsk('c', null)).toMatchObject({ ok: false, reason: 'error' });
+  });
+
   it('tasks.completeMany: сделанные — изменения, не отметившиеся — в failed', async () => {
     const t = { id: 'T-1', version: 2, clientId: null, text: 'а', due: null, type: 'docs', priority: 'medium', done: true };
     const s = server(ok({ results: [{ id: 'T-1', ok: true, task: t }, { id: 'T-2', ok: false, error: { code: 'NOT_FOUND', message: 'Задачи уже нет' }, current: null }], updated: 1, failed: 1 }, 30));

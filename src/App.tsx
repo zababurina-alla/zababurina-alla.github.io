@@ -13,6 +13,7 @@ import { Deadlines } from './screens/Deadlines';
 import { Payments } from './screens/Payments';
 import { PaymentDialog } from './screens/PaymentDialog';
 import { NewDeadlineDialog } from './screens/NewDeadlineDialog';
+import { AiChat } from './app/AiChat';
 import { Month } from './screens/Month';
 import { AddClientDialog } from './screens/AddClientDialog';
 import { Keys, More, Reference, Tasks } from './screens/Other';
@@ -96,6 +97,7 @@ function Screens() {
       <ConflictDialog />
       <FailureWatcher />
       <ScreenBoundary key={clientId ?? ''} what="карточку клиента"><ClientPanel id={clientId} onClose={() => setClientId(null)} /></ScreenBoundary>
+      <AiChat clientId={clientId} />
       <PaymentDialog open={payFor.open} clientId={payFor.clientId} onClose={() => setPayFor((p) => ({ ...p, open: false }))} />
       <AddClientDialog open={addOpen} onClose={() => setAddOpen(false)} />
       <NewDeadlineDialog open={newDl.open} clientId={newDl.clientId} onClose={() => setNewDl((d) => ({ ...d, open: false }))} />
