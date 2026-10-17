@@ -5,10 +5,12 @@ import { defineConfig } from '@playwright/test';
 
 const PORT = 5179;
 
-const shot = (name: string, colorScheme: 'light' | 'dark', width: number, height: number) => ({
+// Телефон (375) — с касанием, как настоящий: (hover: none) и (pointer: coarse) срабатывают, крупные цели касания видны
+// в эталонах. isMobile — мета viewport и мобильная раскладка Chromium; масштаб 1, чтобы снимки остались в css-пикселях.
+const shot = (name: string, colorScheme: 'light' | 'dark', width: number, height: number, touch = false) => ({
   name,
   testMatch: /.*\.visual\.ts/,
-  use: { colorScheme, viewport: { width, height }, deviceScaleFactor: 1 },
+  use: { colorScheme, viewport: { width, height }, deviceScaleFactor: 1, ...(touch ? { hasTouch: true, isMobile: true } : {}) },
 });
 
 export default defineConfig({
@@ -33,8 +35,8 @@ export default defineConfig({
   projects: [
     shot('light-1280', 'light', 1280, 800),
     shot('dark-1280', 'dark', 1280, 800),
-    shot('light-375', 'light', 375, 812),
-    shot('dark-375', 'dark', 375, 812),
+    shot('light-375', 'light', 375, 812, true),
+    shot('dark-375', 'dark', 375, 812, true),
   ],
   webServer: {
     command: 'npm run dev:mock',
