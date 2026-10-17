@@ -1,0 +1,55 @@
+/* Касание: место нажатия не меньше 44 × 44 px (приёмка-5 и замер layout-audit на телефоне: было 496 мест меньше).
+   Только на касании ((hover: none) или (pointer: coarse)) — на мыши вид прежний.
+   Видимые кнопки, вкладки, фишки и поля — просто 44 px. Значки и ссылки внутри строк — зона 44 без роста вида:
+   прозрачная рамка вокруг (фон — только под содержимым) и отрицательные поля, чтобы строка не выросла.
+   :root впереди — вес выше правил компонентов, которые задают свою высоту. */
+@media (hover: none), (pointer: coarse) {
+  :root :is(.btn--sm, .chip, .seg__opt, .tabs__tab, .input--sm, .link, .paylist__cancel, .hint__ok, .question__later) {
+    min-height: var(--tap);
+  }
+
+  /* Имя-кнопка в карточках и строках (вся строка «Клиентов» нажимается своим способом — растянутой зоной) */
+  :root .linklike:not(.ctable__open) {
+    min-height: var(--tap);
+  }
+
+  /* Значки строк: «изменить» у задачи, «позвонить / платёж / действия» у срока — 44 px, кругом не обведены */
+  :root :is(.tasks__edit, .dtable__tool, .dactions__toggle) {
+    width: var(--tap);
+    height: var(--tap);
+  }
+
+  :root .tasks__edit {
+    margin: -4px;
+  }
+
+  /* «+N» у КВЕД: таблетка прежняя (28 px), зона нажатия — 44 за счёт прозрачной рамки */
+  :root .kv__more {
+    height: calc(1.75rem + 16px);
+    margin: -8px;
+    border: 8px solid transparent;
+    background-clip: padding-box;
+  }
+
+  /* Имя клиента в строке задачи — ссылка 44 px высотой, строка не растёт */
+  :root .tasks__client {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap);
+    margin-block: -10px;
+  }
+
+  /* Календарь «Сроков»: дни 44 × 44 — поля листа уже, промежуток между днями 1 px (7 × 44 помещаются в 375) */
+  :root .month__grid {
+    gap: 1px;
+  }
+
+  :root .month__day {
+    min-width: var(--tap);
+    min-height: var(--tap);
+  }
+
+  :root .deadlines-grid > aside.panel--pad {
+    padding-inline: var(--space-3);
+  }
+}

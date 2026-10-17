@@ -219,7 +219,7 @@ function Dialog({ chat, visible }: { chat: Thread; visible: boolean }) {
   const [askFor, setAskFor] = useState<string | null>(null);
   const asking = askFor === chat.key;
   const setAsking = (on: boolean) => setAskFor(on ? chat.key : null);
-  useLiftForToasts(feed);
+  useLiftForToasts(feed, chat.key);
   // В переписке есть нерешённые — сначала вопрос (приёмка-5, Н-3); всё решено — убираем сразу, «Отменить» 10 с
   const hideChat = () => { if (!hide) return; if (chat.open > 0) setAsking(true); else hide(chat.items.map((x) => x.id), chat.name, 'chat'); };
   // Открыт и виден — прочитан до последнего сообщения (счётчик в списке гаснет), как в Telegram.
@@ -296,7 +296,7 @@ function useWide(): boolean {
 
 /** Уведомление внизу окна поверх ленты (на ноутбуке справа) закрывало кнопки решения последнего сообщения
  *  (приёмка-5, Н-5): пока оно видно, у ленты снизу запас на его высоту, и стоявшая внизу лента приподнимается. */
-function useLiftForToasts(feed: RefObject<HTMLElement | null>): void {
+function useLiftForToasts(feed: RefObject<HTMLElement | null>, key: string): void {
   useEffect(() => {
     const el = feed.current;
     const layer = document.querySelector<HTMLElement>('body > .toasts');
@@ -313,7 +313,8 @@ function useLiftForToasts(feed: RefObject<HTMLElement | null>): void {
     const ro = new ResizeObserver(lift);
     ro.observe(layer);
     return () => { ro.disconnect(); el.style.removeProperty('--lift'); };
-  }, [feed]);
+    // key — лента пересоздаётся при смене переписки (key={chat.key}): следим за новой, а не за прежней (Н-5)
+  }, [feed, key]);
 }
 
 /** Блок чатов — от своего верха до низа окна: плашки и шапка над ним бывают разной высоты, а кнопки последнего
@@ -400,7 +401,9 @@ export function Inbox() {
                       {c.open > 0 && <span className="chat__badge num" title="Ждут решения" aria-label={`ждут решения: ${c.open}`}>{c.open}</span>}
                     </span>
                   </a>
-                  {hide && <button type="button" className="icon-btn chat__hide" aria-label={`Убрать переписку с сайта: ${c.name}`} title="Убрать с сайта (в Telegram останется)"
+                  {/* У переписки с нерешёнными в строке кнопки нет — убрать её можно только из шапки, после вопроса
+                      (повторная приёмка-5, Н-3: глаз в строке убирал 2 нерешённых без вопроса) */}
+                  {hide && c.open === 0 && <button type="button" className="icon-btn chat__hide" aria-label={`Убрать переписку с сайта: ${c.name}`} title="Убрать с сайта (в Telegram останется)"
                     onClick={() => hide(c.items.map((x) => x.id), c.name, 'chat')}><Icon name="eyeOff" size={16} /></button>}
                 </li>
               ))}

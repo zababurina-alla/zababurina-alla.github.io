@@ -1085,3 +1085,18 @@
   flex-wrap: wrap;
   gap: var(--space-2);
 }
+
+/* Вкладки карточки — во всю ширину листа, пункты делят её поровну: «История» помещается (владелец 17.10: была срезана
+   краем на 1280 и 1024, полоса 520 px при содержимом 531) */
+.cp > .tabs {
+  display: flex;
+  flex-wrap: wrap; /* не влезло (узкий лист) — перенос, а не скрытая прокрутка; подложка следует за строкой */
+  width: 100%;
+  overflow: visible;
+}
+
+.cp > .tabs > .tabs__tab {
+  flex: 1 1 auto;
+  justify-content: center;
+  padding-inline: var(--space-2);
+}

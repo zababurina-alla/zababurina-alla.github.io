@@ -165,6 +165,58 @@ if (CHECKS) {
       lines.push(`кнопки под краем окна ${w}×${h}: чатов ${n}, с кнопками под краем ${chatsWith}, кнопок под краем ${below}`);
       await ctx2.close();
     }
+    // ── Лента приподнимается над уведомлением — и после смены переписки (повторная приёмка-5, Н-5) ──
+    {
+      const c4 = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+      const p4 = await c4.newPage();
+      await open(p4, '#/inbox');
+      const n = await p4.locator('.chats__list .chat').count();
+      const res = [];
+      for (let i = 0; i < n && res.length < 2; i++) {
+        await p4.locator('.chats__list .chat').nth(i).click();
+        await p4.waitForTimeout(900);
+        const btn = p4.locator('.bubble:not(.is-new) .bubble__hide').last();
+        if (!(await btn.count())) continue;
+        await p4.locator('.bubble:not(.is-new)').last().hover();
+        await btn.click();
+        await p4.waitForFunction(() => document.querySelectorAll('body > .toasts > .toast').length > 0, null, { timeout: 5000 }).catch(() => {});
+        await p4.waitForTimeout(500);
+        res.push(await p4.evaluate(() => {
+          const f = document.querySelector('.dfeed');
+          const t = document.querySelector('body > .toasts')?.getBoundingClientRect();
+          const r = f.getBoundingClientRect();
+          const covers = t && t.height > 0 && t.left < r.right && t.top < r.bottom;
+          return covers ? (parseFloat(f.style.getPropertyValue('--lift')) > 0 ? 'да' : 'нет') : 'не перекрывает';
+        }));
+        await p4.locator('body > .toasts .toast__action').first().click().catch(() => {}); // «Отменить» — вернуть как было
+        await p4.waitForTimeout(400);
+      }
+      lines.push(`лента над уведомлением: ${res.map((r, i) => `${i + 1}-я переписка — ${r}`).join(', ') || 'решённых сообщений нет'}`);
+      await c4.close();
+    }
+    // ── Вкладки карточки на масштабе экрана 125 % (как у владельца, Windows): подложка совпадает с выбранной вкладкой ──
+    {
+      const c5 = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1.25, colorScheme: 'dark' });
+      const p5 = await c5.newPage();
+      await p5.goto('about:blank');
+      await p5.goto(`${BASE}${BASE.includes('?') ? '&' : '?'}demo=1&theme=dark`, { waitUntil: 'load' });
+      await p5.waitForTimeout(1800);
+      await p5.evaluate(() => { location.hash = '#/clients'; });
+      await p5.waitForTimeout(1200);
+      await p5.locator('.ctable__row .ctable__open').first().click();
+      await p5.waitForTimeout(1000);
+      let worst = 0, bad = 0, n = 0;
+      for (const t of await p5.locator('dialog[open] .tabs__tab').all()) {
+        await t.click(); await p5.waitForTimeout(900); n++; // переезд подложки — пружина 0,55 с: меряем после неё
+        const d = await p5.evaluate(() => {
+          const bar = document.querySelector('dialog[open] .tabs'); const i = bar.querySelector('.tabs__ind').getBoundingClientRect(); const a = bar.querySelector('[aria-pressed=true]').getBoundingClientRect();
+          return Math.max(Math.abs(i.left - a.left), Math.abs(i.right - a.right), Math.abs(i.top - a.top), Math.abs(i.bottom - a.bottom));
+        });
+        worst = Math.max(worst, d); if (d > 1) bad++;
+      }
+      lines.push(`вкладки карточки, масштаб 125 %, тёмная: вкладок ${n}, подложка мимо больше 1 px — ${bad}, наибольшее расхождение ${worst.toFixed(2)} px`);
+      await c5.close();
+    }
     // ── Меню целиком в окне ноутбука: ничего не уходит под нижний край (Р-4: 816 → 792 из 776 px) ──
     for (const [w, h] of [[1280, 800], [1280, 720], [1024, 768]]) {
       const c3 = await browser.newContext({ viewport: { width: w, height: h - 24 } }); // 24 px — рамка окна браузера
@@ -179,10 +231,14 @@ if (CHECKS) {
     const page = await ctx.newPage();
     // Сценарий приёмки С-1: закрыть срок и сразу ответить на вопрос — два разных уведомления
     await open(page, '#/today');
+    // Ждём не по часам, а по странице: занятый ПК иногда показывал первое уведомление позже — замер видел одно
+    const count = () => page.locator('.toasts > .toast:not(.is-leaving)').count();
     await page.locator('.dtable__row .check-btn').first().click();
-    await page.waitForTimeout(1500);
+    await page.waitForFunction(() => document.querySelectorAll('.toasts > .toast:not(.is-leaving)').length >= 1, null, { timeout: 5000 }).catch(() => {});
     await page.locator('.panel--wheat button', { hasText: /^Да$/ }).first().click();
-    await page.waitForTimeout(900);
+    await page.waitForFunction(() => document.querySelectorAll('.toasts > .toast:not(.is-leaving)').length >= 2, null, { timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(400); // столбик доехал (пружина), меряем места кнопок
+    if ((await count()) < 2) lines.push('уведомления 1280: второе не появилось за 5 с — проверить вручную');
     const t = await page.evaluate(() => {
       const toasts = [...document.querySelectorAll('.toasts > .toast:not(.is-leaving)')];
       let buttons = 0, blocked = 0, overlaps = 0;
@@ -275,6 +331,7 @@ const SCREENS = [
   { name: 'ещё', hash: '#/more', root: '.page' },
   { name: 'окно платежа', hash: '#/today', root: 'dialog[open] .modal__box', open: (p) => p.keyboard.press('Alt+n') },
   { name: 'новый клиент', hash: '#/clients', root: 'dialog[open] .modal__box', open: (p) => p.locator('button', { hasText: 'Добавить клиента' }).first().click() },
+  { name: 'помощник', hash: '#/today', root: '.ai-panel', open: (p) => p.locator('.ai-fab').click() },
   { name: 'поиск Ctrl K', hash: '#/today', root: '.palette__box', open: (p) => p.keyboard.press('Control+k') },
 ];
 
@@ -451,7 +508,10 @@ function measure(rootSel) {
   if (document.documentElement.scrollWidth > document.documentElement.clientWidth + 1) { sideways++; sidewaysList.push(`страница шире окна на ${document.documentElement.scrollWidth - document.documentElement.clientWidth} px`); }
   for (const el of [root, ...root.querySelectorAll('*')]) {
     const cs = getComputedStyle(el);
-    if (!visible(el) || !/(auto|scroll)/.test(cs.overflowX) || el.closest('.tabs, .chips')) continue;
+    // Полосы вкладок и фишек раньше не считались — так прошла срезанная «История» (новый дизайнер, 17.10). Теперь
+    // листающаяся вбок полоса — находка, если край не затухает явно (mask-image)
+    if (!visible(el) || !/(auto|scroll)/.test(cs.overflowX)) continue;
+    if (el.matches('.tabs, .chips, .seg') && cs.maskImage && cs.maskImage !== 'none') continue;
     const extra = el.scrollWidth - el.clientWidth;
     if (extra > 1) { sideways++; sidewaysList.push(`${label(el)} — вбок на ${extra} px`); }
   }
@@ -471,6 +531,9 @@ function measure(rootSel) {
     });
     // Растянутая зона нажатия (::after на всю строку, как имя в строке «Клиентов») — место нажатия = вся строка
     const hitRect = (el) => {
+      // Поле внутри подписи (поиск «Клиентов»): нажимается вся подпись-рамка
+      const lab = el.matches('input, select, textarea') ? el.closest('label') : null;
+      if (lab) return lab.getBoundingClientRect();
       const a = getComputedStyle(el, '::after');
       if (a.content !== 'none' && a.position === 'absolute') { const host = el.offsetParent; if (host) return host.getBoundingClientRect(); }
       return el.getBoundingClientRect();
@@ -483,14 +546,43 @@ function measure(rootSel) {
     for (let i = 0; i < els.length; i++) for (let j = i + 1; j < els.length; j++) {
       const a = rects[i], b = rects[j];
       if (els[i].contains(els[j]) || els[j].contains(els[i])) continue;
-      // Две крупные строки списка вплотную (чаты, клиенты) — промаха нет: зазор считаем, если хоть одна цель мелкая
-      const big = (q) => q.height >= 48 && q.width >= 120;
-      if (big(a) && big(b)) continue;
+      // Зазор нужен мелкой цели (как в WCAG 2.5.8): две цели от 44 × 44 вплотную — сегменты одной вкладки, строки
+      // списка — промаха нет
+      const ok = (q) => q.width >= 43.5 && q.height >= 43.5;
+      if (ok(a) && ok(b)) continue;
       const dx = Math.max(0, Math.max(a.left, b.left) - Math.min(a.right, b.right));
       const dy = Math.max(0, Math.max(a.top, b.top) - Math.min(a.bottom, b.bottom));
       const overlapX = a.left < b.right && b.left < a.right, overlapY = a.top < b.bottom && b.top < a.bottom;
       const gap = overlapX ? dy : overlapY ? dx : Math.hypot(dx, dy);
       if (gap < 8 && (overlapX || overlapY)) { touch++; touchList.push(`${label(els[i])} и ${label(els[j])} — зазор ${Math.round(gap)} px`); }
+    }
+  }
+
+  // Полосы вкладок, сегментов и фишек (владелец 17.10: подложка «Обзора» неровно, «История» срезана краем):
+  // подложка выбранного пункта внутри полосы и по центру ±1 px; последний пункт виден целиком или край явно затухает.
+  let strips = 0;
+  const stripList = [];
+  for (const bar of root.querySelectorAll('.tabs, .seg, .chips')) {
+    if (!visible(bar)) continue;
+    const r = bar.getBoundingClientRect();
+    const inner = { l: r.left + bar.clientLeft, t: r.top + bar.clientTop, r: r.left + bar.clientLeft + bar.clientWidth, b: r.top + bar.clientTop + bar.clientHeight };
+    const mark = bar.querySelector(':scope > .tabs__ind');
+    const active = bar.querySelector(':scope > [aria-pressed=true]');
+    const pad = mark ? mark : bar.matches('.seg--fill') ? active : null;
+    if (pad && visible(pad) && Number(getComputedStyle(pad).opacity) > 0.05) {
+      const m = pad.getBoundingClientRect();
+      const out = m.top < inner.t - 0.5 || m.bottom > inner.b + 0.5 || m.left < inner.l - 0.5 || m.right > inner.r + 0.5;
+      const rowCenter = active ? (active.getBoundingClientRect().top + active.getBoundingClientRect().bottom) / 2 : (inner.t + inner.b) / 2;
+      const off = Math.abs((m.top + m.bottom) / 2 - rowCenter);
+      if (out) { strips++; stripList.push(`${label(bar)} — подложка выходит за полосу`); }
+      else if (off > 1) { strips++; stripList.push(`${label(bar)} — подложка не по центру (${off.toFixed(1)} px)`); }
+    }
+    const kids = [...bar.children].filter((c) => visible(c) && !c.matches('.tabs__ind'));
+    const last = kids.at(-1);
+    if (last) {
+      const lr = last.getBoundingClientRect();
+      const masked = getComputedStyle(bar).maskImage !== 'none' && getComputedStyle(bar).maskImage !== '';
+      if (lr.right > inner.r + 1 && !masked) { strips++; stripList.push(`${label(bar)} — последний пункт срезан краем на ${Math.round(lr.right - inner.r)} px, прокрутки не видно`); }
     }
   }
 
@@ -500,7 +592,7 @@ function measure(rootSel) {
     const cs = getComputedStyle(el);
     if (/(auto|scroll)/.test(cs.overflowY) && el.scrollHeight > el.clientHeight + 4 && visible(el)) { el.dataset.auditScroll = String(scrollers.length); scrollers.push(label(el)); }
   }
-  return { voids, voidList, uneven, unevenList: unevenList.slice(0, 12), labels, labelList: labelList.slice(0, 16), sideways, sidewaysList, touch, touchList: touchList.slice(0, 40), scrollers };
+  return { voids, voidList, uneven, unevenList: unevenList.slice(0, 12), labels, labelList: labelList.slice(0, 16), sideways, sidewaysList, touch, touchList: touchList.slice(0, 300), strips, stripList, scrollers };
 }
 
 const browser = await chromium.launch();
@@ -539,7 +631,7 @@ try {
           if (top < 1) { wheel++; wheelList.push(`${m.scrollers[i]}${top < 0 ? ' — закрылся от прокрутки' : ''}`); }
         } catch { /* блок пропал до прокрутки — пропускаем */ }
       }
-      results.push({ screen: s.name, view: `${v.w} ${v.theme === 'light' ? 'свет' : 'тьма'}`, missing: Boolean(m.missing), voids: m.voids ?? 0, uneven: m.uneven ?? 0, wheel, labels: m.labels ?? 0, sideways: m.sideways ?? 0, touch: m.touch ?? 0, details: { voids: m.voidList, uneven: m.unevenList, wheel: wheelList, labels: m.labelList, sideways: m.sidewaysList, touch: m.touchList } });
+      results.push({ screen: s.name, view: `${v.w} ${v.theme === 'light' ? 'свет' : 'тьма'}`, missing: Boolean(m.missing), voids: m.voids ?? 0, uneven: m.uneven ?? 0, wheel, labels: m.labels ?? 0, sideways: m.sideways ?? 0, touch: m.touch ?? 0, strips: m.strips ?? 0, details: { strips: m.stripList, voids: m.voidList, uneven: m.unevenList, wheel: wheelList, labels: m.labelList, sideways: m.sidewaysList, touch: m.touchList } });
     }
     await ctx.close();
   }
@@ -548,9 +640,9 @@ try {
 }
 
 const pad = (s, n) => String(s).padEnd(n);
-console.log(`${pad('экран', 16)}${pad('вид', 12)}пустоты  высоты  колесо  подписи  вбок  касание`);
-for (const r of results) console.log(`${pad(r.screen, 16)}${pad(r.view, 12)}${r.missing ? 'нет корня — окно не открылось' : `${pad(r.voids, 9)}${pad(r.uneven, 8)}${pad(r.wheel, 8)}${pad(r.labels, 9)}${pad(r.sideways, 6)}${r.touch}`}`);
+console.log(`${pad('экран', 16)}${pad('вид', 12)}пустоты  высоты  колесо  подписи  вбок  касание  полосы`);
+for (const r of results) console.log(`${pad(r.screen, 16)}${pad(r.view, 12)}${r.missing ? 'нет корня — окно не открылось' : `${pad(r.voids, 9)}${pad(r.uneven, 8)}${pad(r.wheel, 8)}${pad(r.labels, 9)}${pad(r.sideways, 6)}${pad(r.touch, 9)}${r.strips}`}`);
 const sum = (k) => results.reduce((a, r) => a + (r[k] || 0), 0);
-console.log(`\nИтого: пустоты ${sum('voids')} · высоты ${sum('uneven')} · колесо ${sum('wheel')} · подписи ${sum('labels')} · вбок ${sum('sideways')} · касание (375) ${sum('touch')} · не открылось ${results.filter((r) => r.missing).length}`);
+console.log(`\nИтого: пустоты ${sum('voids')} · высоты ${sum('uneven')} · колесо ${sum('wheel')} · подписи ${sum('labels')} · вбок ${sum('sideways')} · касание (375) ${sum('touch')} · полосы ${sum('strips')} · не открылось ${results.filter((r) => r.missing).length}`);
 if (JSON_OUT) writeFileSync(JSON_OUT, JSON.stringify(results, null, 1));
-if (STRICT && sum('voids') + sum('uneven') + sum('wheel') + sum('labels') + sum('sideways') + results.filter((r) => r.missing).length > 0) process.exit(1);
+if (STRICT && sum('voids') + sum('uneven') + sum('wheel') + sum('labels') + sum('sideways') + sum('touch') + sum('strips') + results.filter((r) => r.missing).length > 0) process.exit(1);

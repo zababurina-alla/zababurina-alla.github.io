@@ -128,15 +128,48 @@ export function Tabs<T extends string>({ items, value, onChange, label }: {
 }) {
   const wrap = useRef<HTMLDivElement>(null);
   const ind = useRef<HTMLSpanElement>(null);
+  // Подложка выбранного пункта — по точным (дробным) размерам кнопки: целые offset* на экране с масштабом 125 %
+  // сдвигали её на полпикселя вверх-вниз (владелец 17.10, карточка клиента). По высоте в одну строку её держит CSS
+  // (top/bottom 3 px) — всегда по центру; JS двигает только вбок и задаёт ширину. Пересчёт — и при смене размеров
+  // (догрузился шрифт, сузилось окно). Не помещается — края полосы затухают, выбранный пункт прокручивается в вид.
   useLayoutEffect(() => {
-    const btn = wrap.current?.querySelector<HTMLElement>(`[data-tab="${value}"]`);
-    if (!ind.current) return;
-    // Выбрано то, чего нет среди вкладок (например, фильтр плашкой «Просрочено»), — индикатор прячется.
-    ind.current.style.opacity = btn ? '1' : '0';
-    if (!btn) return;
-    ind.current.style.transform = `translate(${btn.offsetLeft}px, ${btn.offsetTop - 3}px)`;
-    ind.current.style.height = `${btn.offsetHeight}px`;
-    ind.current.style.width = `${btn.offsetWidth}px`;
+    const box = wrap.current;
+    const mark = ind.current;
+    if (!box || !mark) return;
+    const place = () => {
+      const btn = box.querySelector<HTMLElement>(`[data-tab="${value}"]`);
+      // Выбрано то, чего нет среди вкладок (например, фильтр плашкой «Просрочено»), — индикатор прячется.
+      mark.style.opacity = btn ? '1' : '0';
+      if (btn) {
+        const b = btn.getBoundingClientRect();
+        const r = box.getBoundingClientRect();
+        const x = b.left - r.left - box.clientLeft + box.scrollLeft;
+        // Перенос — пункты стоят больше чем в одну строку (любой ниже первого), не только выбранный
+        const all = [...box.querySelectorAll<HTMLElement>('.tabs__tab')];
+        const wrapped = all.some((t) => Math.abs(t.offsetTop - (all[0]?.offsetTop ?? 0)) > 1);
+        if (wrapped) {
+          // Перенос в две строки (телефон): по высоте — строка выбранного пункта
+          const y = b.top - r.top - box.clientTop + box.scrollTop;
+          mark.style.transform = `translate(${x}px, ${y - 3}px)`;
+          mark.style.height = `${b.height}px`;
+        } else {
+          // Одна строка: высота — полоса без отступов 3 + 3 px, подложка ровно по центру
+          mark.style.transform = `translateX(${x}px)`;
+          mark.style.height = `${r.height - box.clientTop * 2 - 6}px`;
+        }
+        mark.style.width = `${b.width}px`;
+      }
+      const more = box.scrollWidth - box.clientWidth;
+      box.classList.toggle('has-more-start', more > 1 && box.scrollLeft > 1);
+      box.classList.toggle('has-more-end', more > 1 && box.scrollLeft < more - 1);
+    };
+    place();
+    const btn = box.querySelector<HTMLElement>(`[data-tab="${value}"]`);
+    if (btn && box.scrollWidth > box.clientWidth + 1) btn.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(place);
+    ro?.observe(box);
+    box.addEventListener('scroll', place, { passive: true });
+    return () => { ro?.disconnect(); box.removeEventListener('scroll', place); };
   }, [value, items]);
   return (
     <div ref={wrap} className="tabs" role="group" aria-label={label}>
