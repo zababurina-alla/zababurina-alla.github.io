@@ -767,6 +767,24 @@
   font-weight: var(--weight-semibold);
 }
 
+/* Колонка КВЕД в таблице: коды одной линией. «⭐» стоит только у основного КВЕД, и код со звездой был на 20 px правее
+   кода без неё (1280, 17.10). Без звезды — пустое место под неё, заголовок «КВЕД» — над кодами. */
+@container (min-width: 760px) {
+  .ctable__head > :nth-child(2) {
+    padding-left: calc(14px + 6px);
+  }
+
+  .ctable__row .kv:not(:has(> .kv__star))::before {
+    content: '';
+    flex: none;
+    width: 14px;
+  }
+
+  .ctable__kved > .nil {
+    padding-left: calc(14px + 6px);
+  }
+}
+
 /* «+6» — над растянутой зоной строки (иначе нажатие открыло бы карточку) */
 .kv__more {
   position: relative;
