@@ -2,7 +2,7 @@
 // (docs/api-contract.md v2.1). Экраны и очередь записей не знают, с кем говорят.
 import { ApiError, call } from './transport';
 import type { Envelope } from './transport';
-import type { ApplyTemplateResult, ArchivedDeadline, ArchivePage, AttentionItem, MonthCheck, MonthItem, MonthSheet, BotLinkResult, CabinetApi, StatementPdf, StatementPreview, StatementResult, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
+import type { AiAnswer, ApplyTemplateResult, ArchivedDeadline, ArchivePage, AttentionItem, MonthCheck, MonthItem, MonthSheet, BotLinkResult, CabinetApi, StatementPdf, StatementPreview, StatementResult, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
 import { MONTH_CHECKS, RETRYABLE } from './api';
 import type { Activity, Client, Consultation, Deadline, InboxItem, InboxType, KvedItem, Payment, Question, RateGroup, Rates, Task } from './types';
 import { INBOX_TYPES } from './types';
@@ -449,6 +449,24 @@ export class LiveApi implements CabinetApi {
       return { ok: true, template: text(d.template) as DeadlineTemplate, added: (d.added ?? []).map((x) => normRecord('deadline', x) as Deadline), skipped: (d.skipped ?? []).map(text) };
     } catch (e) {
       return this.refusal(e);
+    }
+  }
+
+  /** Ответ модели идёт 3–10 с; BUSY — ещё раз. Лимит на сегодня и «помощник выключен» — ответом, не исключением. */
+  async aiAsk(q: string, clientId: string | null): Promise<AiAnswer> {
+    try {
+      const env = await this.rpc<{ answer?: unknown; sources?: unknown[] }>('ai.ask', { q, ...(clientId ? { clientId } : {}) }, undefined, 1);
+      const answer = text(env.data.answer).trim();
+      if (!answer) return { ok: false, reason: 'error', message: 'Помощник не ответил — спросите ещё раз' };
+      return { ok: true, answer, sources: (env.data.sources ?? []).map(text).filter(Boolean) };
+    } catch (e) {
+      if (e instanceof ApiError) {
+        const code = String(e.code);
+        if (code === 'RATE_LIMIT' || code === 'QUOTA') return { ok: false, reason: 'limit', message: e.message || 'Лимит вопросов на сегодня исчерпан — завтра снова можно' };
+        if (code.includes('DISABLED')) return { ok: false, reason: 'off', message: e.message || 'Помощник сейчас выключен' };
+        return { ok: false, reason: 'error', message: e.message || 'Помощник не ответил — спросите ещё раз' };
+      }
+      return { ok: false, reason: 'error', message: 'Нет связи — спросите ещё раз' };
     }
   }
 

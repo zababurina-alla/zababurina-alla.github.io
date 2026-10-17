@@ -3,7 +3,7 @@
 // — версии записей и ошибка CONFLICT; — журнал изменений с курсором; — повтор того же requestId не создаёт дубль.
 // Рычаги отладки (обрыв связи, отказ, правка извне) — для кнопок в режиме отладки.
 import { ACTIVITY, CLIENTS, CONSULTATIONS, DEADLINES, INBOX, KVEDS, PAYMENTS, QUESTIONS, RATES, TASKS } from './fake';
-import type { ApplyTemplateResult, ArchivePage, AttentionItem, MonthCheck, MonthItem, MonthSheet, BotLinkResult, CabinetApi, StatementPdf, StatementPreview, StatementResult, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, TemplatePreview, ClientCard, Entity, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
+import type { AiAnswer, ApplyTemplateResult, ArchivePage, AttentionItem, MonthCheck, MonthItem, MonthSheet, BotLinkResult, CabinetApi, StatementPdf, StatementPreview, StatementResult, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, TemplatePreview, ClientCard, Entity, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Consultation, Deadline, InboxItem, KvedItem, Payment, Question, Rates, Task } from './types';
 import { fold } from '../lib/search';
 import { TODAY, addDays, endOfMonth, fmtDate, fmtDue } from '../lib/dates';
@@ -460,6 +460,20 @@ class FakeServer implements CabinetApi {
     const res: ApplyTemplateResult = { ok: true, template: t, added, skipped };
     this.applied.set(requestId, res);
     return res;
+  }
+
+  /** Учебный помощник: ответ через 3–10 с. Слова «лимит» и «выключ» в вопросе — показать эти состояния. */
+  aiDelayMs = (): number => 3000 + Math.random() * 7000;
+  async aiAsk(q: string, clientId: string | null): Promise<AiAnswer> {
+    await wait(this.aiDelayMs());
+    if (!this.online) return { ok: false, reason: 'error', message: 'Нет связи — спросите ещё раз' };
+    const t = q.toLowerCase();
+    if (t.includes('лимит')) return { ok: false, reason: 'limit', message: 'Лимит вопросов на сегодня исчерпан — завтра снова можно' };
+    if (t.includes('выключ')) return { ok: false, reason: 'off', message: 'Помощник сейчас выключен' };
+    const c = clientId ? this.clients.get(clientId) : undefined;
+    const open = c ? [...this.deadlines.values()].filter((d) => d.clientId === c.id && d.status !== 'done') : [];
+    const about = c ? `По клиенту ${short(c.name)}: открытых сроков ${open.length}${open[0] ? `, ближайший — «${open[0].what}» до ${fmtDate(open[0].due ?? TODAY)}` : ''}.\n` : '';
+    return { ok: true, answer: `${about}Это учебный ответ помощника на вопрос «${q.trim()}». Настоящий помощник ответит по таблице и законам.`, sources: c ? ['⏰ Сроки'] : [] };
   }
 
   async inboxHideAll(): Promise<{ hidden: number; ids: string[]; more: boolean }> {

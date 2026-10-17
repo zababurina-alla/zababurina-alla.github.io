@@ -159,6 +159,12 @@ export type MonthCheck = typeof MONTH_CHECKS[number];
 export interface MonthItem { clientId: string | null; name: string; period: string; status: string | null; comment: string | null; percent: number; checks: Record<MonthCheck, boolean> }
 export interface MonthSheet { period: string | null; items: MonthItem[] }
 
+/** ai.ask (помощник, сервер — отдел «Бот»): ответ; лимит на сегодня; помощник выключен; прочий сбой. Вопросы на сервере
+ *  не хранятся, история — только в памяти вкладки. */
+export type AiAnswer =
+  | { ok: true; answer: string; sources: string[] }
+  | { ok: false; reason: 'limit' | 'off' | 'error'; message: string };
+
 /** deadlines.cancelNotify: сообщение клиенту о закрытии снято (срок остаётся закрытым); снимать было нечего;
  *  уже забрано на отправку (sentAt — примерно когда ушло). */
 export type CancelNotifyResult = { status: 'cancelled' } | { status: 'nothing' } | { status: 'sent'; sentAt: string | null };
@@ -200,6 +206,8 @@ export interface CabinetApi {
   clientBotLink(clientId: string): Promise<BotLinkResult>;
   /** inbox.hideAll: убрать все решённые (≤ 500 за раз, more — ещё). Мимо очереди: ответ (ids) нужен для «Отменить». */
   inboxHideAll(): Promise<{ hidden: number; ids: string[]; more: boolean }>;
+  /** Вопрос помощнику; clientId — если открыта карточка клиента (ответ — про него). */
+  aiAsk(q: string, clientId: string | null): Promise<AiAnswer>;
   /** Чтение, по кнопке «Показать архив» — не на каждый показ карточки. */
   listArchive(clientId: string, offset?: number, limit?: number): Promise<ArchivePage>;
   /** Чтение трёх листов — не чаще раза в несколько минут. */

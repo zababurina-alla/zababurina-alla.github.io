@@ -16,7 +16,7 @@ import { readSnap, readSnapAt, saveSnap } from './snapCache';
 import { Outbox } from './outbox';
 import type { Counters, OutboxEvent, OutboxItem } from './outbox';
 import { newRequestId, touchedBy } from './api';
-import type { ApplyTemplateResult, BotLinkResult, CabinetApi, MonthCheck, StatementPdf, StatementPreview, StatementResult, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, DeadlinePatch, InboxAction, RemindPreview, RemindRequest, RemindResult, Snapshot, TaskPatch, WriteOp, WriteResult } from './api';
+import type { AiAnswer, ApplyTemplateResult, BotLinkResult, CabinetApi, MonthCheck, StatementPdf, StatementPreview, StatementResult, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, DeadlinePatch, InboxAction, RemindPreview, RemindRequest, RemindResult, Snapshot, TaskPatch, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Consultation, DatedDeadline, Deadline, InboxItem, Payment, Question, SaveState, Task } from './types';
 import { isDated } from './types';
 import { TODAY, addDays, fmtDate, plural } from '../lib/dates';
@@ -131,6 +131,8 @@ interface Store {
   /** Архив сроков клиента (флаг archive) и «Требуют внимания» (флаг attention) — чтение; null — сервер ещё не умеет. */
   archive: CabinetApi['listArchive'] | null;
   attention: CabinetApi['attention'] | null;
+  /** Помощник (ai.ask, флаг aiChat); null — выключен. */
+  aiAsk: ((q: string, clientId: string | null) => Promise<AiAnswer>) | null;
   /** «Удалить» и «Очистить прочитанное» во «Входящих» — только на сайте (флаг inboxHide); null — выключено. */
   inboxHide: { hide: (ids: string[]) => string; clearRead: () => Promise<{ hidden: number; undo: () => void }> } | null;
   /** «Ссылка для бота» (clients.botLink). null — нет флага botLink. */
@@ -968,6 +970,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
     return { hidden: ids.length, undo };
   }, [send]);
+  const aiAsk = useMemo(() => (hasFeature('aiChat') ? (q: string, clientId: string | null) => api.aiAsk(q, clientId) : null), []);
   const inboxHide = useMemo(() => (hasFeature('inboxHide') ? { hide: hideInboxNow, clearRead: clearReadNow } : null), [hideInboxNow, clearReadNow]);
 
   const undoHeld = useCallback(async (requestId: string) => {
@@ -998,10 +1001,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<Store>(() => ({
     loaded, online, syncedAt, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, consultations, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateKved, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, updateDeadlines, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention, month, inboxHide,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateKved, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, updateDeadlines, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention, month, inboxHide, aiAsk,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance,
   }), [loaded, online, syncedAt, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, consultations, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateKved, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, updateDeadlines, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention, month, inboxHide,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateKved, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, updateDeadlines, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention, month, inboxHide, aiAsk,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
