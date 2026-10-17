@@ -217,6 +217,44 @@ if (CHECKS) {
       lines.push(`вкладки карточки, масштаб 125 %, тёмная: вкладок ${n}, подложка мимо больше 1 px — ${bad}, наибольшее расхождение ${worst.toFixed(2)} px`);
       await c5.close();
     }
+    // ── Вкладки фильтра «Сроков» на телефоне (замечание «Качества» 17.10: на 375 в две строки): одна строка,
+    //    край виден целиком или явно затухает, подложка на выбранной вкладке; 375 и 320 × светлая / тёмная × 100 / 125 % ──
+    {
+      let rows2 = 0, cut = 0, off = 0, views = 0, worst = 0;
+      for (const w of [375, 320]) for (const theme of ['light', 'dark']) for (const dpr of [1, 1.25]) {
+        const c6 = await browser.newContext({ viewport: { width: w, height: 812 }, deviceScaleFactor: dpr, hasTouch: true, isMobile: true });
+        const p6 = await c6.newPage();
+        await p6.goto('about:blank');
+        await p6.goto(`${BASE}${BASE.includes('?') ? '&' : '?'}demo=1&theme=${theme}`, { waitUntil: 'load' });
+        await p6.waitForTimeout(1800);
+        await p6.evaluate(() => { location.hash = '#/deadlines'; });
+        await p6.waitForTimeout(1300);
+        views++;
+        const bar = p6.locator('.panel__head .tabs').first();
+        if (!(await bar.count())) { await c6.close(); continue; }
+        const tabs = await bar.locator('.tabs__tab').all();
+        for (const t of tabs) {
+          await t.click(); await p6.waitForTimeout(900);
+          const m = await bar.evaluate((b) => {
+            const all = [...b.querySelectorAll('.tabs__tab')];
+            const rows = new Set(all.map((x) => Math.round(x.getBoundingClientRect().top))).size;
+            const r = b.getBoundingClientRect(); const inner = r.left + b.clientLeft + b.clientWidth;
+            const last = all.at(-1).getBoundingClientRect();
+            const masked = getComputedStyle(b).maskImage !== 'none';
+            const i = b.querySelector('.tabs__ind').getBoundingClientRect(); const a = b.querySelector('[aria-pressed=true]').getBoundingClientRect();
+            const d = Math.max(Math.abs(i.left - a.left), Math.abs(i.right - a.right), Math.abs(i.top - a.top), Math.abs(i.bottom - a.bottom));
+            const aVisible = a.left >= r.left - 0.5 && a.right <= inner + 0.5;
+            return { rows, cut: last.right > inner + 1 && !masked, d, aVisible };
+          });
+          if (m.rows > 1) rows2++;
+          if (m.cut || !m.aVisible) cut++;
+          if (m.d > 1) off++;
+          worst = Math.max(worst, m.d);
+        }
+        await c6.close();
+      }
+      lines.push(`вкладки «Сроков» на телефоне (${views} видов × 4 вкладки): в две строки ${rows2}, край срезан без затухания или выбранная за краем ${cut}, подложка мимо больше 1 px ${off} (наибольшее ${worst.toFixed(2)} px)`);
+    }
     // ── Меню целиком в окне ноутбука: ничего не уходит под нижний край (Р-4: 816 → 792 из 776 px) ──
     for (const [w, h] of [[1280, 800], [1280, 720], [1024, 768]]) {
       const c3 = await browser.newContext({ viewport: { width: w, height: h - 24 } }); // 24 px — рамка окна браузера
