@@ -106,7 +106,6 @@ export function touchedBy(op: WriteOp): [Entity, string][] {
     case 'createConsultation': return [['consultation', op.consultation.id]];
     case 'answerQuestion': return [['question', op.id]];
     case 'decideInbox': return [['inbox', op.id]];
-    case 'hideInbox': case 'unhideInbox': return op.ids.map((id) => ['inbox', id] as [Entity, string]);
   }
 }
 
