@@ -15,7 +15,7 @@ import { kvAll, kvDelete, kvSet } from './idb';
 import { readSnap, readSnapAt, saveSnap } from './snapCache';
 import { Outbox } from './outbox';
 import type { Counters, OutboxEvent, OutboxItem } from './outbox';
-import { newRequestId } from './api';
+import { newRequestId, touchedBy } from './api';
 import type { ApplyTemplateResult, BotLinkResult, CabinetApi, MonthCheck, StatementPdf, StatementPreview, StatementResult, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, DeadlinePatch, InboxAction, RemindPreview, RemindRequest, RemindResult, Snapshot, TaskPatch, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Consultation, DatedDeadline, Deadline, InboxItem, Payment, Question, SaveState, Task } from './types';
 import { isDated } from './types';
@@ -258,9 +258,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
    *  чем вернул сервер (строка «Что изменилось», пересчёт системы), — это заберёт следующий опрос по курсору. */
   const applyChanges = useCallback((changes: Change[], advance = true) => {
     const foreign: string[] = [];
+    // Записи, по которым в очереди ещё ждёт своя запись (отмена, правка, решение): журнал по ним не применяем — на экране
+    // остаётся то, что сделала мама, пока сервер не ответит на её запись (ответ применится сам, отказ вернёт экран).
+    // Без этого опрос через 0,8 с приносил прежнее «записано» / «закрыто» и строка мигала (приёмка-5, Р-7).
+    const busy = new Set((outboxRef.current?.list() ?? []).flatMap((it) => touchedBy(it.op).map(([e, id]) => `${e}:${id}`)));
     for (const ch of changes) {
       const own = mine.current.has(ch.origin);
       if (own) outboxRef.current?.markSeen(ch.origin); else foreign.push(ch.id);
+      if (busy.has(`${ch.entity}:${ch.id}`)) continue;
       if (ch.entity === 'client') {
         if (ch.op === 'delete') setClients((xs) => xs.filter((x) => x.id !== ch.id));
         else setClients((xs) => upsert(xs, ch.record as Client));

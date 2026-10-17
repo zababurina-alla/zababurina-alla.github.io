@@ -93,6 +93,26 @@ export interface DeadlinePatch { due?: string; status?: Exclude<DeadlineStatus, 
 export interface ClientCard { client: Client; deadlines: Deadline[]; payments: Payment[]; tasks: Task[]; history: Activity[]; consultations: Consultation[] }
 
 /** clients.remind — напоминание клиенту в Telegram. text — ровно то, что мама видела в превью и отправила. */
+/** Какие записи (сущность и id) трогает запись в очереди: пока она не решена, изменения журнала по ним не применяются —
+ *  иначе прежнее «записано» / «закрыто» из журнала перекрывает «Отменить» на экране (приёмка-5, Р-7: строка мигала). */
+export function touchedBy(op: WriteOp): [Entity, string][] {
+  switch (op.kind) {
+    case 'closeDeadline': case 'reopenDeadline': case 'updateDeadline': return [['deadline', op.id]];
+    case 'closeDeadlines': case 'updateDeadlines': return op.items.map((i) => ['deadline', i.id] as [Entity, string]);
+    case 'addPayment': return [['payment', op.payment.id]];
+    case 'cancelPayment': return [['payment', op.id]];
+    case 'addClient': return [['client', op.client.id]];
+    case 'updateClient': return [['client', op.id]];
+    case 'createTask': return [['task', op.task.id]];
+    case 'updateTask': case 'deleteTask': case 'completeTask': return [['task', op.id]];
+    case 'completeTasks': return op.ids.map((id) => ['task', id] as [Entity, string]);
+    case 'createConsultation': return [['consultation', op.consultation.id]];
+    case 'answerQuestion': return [['question', op.id]];
+    case 'decideInbox': return [['inbox', op.id]];
+    case 'hideInbox': case 'unhideInbox': return op.ids.map((id) => ['inbox', id] as [Entity, string]);
+  }
+}
+
 export interface RemindRequest { clientId: string; kind: 'deadline' | 'key' | 'docs' | 'custom'; deadlineId?: string; period?: string; text: string }
 /** Ушло; не ушло (нет бота / тестовый режим); неизвестно — проверить в Telegram; рано — «12 ч на клиента и повод». */
 export type RemindResult =
