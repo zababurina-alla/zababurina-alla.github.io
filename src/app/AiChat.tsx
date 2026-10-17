@@ -6,7 +6,10 @@ import { useStore } from '../data/store';
 import { Icon } from '../ui/Icon';
 import { shortName } from '../ui/names';
 
-interface Msg { id: number; who: 'me' | 'bot' | 'err'; text: string; about?: string; sources?: string[] }
+/** refusal — помощник отказался (не по теме, нет данных): спокойной репликой, не ошибкой (контракт «Бота»). */
+interface Msg { id: number; who: 'me' | 'bot' | 'refusal' | 'err'; text: string; about?: string; sources?: string[] }
+
+const LONG_MS = 20_000; // дольше — сервер отвечает через ai.result: маме — что ответ придёт сюда
 
 export function AiChat({ clientId }: { clientId: string | null }) {
   const store = useStore();
@@ -17,6 +20,7 @@ export function AiChat({ clientId }: { clientId: string | null }) {
   const [q, setQ] = useState('');
   const [thinking, setThinking] = useState(false);
   const [off, setOff] = useState<string | null>(null);
+  const [long, setLong] = useState(false);
   const list = useRef<HTMLOListElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const client = clientId ? store.client(clientId) : undefined;
@@ -24,6 +28,11 @@ export function AiChat({ clientId }: { clientId: string | null }) {
   // Новое сообщение — лента к низу; открыли — курсор в поле.
   useEffect(() => { const el = list.current; if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'instant' }); }, [msgs, thinking, open]);
   useEffect(() => { if (open) input.current?.focus(); }, [open]);
+  useEffect(() => {
+    if (!thinking) return;
+    const t = window.setTimeout(() => setLong(true), LONG_MS);
+    return () => { window.clearTimeout(t); setLong(false); };
+  }, [thinking]);
   if (!ask) return null;
 
   async function send(e?: React.FormEvent) {
@@ -35,7 +44,7 @@ export function AiChat({ clientId }: { clientId: string | null }) {
     setQ(''); setThinking(true);
     try {
       const r = await ask(text, client ? client.id : null);
-      if (r.ok) setMsgs((m) => [...m, { id: Date.now() + 1, who: 'bot', text: r.answer, sources: r.sources }]);
+      if (r.ok) setMsgs((m) => [...m, { id: Date.now() + 1, who: r.kind === 'refusal' ? 'refusal' : 'bot', text: r.answer, sources: r.sources }]);
       else {
         if (r.reason === 'off') setOff(r.message);
         setMsgs((m) => [...m, { id: Date.now() + 1, who: 'err', text: r.message }]);
@@ -65,7 +74,8 @@ export function AiChat({ clientId }: { clientId: string | null }) {
                 {m.sources && m.sources.length > 0 && <span className="ai-msg__src sub">По данным: {m.sources.join(', ')}</span>}
               </li>
             ))}
-            {thinking && <li className="ai-msg ai-msg--wait" role="status"><span className="ai-dots" aria-hidden="true" />Думает…</li>}
+            {thinking && <li className="ai-msg ai-msg--wait" role="status"><span className="ai-dots" aria-hidden="true" />
+              {long ? 'Думает дольше обычного — ответ придёт сюда, вкладку можно не закрывать' : 'Думает…'}</li>}
           </ol>
           <form className="ai-form" onSubmit={(e) => { void send(e); }}>
             {client && <span className="ai-form__about sub">Вопрос о клиенте: <strong>{shortName(client.name)}</strong></span>}

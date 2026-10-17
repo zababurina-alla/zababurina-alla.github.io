@@ -162,7 +162,8 @@ export interface MonthSheet { period: string | null; items: MonthItem[] }
 /** ai.ask (помощник, сервер — отдел «Бот»): ответ; лимит на сегодня; помощник выключен; прочий сбой. Вопросы на сервере
  *  не хранятся, история — только в памяти вкладки. */
 export type AiAnswer =
-  | { ok: true; answer: string; sources: string[] }
+  /** kind 'refusal' — помощник отказался отвечать (не по теме, нет данных): показываем спокойно, не ошибкой. */
+  | { ok: true; kind: 'reply' | 'refusal'; answer: string; sources: string[] }
   | { ok: false; reason: 'limit' | 'off' | 'error'; message: string };
 
 /** deadlines.cancelNotify: сообщение клиенту о закрытии снято (срок остаётся закрытым); снимать было нечего;

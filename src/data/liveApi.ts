@@ -452,21 +452,40 @@ export class LiveApi implements CabinetApi {
     }
   }
 
-  /** Ответ модели идёт 3–10 с; BUSY — ещё раз. Лимит на сегодня и «помощник выключен» — ответом, не исключением. */
+  /** ai.ask (контракт «Бота», 17.10). Сам НЕ повторяем — каждый вызов тратит лимит (10 в час, 50 в день). Не уложился
+   *  в 20 с — { pending, jobId, retryAfterMs }: спрашиваем ai.result, пока не ответит (до 4,5 мин; сервер держит 4).
+   *  Лимит, «выключен» (VALIDATION field ai), обслуживание, сбой — ответом, не исключением. */
   async aiAsk(q: string, clientId: string | null): Promise<AiAnswer> {
+    type AiData = { answer?: unknown; kind?: unknown; sources?: unknown[]; pending?: unknown; jobId?: unknown; retryAfterMs?: unknown };
+    const at = (iso: string | undefined) => { const d = iso ? new Date(iso) : null; return d && !Number.isNaN(d.getTime()) ? d.toTimeString().slice(0, 5) : null; };
     try {
-      const env = await this.rpc<{ answer?: unknown; sources?: unknown[] }>('ai.ask', { q, ...(clientId ? { clientId } : {}) }, undefined, 1);
-      const answer = text(env.data.answer).trim();
-      if (!answer) return { ok: false, reason: 'error', message: 'Помощник не ответил — спросите ещё раз' };
-      return { ok: true, answer, sources: (env.data.sources ?? []).map(text).filter(Boolean) };
-    } catch (e) {
-      if (e instanceof ApiError) {
-        const code = String(e.code);
-        if (code === 'RATE_LIMIT' || code === 'QUOTA') return { ok: false, reason: 'limit', message: e.message || 'Лимит вопросов на сегодня исчерпан — завтра снова можно' };
-        if (code.includes('DISABLED')) return { ok: false, reason: 'off', message: e.message || 'Помощник сейчас выключен' };
-        return { ok: false, reason: 'error', message: e.message || 'Помощник не ответил — спросите ещё раз' };
+      let d = (await this.rpc<AiData>('ai.ask', { q, ...(clientId ? { clientId } : {}) })).data;
+      const started = Date.now();
+      while (d.pending === true) {
+        if (Date.now() - started > 4.5 * 60_000) return { ok: false, reason: 'error', message: 'Не дождалась ответа — спросите ещё раз' };
+        await pause.sleep(num(d.retryAfterMs) ?? 5000);
+        try {
+          d = (await this.rpc<AiData>('ai.result', { jobId: text(d.jobId) }, undefined, 2)).data;
+        } catch (e) {
+          // Опрос — чтение, лимит не тратит: обрыв — спросим ещё раз через паузу.
+          if (e instanceof ApiError && (e.code === 'NETWORK' || e.code === 'BUSY')) continue;
+          throw e;
+        }
       }
-      return { ok: false, reason: 'error', message: 'Нет связи — спросите ещё раз' };
+      const answer = text(d.answer).trim();
+      if (!answer) return { ok: false, reason: 'error', message: 'Помощник не ответил — спросите ещё раз' };
+      return { ok: true, kind: d.kind === 'refusal' ? 'refusal' : 'reply', answer, sources: (d.sources ?? []).map(text).filter(Boolean) };
+    } catch (e) {
+      if (!(e instanceof ApiError)) return { ok: false, reason: 'error', message: 'Нет связи — спросите ещё раз' };
+      const code = String(e.code);
+      if (code === 'RATE_LIMIT' || code === 'QUOTA') {
+        const when = at(e.retryAt);
+        return { ok: false, reason: 'limit', message: `${e.message || 'Лимит вопросов исчерпан'}${when ? ` — снова можно в ${when}` : ''}` };
+      }
+      if ((code === 'VALIDATION' && e.field === 'ai') || code.includes('DISABLED')) return { ok: false, reason: 'off', message: e.message || 'Помощник на сайте пока выключен' };
+      if (code === 'MAINTENANCE') { const when = at(e.retryAt); return { ok: false, reason: 'error', message: `${e.message || 'Ночное обслуживание'}${when ? ` — спросите после ${when}` : ''}` }; }
+      if (code === 'NETWORK') return { ok: false, reason: 'error', message: 'Нет связи — спросите ещё раз' };
+      return { ok: false, reason: 'error', message: e.message || 'Помощник не ответил — спросите ещё раз' };
     }
   }
 

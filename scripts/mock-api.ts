@@ -10,7 +10,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Plugin, ViteDevServer } from 'vite';
 
 interface Ctx {
-  fake: FakeLike; nonces: Set<string>; sessions: Map<string, { email: string; name: string; exp: number }>;
+  fake: FakeLike; ai: Map<string, { at: number; answer: Record<string, unknown> }>; nonces: Set<string>; sessions: Map<string, { email: string; name: string; exp: number }>;
   counters: { received: number; applied: number; rejectedByCode: Record<string, number>; repeats: number; seen: Set<string> };
 }
 interface FakeLike {
@@ -98,6 +98,27 @@ async function handle(ctx: Ctx, body: { action: string; payload?: Record<string,
   if (body.action === 'reference.rates') return env(await f.referenceRates(typeof p.year === 'number' ? p.year : undefined), 0);
   if (body.action === 'reference.kved') return env(p.all ? await f.referenceKvedAll() : await f.referenceKved(String(p.q ?? '')), 0);
   if (body.action === 'questions.list') return env({ questions: await f.listQuestions() }, 0);
+  // Помощник по контракту «Бота» (17.10): «долго» в вопросе — ответ позже (pending → ai.result); «лимит», «выключ», «отказ» — эти
+  // состояния. Вопросы не храним — только ожидающие ответы, до 4 мин.
+  if (body.action === 'ai.ask') {
+    const q = String(p.q ?? '').trim();
+    if (!q || q.length > 1000) return fail('VALIDATION', 'Вопрос — от 1 до 1000 знаков', { field: 'q' });
+    const t = q.toLowerCase();
+    if (t.includes('выключ')) return fail('VALIDATION', 'Помощник на сайте пока выключен', { field: 'ai' });
+    if (t.includes('лимит')) return fail('RATE_LIMIT', 'Лимит вопросов на этот час', { retryable: false, retryAt: new Date(Date.now() + 3600_000).toISOString() });
+    const answer = { answer: t.includes('отказ') ? 'Об этом я не подскажу — спросите Дмитрия.' : `Учебный ответ на «${q}».`, kind: t.includes('отказ') ? 'refusal' : 'reply',
+      sources: p.clientId ? ['⏰ Сроки'] : [], usage: { model: 'mock', inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, calls: 1, ms: 0 } };
+    if (t.includes('долго')) { const jobId = randomUUID(); ctx.ai.set(jobId, { at: Date.now() + 8000, answer }); return env({ pending: true, jobId, retryAfterMs: 5000 }, 0); }
+    await new Promise((r) => setTimeout(r, 2000));
+    return env(answer, 0);
+  }
+  if (body.action === 'ai.result') {
+    const job = ctx.ai.get(String(p.jobId ?? ''));
+    if (!job) return fail('NOT_FOUND', 'Ответ устарел — спросите ещё раз');
+    if (Date.now() < job.at) return env({ pending: true, jobId: p.jobId, retryAfterMs: 5000 }, 0);
+    ctx.ai.delete(String(p.jobId));
+    return env(job.answer, 0);
+  }
   if (body.action === 'clients.revealPassword') return env({ login: 'учебный-логин', password: 'учебный-пароль', ttlSeconds: 30 }, 0);
 
   const rid = body.requestId ?? randomUUID();
@@ -187,7 +208,7 @@ export function mockApi(): Plugin {
           try {
             if (!ctx) {
               const mod = await server.ssrLoadModule('/src/data/fakeServer.ts') as { fakeServer: FakeLike };
-              ctx = { fake: mod.fakeServer, nonces: new Set(), sessions: new Map(), counters: { received: 0, applied: 0, rejectedByCode: {}, repeats: 0, seen: new Set() } };
+              ctx = { fake: mod.fakeServer, ai: new Map(), nonces: new Set(), sessions: new Map(), counters: { received: 0, applied: 0, rejectedByCode: {}, repeats: 0, seen: new Set() } };
             }
             const body = JSON.parse(await readBody(req)) as Parameters<typeof handle>[1];
             res.end(JSON.stringify(await handle(ctx, body)));

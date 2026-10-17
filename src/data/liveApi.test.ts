@@ -538,21 +538,42 @@ describe('живой адаптер: чтение', () => {
     expect(s.sent[2]).toMatchObject({ action: 'inbox.hideAll', payload: {} });
   });
 
-  it('ai.ask: q и clientId; ответ и источники; RATE_LIMIT — «лимит», *DISABLED — «выключен», пустой ответ — сбой', async () => {
-    const s = server(
-      ok({ answer: 'Сдать декларацию до 9 ноября', sources: ['⏰ Сроки'], usage: { in: 100, out: 20 } }),
-      fail('RATE_LIMIT', 'Лимит на сегодня'),
-      fail('AI_DISABLED', 'Помощник выключен'),
-      ok({ answer: '  ' }),
-    );
-    const api = new LiveApi(URL_, auth(), s.fetchImpl);
-    expect(await api.aiAsk('Что сдать?', 'C-1')).toEqual({ ok: true, answer: 'Сдать декларацию до 9 ноября', sources: ['⏰ Сроки'] });
-    expect(s.sent[0]).toMatchObject({ action: 'ai.ask', payload: { q: 'Что сдать?', clientId: 'C-1' } });
-    expect(s.sent[0]?.requestId).toBeUndefined();
-    expect(await api.aiAsk('a', null)).toEqual({ ok: false, reason: 'limit', message: 'Лимит на сегодня' });
-    expect(Object.keys((s.sent[1] as unknown as { payload: object }).payload)).toEqual(['q']);
-    expect(await api.aiAsk('b', null)).toEqual({ ok: false, reason: 'off', message: 'Помощник выключен' });
-    expect(await api.aiAsk('c', null)).toMatchObject({ ok: false, reason: 'error' });
+  it('ai.ask (контракт 17.10): ответ и отказ; pending → ai.result до ответа; сам ai.ask НЕ повторяется; ошибки по кодам', async () => {
+    const sleep = pause.sleep;
+    const waits: number[] = [];
+    pause.sleep = async (ms) => { waits.push(ms); };
+    try {
+      const usage = { model: 'm', inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0, calls: 1, ms: 900 };
+      const s = server(
+        ok({ answer: 'Сдать декларацию до 9 ноября', kind: 'reply', sources: ['⏰ Сроки'], usage }),
+        ok({ answer: 'Не подскажу', kind: 'refusal', sources: [], usage }),
+        ok({ pending: true, jobId: 'J1', retryAfterMs: 5000 }),
+        ok({ pending: true, jobId: 'J1', retryAfterMs: 5000 }),
+        ok({ answer: 'Готово', kind: 'reply', sources: [], usage }),
+        fail('BUSY', 'Занято', { retryable: true }),
+        fail('RATE_LIMIT', 'Лимит вопросов на этот час', { retryAt: '2026-10-17T15:00:00+03:00' }),
+        fail('VALIDATION', 'Помощник на сайте пока выключен', { field: 'ai' }),
+        fail('SERVER', 'Помощник не настроен — сообщите Дмитрию'),
+      );
+      const api = new LiveApi(URL_, auth(), s.fetchImpl);
+      expect(await api.aiAsk('Что сдать?', 'C-1')).toEqual({ ok: true, kind: 'reply', answer: 'Сдать декларацию до 9 ноября', sources: ['⏰ Сроки'] });
+      expect(s.sent[0]).toMatchObject({ action: 'ai.ask', payload: { q: 'Что сдать?', clientId: 'C-1' } });
+      expect(s.sent[0]?.requestId).toBeUndefined();
+      expect(await api.aiAsk('x', null)).toMatchObject({ ok: true, kind: 'refusal' });
+      expect(Object.keys((s.sent[1] as unknown as { payload: object }).payload)).toEqual(['q']);
+      expect(await api.aiAsk('долго', null)).toMatchObject({ ok: true, answer: 'Готово' });
+      expect(s.sent.slice(2, 5).map((x) => x.action)).toEqual(['ai.ask', 'ai.result', 'ai.result']);
+      expect(s.sent[3]).toMatchObject({ payload: { jobId: 'J1' } });
+      expect(waits).toEqual([5000, 5000]);
+      // BUSY у ai.ask — без повтора (каждый вызов тратит лимит): сразу ответ «спросите ещё раз».
+      expect(await api.aiAsk('y', null)).toMatchObject({ ok: false, reason: 'error' });
+      expect(s.sent).toHaveLength(6);
+      expect(await api.aiAsk('z', null)).toMatchObject({ ok: false, reason: 'limit', message: expect.stringContaining('Лимит вопросов на этот час') });
+      expect(await api.aiAsk('w', null)).toEqual({ ok: false, reason: 'off', message: 'Помощник на сайте пока выключен' });
+      expect(await api.aiAsk('v', null)).toEqual({ ok: false, reason: 'error', message: 'Помощник не настроен — сообщите Дмитрию' });
+    } finally {
+      pause.sleep = sleep;
+    }
   });
 
   it('tasks.completeMany: сделанные — изменения, не отметившиеся — в failed', async () => {

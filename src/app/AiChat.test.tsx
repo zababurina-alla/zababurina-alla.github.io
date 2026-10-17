@@ -9,7 +9,7 @@ import type { AiAnswer, Snapshot } from '../data/api';
 window.matchMedia ??= ((q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
 Element.prototype.scrollTo ??= function scrollTo() { /* jsdom */ };
 
-let reply: (q: string) => AiAnswer = () => ({ ok: true, answer: 'Ответ', sources: [] });
+let reply: (q: string) => AiAnswer = () => ({ ok: true, kind: 'reply', answer: 'Ответ', sources: [] });
 const aiAsk = vi.fn(async (q: string) => { await new Promise((r) => setTimeout(r, 60)); return reply(q); });
 const SNAP: Snapshot = {
   clients: [{ id: 'C-1', version: 1, name: 'Ромашко Олена Петрівна', kind: 'fop2', marks: [], employer: false, kved: [], phone: '', keyIssuer: '', keyUntil: null, monthly: [] }],
@@ -64,6 +64,11 @@ describe('помощник', () => {
     const { host, root } = await mount(null);
     await act(async () => { host.querySelector<HTMLButtonElement>('.ai-fab')?.click(); });
     const q = () => host.querySelector<HTMLTextAreaElement>('.ai-form__q');
+    reply = () => ({ ok: true, kind: 'refusal', answer: 'Об этом не подскажу', sources: [] });
+    await act(async () => { const el = q(); if (el) type(el, 'не по теме'); });
+    await act(async () => { host.querySelector<HTMLFormElement>('.ai-form')?.requestSubmit(); });
+    await tick(120);
+    expect([host.querySelector('.ai-msg--refusal')?.textContent, host.querySelector('.ai-msg--err')]).toEqual(['Об этом не подскажу', null]);
     reply = () => ({ ok: false, reason: 'limit', message: 'Лимит на сегодня' });
     await act(async () => { const el = q(); if (el) type(el, 'вопрос'); });
     await act(async () => { host.querySelector<HTMLFormElement>('.ai-form')?.requestSubmit(); });

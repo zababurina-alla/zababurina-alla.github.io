@@ -469,11 +469,12 @@ class FakeServer implements CabinetApi {
     if (!this.online) return { ok: false, reason: 'error', message: 'Нет связи — спросите ещё раз' };
     const t = q.toLowerCase();
     if (t.includes('лимит')) return { ok: false, reason: 'limit', message: 'Лимит вопросов на сегодня исчерпан — завтра снова можно' };
-    if (t.includes('выключ')) return { ok: false, reason: 'off', message: 'Помощник сейчас выключен' };
+    if (t.includes('выключ')) return { ok: false, reason: 'off', message: 'Помощник на сайте пока выключен' };
     const c = clientId ? this.clients.get(clientId) : undefined;
     const open = c ? [...this.deadlines.values()].filter((d) => d.clientId === c.id && d.status !== 'done') : [];
     const about = c ? `По клиенту ${short(c.name)}: открытых сроков ${open.length}${open[0] ? `, ближайший — «${open[0].what}» до ${fmtDate(open[0].due ?? TODAY)}` : ''}.\n` : '';
-    return { ok: true, answer: `${about}Это учебный ответ помощника на вопрос «${q.trim()}». Настоящий помощник ответит по таблице и законам.`, sources: c ? ['⏰ Сроки'] : [] };
+    if (t.includes('отказ')) return { ok: true, kind: 'refusal', answer: 'Об этом я не подскажу — спросите Дмитрия.', sources: [] };
+    return { ok: true, kind: 'reply', answer: `${about}Это учебный ответ помощника на вопрос «${q.trim()}». Настоящий помощник ответит по таблице и законам.`, sources: c ? ['⏰ Сроки'] : [] };
   }
 
   async inboxHideAll(): Promise<{ hidden: number; ids: string[]; more: boolean }> {
