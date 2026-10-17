@@ -194,6 +194,29 @@ if (CHECKS) {
       lines.push(`лента над уведомлением: ${res.map((r, i) => `${i + 1}-я переписка — ${r}`).join(', ') || 'решённых сообщений нет'}`);
       await c4.close();
     }
+    // ── Вкладки карточки на масштабе экрана 125 % (как у владельца, Windows): подложка совпадает с выбранной вкладкой ──
+    {
+      const c5 = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1.25, colorScheme: 'dark' });
+      const p5 = await c5.newPage();
+      await p5.goto('about:blank');
+      await p5.goto(`${BASE}${BASE.includes('?') ? '&' : '?'}demo=1&theme=dark`, { waitUntil: 'load' });
+      await p5.waitForTimeout(1800);
+      await p5.evaluate(() => { location.hash = '#/clients'; });
+      await p5.waitForTimeout(1200);
+      await p5.locator('.ctable__row .ctable__open').first().click();
+      await p5.waitForTimeout(1000);
+      let worst = 0, bad = 0, n = 0;
+      for (const t of await p5.locator('dialog[open] .tabs__tab').all()) {
+        await t.click(); await p5.waitForTimeout(450); n++;
+        const d = await p5.evaluate(() => {
+          const bar = document.querySelector('dialog[open] .tabs'); const i = bar.querySelector('.tabs__ind').getBoundingClientRect(); const a = bar.querySelector('[aria-pressed=true]').getBoundingClientRect();
+          return Math.max(Math.abs(i.left - a.left), Math.abs(i.right - a.right), Math.abs(i.top - a.top), Math.abs(i.bottom - a.bottom));
+        });
+        worst = Math.max(worst, d); if (d > 1) bad++;
+      }
+      lines.push(`вкладки карточки, масштаб 125 %, тёмная: вкладок ${n}, подложка мимо больше 1 px — ${bad}, наибольшее расхождение ${worst.toFixed(2)} px`);
+      await c5.close();
+    }
     // ── Меню целиком в окне ноутбука: ничего не уходит под нижний край (Р-4: 816 → 792 из 776 px) ──
     for (const [w, h] of [[1280, 800], [1280, 720], [1024, 768]]) {
       const c3 = await browser.newContext({ viewport: { width: w, height: h - 24 } }); // 24 px — рамка окна браузера
