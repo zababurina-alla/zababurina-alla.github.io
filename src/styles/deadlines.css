@@ -266,7 +266,7 @@
 
   .dtable__row,
   .dtable--noclient .dtable__row {
-    grid-template-columns: 2.75rem minmax(0, 1fr) 11rem;
+    grid-template-columns: 2.75rem minmax(0, 1fr) 12rem; /* 11rem: «просрочено 24 дн.» вылезало из колонки на 7 px, в поле листа (17.10) */
     gap: 2px var(--space-3);
   }
 
@@ -793,6 +793,12 @@
   }
 
   .dtable__tools:has(> .dactions) .dtable__tool-text { display: inline; }
+
+  /* «Действия» — всегда своей строкой под названием: при коротком названии кнопка вставала справа от него, при
+     длинном — под ним, строки списка выходили разной высоты (375: 2 из 9 строк ниже соседей, 17.10) */
+  .dtable__line > .dtable__tools {
+    flex-basis: 100%;
+  }
 }
 
 /* «Действия» — явная кнопка со словом, а не бледное «⋯» под текстом (№ 9) */
@@ -811,9 +817,11 @@
   display: grid;
   justify-items: start;
   gap: 1px;
+  max-width: 100%;
   padding-block: 6px;
   text-align: left;
   line-height: 1.2;
+  white-space: normal; /* 375: «с пометкой «отложено» до этой даты» вылезала за край меню на 7 px */
 }
 
 .dactions__hint {
