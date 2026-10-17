@@ -485,7 +485,10 @@ function measure(rootSel) {
   if (document.documentElement.scrollWidth > document.documentElement.clientWidth + 1) { sideways++; sidewaysList.push(`страница шире окна на ${document.documentElement.scrollWidth - document.documentElement.clientWidth} px`); }
   for (const el of [root, ...root.querySelectorAll('*')]) {
     const cs = getComputedStyle(el);
-    if (!visible(el) || !/(auto|scroll)/.test(cs.overflowX) || el.closest('.tabs, .chips')) continue;
+    // Полосы вкладок и фишек раньше не считались — так прошла срезанная «История» (новый дизайнер, 17.10). Теперь
+    // листающаяся вбок полоса — находка, если край не затухает явно (mask-image)
+    if (!visible(el) || !/(auto|scroll)/.test(cs.overflowX)) continue;
+    if (el.matches('.tabs, .chips, .seg') && cs.maskImage && cs.maskImage !== 'none') continue;
     const extra = el.scrollWidth - el.clientWidth;
     if (extra > 1) { sideways++; sidewaysList.push(`${label(el)} — вбок на ${extra} px`); }
   }
@@ -532,13 +535,41 @@ function measure(rootSel) {
     }
   }
 
+  // Полосы вкладок, сегментов и фишек (владелец 17.10: подложка «Обзора» неровно, «История» срезана краем):
+  // подложка выбранного пункта внутри полосы и по центру ±1 px; последний пункт виден целиком или край явно затухает.
+  let strips = 0;
+  const stripList = [];
+  for (const bar of root.querySelectorAll('.tabs, .seg, .chips')) {
+    if (!visible(bar)) continue;
+    const r = bar.getBoundingClientRect();
+    const inner = { l: r.left + bar.clientLeft, t: r.top + bar.clientTop, r: r.left + bar.clientLeft + bar.clientWidth, b: r.top + bar.clientTop + bar.clientHeight };
+    const mark = bar.querySelector(':scope > .tabs__ind');
+    const active = bar.querySelector(':scope > [aria-pressed=true]');
+    const pad = mark ? mark : bar.matches('.seg--fill') ? active : null;
+    if (pad && visible(pad) && Number(getComputedStyle(pad).opacity) > 0.05) {
+      const m = pad.getBoundingClientRect();
+      const out = m.top < inner.t - 0.5 || m.bottom > inner.b + 0.5 || m.left < inner.l - 0.5 || m.right > inner.r + 0.5;
+      const rowCenter = active ? (active.getBoundingClientRect().top + active.getBoundingClientRect().bottom) / 2 : (inner.t + inner.b) / 2;
+      const off = Math.abs((m.top + m.bottom) / 2 - rowCenter);
+      if (out) { strips++; stripList.push(`${label(bar)} — подложка выходит за полосу`); }
+      else if (off > 1) { strips++; stripList.push(`${label(bar)} — подложка не по центру (${off.toFixed(1)} px)`); }
+    }
+    const kids = [...bar.children].filter((c) => visible(c) && !c.matches('.tabs__ind'));
+    const last = kids.at(-1);
+    if (last) {
+      const lr = last.getBoundingClientRect();
+      const masked = getComputedStyle(bar).maskImage !== 'none' && getComputedStyle(bar).maskImage !== '';
+      if (lr.right > inner.r + 1 && !masked) { strips++; stripList.push(`${label(bar)} — последний пункт срезан краем на ${Math.round(lr.right - inner.r)} px, прокрутки не видно`); }
+    }
+  }
+
   // Блоки с прокруткой — пометить для проверки колесом снаружи
   const scrollers = [];
   for (const el of [root, ...root.querySelectorAll('*')]) {
     const cs = getComputedStyle(el);
     if (/(auto|scroll)/.test(cs.overflowY) && el.scrollHeight > el.clientHeight + 4 && visible(el)) { el.dataset.auditScroll = String(scrollers.length); scrollers.push(label(el)); }
   }
-  return { voids, voidList, uneven, unevenList: unevenList.slice(0, 12), labels, labelList: labelList.slice(0, 16), sideways, sidewaysList, touch, touchList: touchList.slice(0, 300), scrollers };
+  return { voids, voidList, uneven, unevenList: unevenList.slice(0, 12), labels, labelList: labelList.slice(0, 16), sideways, sidewaysList, touch, touchList: touchList.slice(0, 300), strips, stripList, scrollers };
 }
 
 const browser = await chromium.launch();
@@ -577,7 +608,7 @@ try {
           if (top < 1) { wheel++; wheelList.push(`${m.scrollers[i]}${top < 0 ? ' — закрылся от прокрутки' : ''}`); }
         } catch { /* блок пропал до прокрутки — пропускаем */ }
       }
-      results.push({ screen: s.name, view: `${v.w} ${v.theme === 'light' ? 'свет' : 'тьма'}`, missing: Boolean(m.missing), voids: m.voids ?? 0, uneven: m.uneven ?? 0, wheel, labels: m.labels ?? 0, sideways: m.sideways ?? 0, touch: m.touch ?? 0, details: { voids: m.voidList, uneven: m.unevenList, wheel: wheelList, labels: m.labelList, sideways: m.sidewaysList, touch: m.touchList } });
+      results.push({ screen: s.name, view: `${v.w} ${v.theme === 'light' ? 'свет' : 'тьма'}`, missing: Boolean(m.missing), voids: m.voids ?? 0, uneven: m.uneven ?? 0, wheel, labels: m.labels ?? 0, sideways: m.sideways ?? 0, touch: m.touch ?? 0, strips: m.strips ?? 0, details: { strips: m.stripList, voids: m.voidList, uneven: m.unevenList, wheel: wheelList, labels: m.labelList, sideways: m.sidewaysList, touch: m.touchList } });
     }
     await ctx.close();
   }
@@ -586,9 +617,9 @@ try {
 }
 
 const pad = (s, n) => String(s).padEnd(n);
-console.log(`${pad('экран', 16)}${pad('вид', 12)}пустоты  высоты  колесо  подписи  вбок  касание`);
-for (const r of results) console.log(`${pad(r.screen, 16)}${pad(r.view, 12)}${r.missing ? 'нет корня — окно не открылось' : `${pad(r.voids, 9)}${pad(r.uneven, 8)}${pad(r.wheel, 8)}${pad(r.labels, 9)}${pad(r.sideways, 6)}${r.touch}`}`);
+console.log(`${pad('экран', 16)}${pad('вид', 12)}пустоты  высоты  колесо  подписи  вбок  касание  полосы`);
+for (const r of results) console.log(`${pad(r.screen, 16)}${pad(r.view, 12)}${r.missing ? 'нет корня — окно не открылось' : `${pad(r.voids, 9)}${pad(r.uneven, 8)}${pad(r.wheel, 8)}${pad(r.labels, 9)}${pad(r.sideways, 6)}${pad(r.touch, 9)}${r.strips}`}`);
 const sum = (k) => results.reduce((a, r) => a + (r[k] || 0), 0);
-console.log(`\nИтого: пустоты ${sum('voids')} · высоты ${sum('uneven')} · колесо ${sum('wheel')} · подписи ${sum('labels')} · вбок ${sum('sideways')} · касание (375) ${sum('touch')} · не открылось ${results.filter((r) => r.missing).length}`);
+console.log(`\nИтого: пустоты ${sum('voids')} · высоты ${sum('uneven')} · колесо ${sum('wheel')} · подписи ${sum('labels')} · вбок ${sum('sideways')} · касание (375) ${sum('touch')} · полосы ${sum('strips')} · не открылось ${results.filter((r) => r.missing).length}`);
 if (JSON_OUT) writeFileSync(JSON_OUT, JSON.stringify(results, null, 1));
-if (STRICT && sum('voids') + sum('uneven') + sum('wheel') + sum('labels') + sum('sideways') + results.filter((r) => r.missing).length > 0) process.exit(1);
+if (STRICT && sum('voids') + sum('uneven') + sum('wheel') + sum('labels') + sum('sideways') + sum('touch') + sum('strips') + results.filter((r) => r.missing).length > 0) process.exit(1);

@@ -133,6 +133,21 @@
   text-align: center;
 }
 
+/* Пока вопросов нет — подсказка по центру ленты, над ней тихий знак помощника: окно не выглядит пустым */
+.ai-msgs:has(> .ai-msg--hint:only-child) {
+  justify-content: center;
+}
+
+.ai-msg--hint::before {
+  content: '';
+  justify-self: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  margin-bottom: var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--accent-soft) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231E64CF' stroke-width='1.8' stroke-linejoin='round'%3E%3Cpath d='m11 3 1.8 4.7 4.7 1.8-4.7 1.8L11 16l-1.8-4.7L4.5 9.5l4.7-1.8zM18.5 14.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z'/%3E%3C/svg%3E") center / 1.375rem no-repeat;
+}
+
 .ai-msg--wait {
   display: inline-flex;
   align-items: center;

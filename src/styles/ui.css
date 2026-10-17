@@ -480,6 +480,32 @@ p.empty {
   transition: transform var(--dur-spring) var(--spring), width var(--dur-spring) var(--spring);
 }
 
+/* Полоса не помещается (карточка на узком экране) — края, за которыми ещё пункты, затухают: видно, что листается */
+.tabs.has-more-end {
+  mask-image: linear-gradient(to right, #000 calc(100% - 2rem), transparent);
+}
+
+.tabs.has-more-start {
+  mask-image: linear-gradient(to left, #000 calc(100% - 2rem), transparent);
+}
+
+.tabs.has-more-start.has-more-end {
+  mask-image: linear-gradient(to right, transparent, #000 2rem, #000 calc(100% - 2rem), transparent);
+}
+
+/* Тёмная тема: подложка выбранного пункта светлее полосы (лист темнее полосы — подложка читалась «дырой») */
+:root[data-theme='dark'] .tabs__ind,
+:root[data-theme='dark'] .seg--fill .seg__opt[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--ink) 9%, var(--surface-sunk));
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .tabs__ind,
+  :root:not([data-theme='light']) .seg--fill .seg__opt[aria-pressed='true'] {
+    background: color-mix(in srgb, var(--ink) 9%, var(--surface-sunk));
+  }
+}
+
 .tabs__tab {
   position: relative;
   display: inline-flex;
