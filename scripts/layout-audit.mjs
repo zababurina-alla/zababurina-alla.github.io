@@ -308,6 +308,7 @@ const SCREENS = [
   { name: 'ещё', hash: '#/more', root: '.page' },
   { name: 'окно платежа', hash: '#/today', root: 'dialog[open] .modal__box', open: (p) => p.keyboard.press('Alt+n') },
   { name: 'новый клиент', hash: '#/clients', root: 'dialog[open] .modal__box', open: (p) => p.locator('button', { hasText: 'Добавить клиента' }).first().click() },
+  { name: 'помощник', hash: '#/today', root: '.ai-panel', open: (p) => p.locator('.ai-fab').click() },
   { name: 'поиск Ctrl K', hash: '#/today', root: '.palette__box', open: (p) => p.keyboard.press('Control+k') },
 ];
 
