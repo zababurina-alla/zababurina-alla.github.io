@@ -179,10 +179,14 @@ if (CHECKS) {
     const page = await ctx.newPage();
     // Сценарий приёмки С-1: закрыть срок и сразу ответить на вопрос — два разных уведомления
     await open(page, '#/today');
+    // Ждём не по часам, а по странице: занятый ПК иногда показывал первое уведомление позже — замер видел одно
+    const count = () => page.locator('.toasts > .toast:not(.is-leaving)').count();
     await page.locator('.dtable__row .check-btn').first().click();
-    await page.waitForTimeout(1500);
+    await page.waitForFunction(() => document.querySelectorAll('.toasts > .toast:not(.is-leaving)').length >= 1, null, { timeout: 5000 }).catch(() => {});
     await page.locator('.panel--wheat button', { hasText: /^Да$/ }).first().click();
-    await page.waitForTimeout(900);
+    await page.waitForFunction(() => document.querySelectorAll('.toasts > .toast:not(.is-leaving)').length >= 2, null, { timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(400); // столбик доехал (пружина), меряем места кнопок
+    if ((await count()) < 2) lines.push('уведомления 1280: второе не появилось за 5 с — проверить вручную');
     const t = await page.evaluate(() => {
       const toasts = [...document.querySelectorAll('.toasts > .toast:not(.is-leaving)')];
       let buttons = 0, blocked = 0, overlaps = 0;
@@ -471,6 +475,9 @@ function measure(rootSel) {
     });
     // Растянутая зона нажатия (::after на всю строку, как имя в строке «Клиентов») — место нажатия = вся строка
     const hitRect = (el) => {
+      // Поле внутри подписи (поиск «Клиентов»): нажимается вся подпись-рамка
+      const lab = el.matches('input, select, textarea') ? el.closest('label') : null;
+      if (lab) return lab.getBoundingClientRect();
       const a = getComputedStyle(el, '::after');
       if (a.content !== 'none' && a.position === 'absolute') { const host = el.offsetParent; if (host) return host.getBoundingClientRect(); }
       return el.getBoundingClientRect();
@@ -483,9 +490,10 @@ function measure(rootSel) {
     for (let i = 0; i < els.length; i++) for (let j = i + 1; j < els.length; j++) {
       const a = rects[i], b = rects[j];
       if (els[i].contains(els[j]) || els[j].contains(els[i])) continue;
-      // Две крупные строки списка вплотную (чаты, клиенты) — промаха нет: зазор считаем, если хоть одна цель мелкая
-      const big = (q) => q.height >= 48 && q.width >= 120;
-      if (big(a) && big(b)) continue;
+      // Зазор нужен мелкой цели (как в WCAG 2.5.8): две цели от 44 × 44 вплотную — сегменты одной вкладки, строки
+      // списка — промаха нет
+      const ok = (q) => q.width >= 43.5 && q.height >= 43.5;
+      if (ok(a) && ok(b)) continue;
       const dx = Math.max(0, Math.max(a.left, b.left) - Math.min(a.right, b.right));
       const dy = Math.max(0, Math.max(a.top, b.top) - Math.min(a.bottom, b.bottom));
       const overlapX = a.left < b.right && b.left < a.right, overlapY = a.top < b.bottom && b.top < a.bottom;
@@ -500,7 +508,7 @@ function measure(rootSel) {
     const cs = getComputedStyle(el);
     if (/(auto|scroll)/.test(cs.overflowY) && el.scrollHeight > el.clientHeight + 4 && visible(el)) { el.dataset.auditScroll = String(scrollers.length); scrollers.push(label(el)); }
   }
-  return { voids, voidList, uneven, unevenList: unevenList.slice(0, 12), labels, labelList: labelList.slice(0, 16), sideways, sidewaysList, touch, touchList: touchList.slice(0, 40), scrollers };
+  return { voids, voidList, uneven, unevenList: unevenList.slice(0, 12), labels, labelList: labelList.slice(0, 16), sideways, sidewaysList, touch, touchList: touchList.slice(0, 300), scrollers };
 }
 
 const browser = await chromium.launch();
