@@ -207,7 +207,7 @@ if (CHECKS) {
       await p5.waitForTimeout(1000);
       let worst = 0, bad = 0, n = 0;
       for (const t of await p5.locator('dialog[open] .tabs__tab').all()) {
-        await t.click(); await p5.waitForTimeout(450); n++;
+        await t.click(); await p5.waitForTimeout(900); n++; // переезд подложки — пружина 0,55 с: меряем после неё
         const d = await p5.evaluate(() => {
           const bar = document.querySelector('dialog[open] .tabs'); const i = bar.querySelector('.tabs__ind').getBoundingClientRect(); const a = bar.querySelector('[aria-pressed=true]').getBoundingClientRect();
           return Math.max(Math.abs(i.left - a.left), Math.abs(i.right - a.right), Math.abs(i.top - a.top), Math.abs(i.bottom - a.bottom));
