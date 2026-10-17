@@ -576,6 +576,15 @@ describe('живой адаптер: чтение', () => {
     }
   });
 
+  it('clients.photos: первый раз без etag — фото и etag; потом с etag — notModified без фото', async () => {
+    const s = server(ok({ etag: 'e1', photos: { 'C-12': 'data:image/jpeg;base64,/9j/', 'C-13': 5 } }), ok({ etag: 'e1', notModified: true }));
+    const api = new LiveApi(URL_, auth(), s.fetchImpl);
+    expect(await api.clientPhotos(null)).toEqual({ etag: 'e1', notModified: false, photos: { 'C-12': 'data:image/jpeg;base64,/9j/' } });
+    expect(s.sent[0]).toMatchObject({ action: 'clients.photos', payload: {} });
+    expect(await api.clientPhotos('e1')).toEqual({ etag: 'e1', notModified: true, photos: {} });
+    expect(s.sent[1]).toMatchObject({ payload: { etag: 'e1' } });
+  });
+
   it('tasks.completeMany: сделанные — изменения, не отметившиеся — в failed', async () => {
     const t = { id: 'T-1', version: 2, clientId: null, text: 'а', due: null, type: 'docs', priority: 'medium', done: true };
     const s = server(ok({ results: [{ id: 'T-1', ok: true, task: t }, { id: 'T-2', ok: false, error: { code: 'NOT_FOUND', message: 'Задачи уже нет' }, current: null }], updated: 1, failed: 1 }, 30));

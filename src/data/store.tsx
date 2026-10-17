@@ -22,6 +22,7 @@ import { isDated } from './types';
 import { TODAY, addDays, fmtDate, plural } from '../lib/dates';
 import { play } from '../lib/sound';
 import { threadKey } from '../lib/inboxThreads';
+import { setPhotos } from '../ui/photo';
 
 // Опрос изменений из таблицы: бриф — раз в 30–60 с. Квоты Apps Script дневного лимита на запросы не задают
 // (developers.google.com/apps-script/guides/services/quotas), но одновременных выполнений — 30 на владельца.
@@ -131,6 +132,8 @@ interface Store {
   /** Архив сроков клиента (флаг archive) и «Требуют внимания» (флаг attention) — чтение; null — сервер ещё не умеет. */
   archive: CabinetApi['listArchive'] | null;
   attention: CabinetApi['attention'] | null;
+  /** Фото клиентов (clients.photos, флаг photos): id → картинка. Пусто — аватары буквами. Только в памяти вкладки. */
+  photos: Readonly<Record<string, string>>;
   /** Помощник (ai.ask, флаг aiChat); null — выключен. */
   aiAsk: ((q: string, clientId: string | null) => Promise<AiAnswer>) | null;
   /** «Удалить» и «Очистить прочитанное» во «Входящих» — только на сайте (флаг inboxHide); null — выключено. */
@@ -970,6 +973,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
     return { hidden: ids.length, undo };
   }, [send]);
+  // Фото клиентов: после снимка и раз в 30 мин, с etag; notModified — ничего не перерисовываем (тот же объект).
+  const [photos, setPhotoState] = useState<Readonly<Record<string, string>>>({});
+  const photoEtag = useRef<string | null>(null);
+  useEffect(() => {
+    if (!loaded || !hasFeature('photos')) return;
+    let alive = true;
+    const load = () => {
+      // Фото — украшение: любой сбой (и синхронный) не должен ронять кабинет — аватар останется буквами.
+      Promise.resolve().then(() => api.clientPhotos(photoEtag.current)).then((r) => {
+        if (!alive || r.notModified) return;
+        photoEtag.current = r.etag;
+        setPhotoState(setPhotos(r.photos));
+      }, () => { /* без фото — буквы, попробуем в следующий раз */ });
+    };
+    load();
+    const t = window.setInterval(load, 30 * 60_000);
+    return () => { alive = false; window.clearInterval(t); };
+  }, [loaded]);
   const aiAsk = useMemo(() => (hasFeature('aiChat') ? (q: string, clientId: string | null) => api.aiAsk(q, clientId) : null), []);
   const inboxHide = useMemo(() => (hasFeature('inboxHide') ? { hide: hideInboxNow, clearRead: clearReadNow } : null), [hideInboxNow, clearReadNow]);
 
@@ -1001,10 +1022,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<Store>(() => ({
     loaded, online, syncedAt, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, consultations, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateKved, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, updateDeadlines, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention, month, inboxHide, aiAsk,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateKved, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, updateDeadlines, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention, month, inboxHide, aiAsk, photos,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance,
   }), [loaded, online, syncedAt, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, consultations, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateKved, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, updateDeadlines, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention, month, inboxHide, aiAsk,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateKved, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, updateDeadlines, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention, month, inboxHide, aiAsk, photos,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

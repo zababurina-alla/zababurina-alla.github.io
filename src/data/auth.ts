@@ -7,6 +7,7 @@
 import { ApiError, call } from './transport';
 import type { Envelope } from './transport';
 import { clearSnap } from './snapCache';
+import { setPhotos } from '../ui/photo';
 import { getTheme } from '../lib/theme';
 
 export interface User { email: string; name: string; role: 'mama' | 'owner' }
@@ -312,6 +313,7 @@ export class Auth {
   private signOutLocal(error: string | null) {
     this.stored = null;
     clearSnap(); // данные клиентов этой вкладки — вместе с сеансом
+    setPhotos({}); // фото клиентов — тоже
     try { localStorage.removeItem(KEY); sessionStorage.removeItem(KEY); } catch { /* нечего чистить */ }
     this.set({ status: 'signedOut', user: null, error });
   }

@@ -2,7 +2,7 @@
 // (docs/api-contract.md v2.1). Экраны и очередь записей не знают, с кем говорят.
 import { ApiError, call } from './transport';
 import type { Envelope } from './transport';
-import type { AiAnswer, ApplyTemplateResult, ArchivedDeadline, ArchivePage, AttentionItem, MonthCheck, MonthItem, MonthSheet, BotLinkResult, CabinetApi, StatementPdf, StatementPreview, StatementResult, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
+import type { AiAnswer, ApplyTemplateResult, ClientPhotos, ArchivedDeadline, ArchivePage, AttentionItem, MonthCheck, MonthItem, MonthSheet, BotLinkResult, CabinetApi, StatementPdf, StatementPreview, StatementResult, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, ClientCard, Entity, ErrorCode, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
 import { MONTH_CHECKS, RETRYABLE } from './api';
 import type { Activity, Client, Consultation, Deadline, InboxItem, InboxType, KvedItem, Payment, Question, RateGroup, Rates, Task } from './types';
 import { INBOX_TYPES } from './types';
@@ -487,6 +487,14 @@ export class LiveApi implements CabinetApi {
       if (code === 'NETWORK') return { ok: false, reason: 'error', message: 'Нет связи — спросите ещё раз' };
       return { ok: false, reason: 'error', message: e.message || 'Помощник не ответил — спросите ещё раз' };
     }
+  }
+
+  async clientPhotos(etag: string | null): Promise<ClientPhotos> {
+    const env = await this.rpc<{ etag?: unknown; notModified?: unknown; photos?: Record<string, unknown> }>('clients.photos', etag ? { etag } : {}, undefined, 2);
+    const d = env.data;
+    const photos: Record<string, string> = {};
+    for (const [id, v] of Object.entries(d.photos ?? {})) if (typeof v === 'string') photos[id] = v;
+    return { etag: text(d.etag) || null, notModified: d.notModified === true, photos };
   }
 
   async inboxHideAll(): Promise<{ hidden: number; ids: string[]; more: boolean }> {

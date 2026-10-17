@@ -3,7 +3,7 @@
 // — версии записей и ошибка CONFLICT; — журнал изменений с курсором; — повтор того же requestId не создаёт дубль.
 // Рычаги отладки (обрыв связи, отказ, правка извне) — для кнопок в режиме отладки.
 import { ACTIVITY, CLIENTS, CONSULTATIONS, DEADLINES, INBOX, KVEDS, PAYMENTS, QUESTIONS, RATES, TASKS } from './fake';
-import type { AiAnswer, ApplyTemplateResult, ArchivePage, AttentionItem, MonthCheck, MonthItem, MonthSheet, BotLinkResult, CabinetApi, StatementPdf, StatementPreview, StatementResult, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, TemplatePreview, ClientCard, Entity, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
+import type { AiAnswer, ApplyTemplateResult, ClientPhotos, ArchivePage, AttentionItem, MonthCheck, MonthItem, MonthSheet, BotLinkResult, CabinetApi, StatementPdf, StatementPreview, StatementResult, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, TemplatePreview, ClientCard, Entity, KvedAll, KvedFound, RemindPreview, RemindRequest, RemindResult, Snapshot, WriteOp, WriteResult } from './api';
 import type { Activity, Client, Consultation, Deadline, InboxItem, KvedItem, Payment, Question, Rates, Task } from './types';
 import { fold } from '../lib/search';
 import { TODAY, addDays, endOfMonth, fmtDate, fmtDue } from '../lib/dates';
@@ -475,6 +475,12 @@ class FakeServer implements CabinetApi {
     const about = c ? `По клиенту ${short(c.name)}: открытых сроков ${open.length}${open[0] ? `, ближайший — «${open[0].what}» до ${fmtDate(open[0].due ?? TODAY)}` : ''}.\n` : '';
     if (t.includes('отказ')) return { ok: true, kind: 'refusal', answer: 'Об этом я не подскажу — спросите Дмитрия.', sources: [] };
     return { ok: true, kind: 'reply', answer: `${about}Это учебный ответ помощника на вопрос «${q.trim()}». Настоящий помощник ответит по таблице и законам.`, sources: c ? ['⏰ Сроки'] : [] };
+  }
+
+  /** Учебные фото: у выдуманных клиентов фото нет — аватар остаётся буквами; etag один, второй раз — notModified. */
+  async clientPhotos(etag: string | null): Promise<ClientPhotos> {
+    await wait(READ_MS);
+    return etag === 'demo-1' ? { etag, notModified: true, photos: {} } : { etag: 'demo-1', notModified: false, photos: {} };
   }
 
   async inboxHideAll(): Promise<{ hidden: number; ids: string[]; more: boolean }> {

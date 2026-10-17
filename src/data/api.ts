@@ -166,6 +166,10 @@ export type AiAnswer =
   | { ok: true; kind: 'reply' | 'refusal'; answer: string; sources: string[] }
   | { ok: false; reason: 'limit' | 'off' | 'error'; message: string };
 
+/** clients.photos: фото текущих клиентов (data:image/… от сервера, в снимок не входят); notModified — с прошлого etag
+ *  ничего не изменилось. */
+export interface ClientPhotos { etag: string | null; notModified: boolean; photos: Record<string, string> }
+
 /** deadlines.cancelNotify: сообщение клиенту о закрытии снято (срок остаётся закрытым); снимать было нечего;
  *  уже забрано на отправку (sentAt — примерно когда ушло). */
 export type CancelNotifyResult = { status: 'cancelled' } | { status: 'nothing' } | { status: 'sent'; sentAt: string | null };
@@ -209,6 +213,8 @@ export interface CabinetApi {
   inboxHideAll(): Promise<{ hidden: number; ids: string[]; more: boolean }>;
   /** Вопрос помощнику; clientId — если открыта карточка клиента (ответ — про него). */
   aiAsk(q: string, clientId: string | null): Promise<AiAnswer>;
+  /** Фото клиентов с etag: тот же etag — notModified, без самих фото. */
+  clientPhotos(etag: string | null): Promise<ClientPhotos>;
   /** Чтение, по кнопке «Показать архив» — не на каждый показ карточки. */
   listArchive(clientId: string, offset?: number, limit?: number): Promise<ArchivePage>;
   /** Чтение трёх листов — не чаще раза в несколько минут. */
