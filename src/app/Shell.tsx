@@ -193,20 +193,23 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
   const pillRef = useRef<HTMLSpanElement>(null);
 
   // Подсветка выбранного раздела переезжает к новому пункту пружиной (только transform) — видно, куда перешли.
+  // Высота — по пункту: на ноутбуке пункты 38 и 34 px (Р-4), а подсветка была 44 — выше пункта на 6–10 px, слово
+  // не по центру, низ наезжал на соседний пункт (17.10). Окно сменило высоту — пункты другие, подсветка следом.
   // Меню и при смене размера окна: открыли узким (меню скрыто, offsetTop 0), растянули — подсветка стояла на
   // «Сегодня», а открыт другой раздел (проход 22.10).
   useLayoutEffect(() => {
-    const nav = navRef.current;
+    const nav = navRef.current, pill = pillRef.current;
+    if (!nav || !pill) return;
     const place = () => {
-      const active = nav?.querySelector<HTMLElement>('.nav__item[aria-current="page"]');
-      const pill = pillRef.current;
-      if (!pill) return;
+      if (!nav.offsetHeight) return; // меню скрыто (телефон) — подсветку не трогаем, встанет при показе
+      const active = nav.querySelector<HTMLElement>('.nav__item[aria-current="page"]');
       if (!active) { pill.style.opacity = '0'; return; }
       pill.style.opacity = '1';
       pill.style.transform = `translateY(${active.offsetTop}px)`;
+      pill.style.height = `${active.offsetHeight}px`;
     };
     place();
-    if (!nav || typeof ResizeObserver === 'undefined') return;
+    if (typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver(place);
     ro.observe(nav);
     return () => ro.disconnect();
