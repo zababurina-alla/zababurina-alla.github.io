@@ -9,7 +9,7 @@ import { canWrite } from '../config';
 import { useStore } from '../data/store';
 import type { InboxItem, InboxStatus, InboxType } from '../data/types';
 import type { InboxAction } from '../data/api';
-import { TODAY, addDays, fmtDayMonth } from '../lib/dates';
+import { TODAY, addDays, fmtDayMonth, plural } from '../lib/dates';
 import { useRoute } from '../router';
 import { groupThreads } from '../lib/inboxThreads';
 import type { Thread } from '../lib/inboxThreads';
@@ -19,6 +19,7 @@ import { Icon } from '../ui/Icon';
 import type { IconName } from '../ui/Icon';
 import { Avatar } from '../ui/kit';
 import { clientPhoto } from '../ui/photo';
+import { keepNumbers } from '../ui/numbers';
 import { Empty } from '../ui/Empty';
 import { roAttrs } from '../ui/readonly';
 import { shortName } from '../ui/names';
@@ -129,7 +130,7 @@ export function InboxCard({ it, compact = false }: { it: InboxItem; compact?: bo
       </div>
       {voiceText(it) !== null
         ? <p className="inbox__snippet inbox__voice"><Icon name="mic" size={16} />{voiceText(it) || 'Голосовое — послушать в Telegram'}</p>
-        : <p className="inbox__snippet">«{it.snippet}»</p>}
+        : <p className="inbox__snippet">«{keepNumbers(it.snippet)}»</p>}
       {it.type === 'order' && it.amount ? <p className="sub inbox__tax">Оплатить за клиента: {formatMoney(it.amount)}</p> : null}
       {it.taxKopecks ? <p className="sub inbox__tax">В сообщении и налог: {formatMoney(it.taxKopecks)}</p> : null}
       {it.status !== 'new'
@@ -164,15 +165,17 @@ function voiceText(it: InboxItem): string | null {
   return t === '…' || t === '...' ? '' : t;
 }
 
-/** «Убрать с сайта» (inbox.hide, флаг inboxHide): только здесь — Telegram мамы не трогаем; 10 с на «Отменить». */
-function useHide(): ((ids: string[], who: string) => void) | null {
+/** «Убрать с сайта» (inbox.hide, флаг inboxHide): только здесь — Telegram мамы не трогаем; 10 с на «Отменить».
+ *  Текст — что именно убрано: одно сообщение или вся переписка (приёмка-5, Н-4). */
+function useHide(): ((ids: string[], who: string, what: 'message' | 'chat') => void) | null {
   const store = useStore();
   const toast = useToast();
   const h = store.inboxHide;
   if (!h) return null;
-  return (ids, who) => {
+  return (ids, who, what) => {
     const rid = h.hide(ids);
-    toast({ text: `Убрано с сайта: ${who} — в Telegram всё осталось`, tone: 'info', timeout: HOLD_MS, action: { label: 'Отменить', run: () => {
+    const text = what === 'message' ? 'Сообщение убрано с сайта — в Telegram осталось' : `Переписка с ${who} убрана с сайта — в Telegram всё осталось`;
+    toast({ text, tone: 'info', timeout: HOLD_MS, action: { label: 'Отменить', run: () => {
       void store.undoHeld(rid).then((ok) => { if (!ok) toast({ text: 'Уже убрано — вернуть можно в течение суток, напишите Дмитрию', tone: 'info' }); });
     } } });
   };
@@ -187,13 +190,17 @@ function Bubble({ it, i }: { it: InboxItem; i: number }) {
         <span className="bubble__type"><Icon name={t.icon} size={14} />{t.label}</span>
         {voiceText(it) !== null
           ? <p className="bubble__voice"><Icon name="mic" size={18} /><span>{voiceText(it) || 'Голосовое — послушать в Telegram'}</span></p>
-          : <p className="bubble__text">{it.snippet}</p>}
+          : <p className="bubble__text">{keepNumbers(it.snippet)}</p>}
         {it.type === 'order' && it.amount ? <p className="bubble__order">Оплатить за клиента: <span className="num">{formatMoney(it.amount)}</span></p> : null}
         {it.file && <span className="bubble__file"><Icon name="attach" size={16} />файл приложен — открыть можно в Telegram</span>}
         {it.taxKopecks ? <p className="bubble__tax">В сообщении и налог: <span className="num">{formatMoney(it.taxKopecks)}</span></p> : null}
-        <time className="bubble__time num" dateTime={it.at}>{hhmm(it.at)}</time>
-        {hide && <button type="button" className="icon-btn bubble__hide" aria-label="Убрать сообщение с сайта" title="Убрать с сайта (в Telegram останется)"
-          onClick={() => hide([it.id], it.clientName)}><Icon name="eyeOff" size={16} /></button>}
+        {/* Низ пузыря: время; у решённого — «убрать» (у нерешённого кнопки нет: промах пальцем не должен убрать
+            неоплаченный платёж, приёмка-5 Н-3). На мыши «убрать» — снаружи пузыря, на телефоне — слева в этой строке. */}
+        <div className="bubble__foot">
+          {hide && it.status !== 'new' && <button type="button" className="icon-btn bubble__hide" aria-label="Убрать сообщение с сайта" title="Убрать с сайта (в Telegram останется)"
+            onClick={() => hide([it.id], it.clientName, 'message')}><Icon name="eyeOff" size={16} /></button>}
+          <time className="bubble__time num" dateTime={it.at}>{hhmm(it.at)}</time>
+        </div>
       </div>
       {it.status === 'new' && <InboxActions it={it} />}
     </li>
@@ -208,6 +215,13 @@ function Dialog({ chat, visible }: { chat: Thread; visible: boolean }) {
   // (находка «Пользователя» № 22). Телефона нет — просто Telegram.
   const tg = telegramLink(chat.clientId ? store.client(chat.clientId)?.phone : null);
   const feed = useRef<HTMLOListElement>(null);
+  // Вопрос «всё равно убрать?» — к этой переписке: открыли другую — вопроса нет (без сброса в эффекте)
+  const [askFor, setAskFor] = useState<string | null>(null);
+  const asking = askFor === chat.key;
+  const setAsking = (on: boolean) => setAskFor(on ? chat.key : null);
+  useLiftForToasts(feed);
+  // В переписке есть нерешённые — сначала вопрос (приёмка-5, Н-3); всё решено — убираем сразу, «Отменить» 10 с
+  const hideChat = () => { if (!hide) return; if (chat.open > 0) setAsking(true); else hide(chat.items.map((x) => x.id), chat.name, 'chat'); };
   // Открыт и виден — прочитан до последнего сообщения (счётчик в списке гаснет), как в Telegram.
   useEffect(() => { if (visible) markRead(chat.key, chat.last.at); }, [visible, chat.key, chat.last.at]);
   // Открыли чат — лента внизу, у последнего сообщения (как в Telegram), если у неё своя прокрутка.
@@ -241,8 +255,15 @@ function Dialog({ chat, visible }: { chat: Thread; visible: boolean }) {
           title={tg ? 'Откроет чат с клиентом в Telegram по телефону из карточки' : 'Телефона клиента нет в таблице — откроется Telegram'}>
           <Icon name="reply" size={16} /><span className="dialog__tg-text">{tg ? 'Ответить' : 'Открыть'}<span className="dialog__tg-more">{tg ? ' в Telegram' : ' Telegram'}</span></span></a>
         {hide && <button type="button" className="icon-btn dialog__hide" aria-label="Убрать переписку с сайта" title="Убрать переписку с сайта (в Telegram останется)"
-          onClick={() => hide(chat.items.map((x) => x.id), chat.name)}><Icon name="eyeOff" size={18} /></button>}
+          aria-expanded={asking} onClick={hideChat}><Icon name="eyeOff" size={18} /></button>}
       </header>
+      {asking && hide && (
+        <div className="dialog__ask" role="group" aria-label="Убрать переписку с сайта">
+          <p>В переписке {chat.open} {plural(chat.open, 'сообщение ждёт', 'сообщения ждут', 'сообщений ждут')} решения. Всё равно убрать с сайта? В Telegram ничего не изменится.</p>
+          <button type="button" className="btn btn--primary btn--sm" autoFocus onClick={() => { setAsking(false); hide(chat.items.map((x) => x.id), chat.name, 'chat'); }}>Всё равно убрать</button>
+          <button type="button" className="btn btn--ghost btn--sm" onClick={() => setAsking(false)}>Отмена</button>
+        </div>
+      )}
       <ol ref={feed} className="dfeed" key={chat.key}>
         {days.map((g) => (
           <li key={g.day} className="dfeed__group">
@@ -252,6 +273,8 @@ function Dialog({ chat, visible }: { chat: Thread; visible: boolean }) {
         ))}
         {/* Тихая отметка конца: видно, что ниже ничего нет (повторная приёмка 16.10, Г-7) */}
         <li className="dfeed__end" aria-hidden="true">Это последнее сообщение</li>
+        {/* Телефон: «убрать переписку» — словами здесь, а не вторым безымянным значком в шапке (приёмка-5, Н-7) */}
+        {hide && <li className="dfeed__hide"><button type="button" className="btn btn--ghost btn--sm" onClick={hideChat}><Icon name="eyeOff" size={16} />Убрать переписку с сайта</button></li>}
       </ol>
     </section>
   );
@@ -269,6 +292,28 @@ function useWide(): boolean {
     return () => m.removeEventListener('change', on);
   }, []);
   return wide;
+}
+
+/** Уведомление внизу окна поверх ленты (на ноутбуке справа) закрывало кнопки решения последнего сообщения
+ *  (приёмка-5, Н-5): пока оно видно, у ленты снизу запас на его высоту, и стоявшая внизу лента приподнимается. */
+function useLiftForToasts(feed: RefObject<HTMLElement | null>): void {
+  useEffect(() => {
+    const el = feed.current;
+    const layer = document.querySelector<HTMLElement>('body > .toasts');
+    if (!el || !layer || typeof ResizeObserver === 'undefined') return;
+    const lift = () => {
+      const f = el.getBoundingClientRect();
+      const t = layer.getBoundingClientRect();
+      const covers = t.height > 0 && t.left < f.right && t.right > f.left && t.top < f.bottom;
+      const need = covers ? Math.ceil(f.bottom - t.top) + 12 : 0;
+      const atEnd = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+      el.style.setProperty('--lift', `${need}px`);
+      if (atEnd && need) el.scrollTop = el.scrollHeight;
+    };
+    const ro = new ResizeObserver(lift);
+    ro.observe(layer);
+    return () => { ro.disconnect(); el.style.removeProperty('--lift'); };
+  }, [feed]);
 }
 
 /** Блок чатов — от своего верха до низа окна: плашки и шапка над ним бывают разной высоты, а кнопки последнего
@@ -351,12 +396,12 @@ export function Inbox() {
                     <Avatar name={c.name} {...(c.clientId ? { clientId: c.clientId } : {})} photo={clientPhoto(c.clientId ? store.client(c.clientId) : null)} />
                     <span className="chat__top"><strong className="chat__name">{c.clientId ? shortName(c.name) : c.name}</strong><span className="chat__time num">{listTime(c.last.at)}</span></span>
                     <span className="chat__bottom">
-                      <span className="chat__snippet">{c.last.file && <Icon name="attach" size={14} />}{voiceText(c.last) !== null ? <><Icon name="mic" size={14} />{voiceText(c.last) || 'Голосовое'}</> : c.last.snippet}</span>
+                      <span className="chat__snippet">{c.last.file && <Icon name="attach" size={14} />}{voiceText(c.last) !== null ? <><Icon name="mic" size={14} />{voiceText(c.last) || 'Голосовое'}</> : keepNumbers(c.last.snippet)}</span>
                       {c.open > 0 && <span className="chat__badge num" title="Ждут решения" aria-label={`ждут решения: ${c.open}`}>{c.open}</span>}
                     </span>
                   </a>
                   {hide && <button type="button" className="icon-btn chat__hide" aria-label={`Убрать переписку с сайта: ${c.name}`} title="Убрать с сайта (в Telegram останется)"
-                    onClick={() => hide(c.items.map((x) => x.id), c.name)}><Icon name="eyeOff" size={16} /></button>}
+                    onClick={() => hide(c.items.map((x) => x.id), c.name, 'chat')}><Icon name="eyeOff" size={16} /></button>}
                 </li>
               ))}
             </ul>

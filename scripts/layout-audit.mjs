@@ -257,6 +257,7 @@ const VIEWS = [
 const SCREENS = [
   { name: 'сегодня', hash: '#/today', root: '.page' },
   { name: 'входящие', hash: '#/inbox', root: '.page' },
+  { name: 'переписка', hash: '#/inbox', root: '.page', open: (p) => p.locator('.chats__list .chat').first().click() },
   { name: 'клиенты', hash: '#/clients', root: '.page' },
   { name: 'карточка', hash: '#/clients', root: 'dialog[open] .modal__box', open: (p) => p.locator('.ctable__row .ctable__open').first().click() },
   { name: 'КВЕД +N', hash: '#/clients', root: '.kv-pop', open: async (p) => {
@@ -455,20 +456,59 @@ function measure(rootSel) {
     if (extra > 1) { sideways++; sidewaysList.push(`${label(el)} — вбок на ${extra} px`); }
   }
 
+  // Касание (только телефон, окно уже 600 px; приёмка-5): место нажатия меньше 44 × 44 px и соседние места нажатия
+  // ближе 8 px друг к другу — промах пальцем. Ссылки внутри строки текста не считаются (у них место — строка).
+  let touch = 0;
+  const touchList = [];
+  if (window.innerWidth < 600) {
+    const TARGETS = 'button, a[href], input:not([type=hidden]), select, textarea, [role=button], [role=tab], summary';
+    const els = [...root.querySelectorAll(TARGETS)].filter((el) => {
+      if (!visible(el) || el.closest('[aria-hidden=true], .visually-hidden') || el.disabled) return false;
+      const cs = getComputedStyle(el);
+      if (cs.display === 'inline' && el.matches('a')) return false; // ссылка в тексте
+      if (el.matches('input[type=checkbox], input[type=radio]') && el.closest('label')) return false; // место — подпись
+      return cs.pointerEvents !== 'none';
+    });
+    // Растянутая зона нажатия (::after на всю строку, как имя в строке «Клиентов») — место нажатия = вся строка
+    const hitRect = (el) => {
+      const a = getComputedStyle(el, '::after');
+      if (a.content !== 'none' && a.position === 'absolute') { const host = el.offsetParent; if (host) return host.getBoundingClientRect(); }
+      return el.getBoundingClientRect();
+    };
+    const rects = els.map(hitRect);
+    els.forEach((el, i) => {
+      const r = rects[i];
+      if (r.width < 43.5 || r.height < 43.5) { touch++; touchList.push(`${label(el)} — ${Math.round(r.width)}×${Math.round(r.height)} px`); }
+    });
+    for (let i = 0; i < els.length; i++) for (let j = i + 1; j < els.length; j++) {
+      const a = rects[i], b = rects[j];
+      if (els[i].contains(els[j]) || els[j].contains(els[i])) continue;
+      // Две крупные строки списка вплотную (чаты, клиенты) — промаха нет: зазор считаем, если хоть одна цель мелкая
+      const big = (q) => q.height >= 48 && q.width >= 120;
+      if (big(a) && big(b)) continue;
+      const dx = Math.max(0, Math.max(a.left, b.left) - Math.min(a.right, b.right));
+      const dy = Math.max(0, Math.max(a.top, b.top) - Math.min(a.bottom, b.bottom));
+      const overlapX = a.left < b.right && b.left < a.right, overlapY = a.top < b.bottom && b.top < a.bottom;
+      const gap = overlapX ? dy : overlapY ? dx : Math.hypot(dx, dy);
+      if (gap < 8 && (overlapX || overlapY)) { touch++; touchList.push(`${label(els[i])} и ${label(els[j])} — зазор ${Math.round(gap)} px`); }
+    }
+  }
+
   // Блоки с прокруткой — пометить для проверки колесом снаружи
   const scrollers = [];
   for (const el of [root, ...root.querySelectorAll('*')]) {
     const cs = getComputedStyle(el);
     if (/(auto|scroll)/.test(cs.overflowY) && el.scrollHeight > el.clientHeight + 4 && visible(el)) { el.dataset.auditScroll = String(scrollers.length); scrollers.push(label(el)); }
   }
-  return { voids, voidList, uneven, unevenList: unevenList.slice(0, 12), labels, labelList: labelList.slice(0, 16), sideways, sidewaysList, scrollers };
+  return { voids, voidList, uneven, unevenList: unevenList.slice(0, 12), labels, labelList: labelList.slice(0, 16), sideways, sidewaysList, touch, touchList: touchList.slice(0, 40), scrollers };
 }
 
 const browser = await chromium.launch();
 const results = [];
 try {
   for (const v of VIEWS) {
-    const ctx = await browser.newContext({ viewport: { width: v.w, height: v.h } });
+    // 375 — телефон с касанием, как у «Пользователя» (hasTouch): включаются правила для пальца, а не наведения
+    const ctx = await browser.newContext({ viewport: { width: v.w, height: v.h }, ...(v.w < 600 ? { hasTouch: true, isMobile: true } : {}) });
     const page = await ctx.newPage();
     for (const s of SCREENS) {
       if (ONLY && !ONLY.includes(s.name)) continue;
@@ -499,7 +539,7 @@ try {
           if (top < 1) { wheel++; wheelList.push(`${m.scrollers[i]}${top < 0 ? ' — закрылся от прокрутки' : ''}`); }
         } catch { /* блок пропал до прокрутки — пропускаем */ }
       }
-      results.push({ screen: s.name, view: `${v.w} ${v.theme === 'light' ? 'свет' : 'тьма'}`, missing: Boolean(m.missing), voids: m.voids ?? 0, uneven: m.uneven ?? 0, wheel, labels: m.labels ?? 0, sideways: m.sideways ?? 0, details: { voids: m.voidList, uneven: m.unevenList, wheel: wheelList, labels: m.labelList, sideways: m.sidewaysList } });
+      results.push({ screen: s.name, view: `${v.w} ${v.theme === 'light' ? 'свет' : 'тьма'}`, missing: Boolean(m.missing), voids: m.voids ?? 0, uneven: m.uneven ?? 0, wheel, labels: m.labels ?? 0, sideways: m.sideways ?? 0, touch: m.touch ?? 0, details: { voids: m.voidList, uneven: m.unevenList, wheel: wheelList, labels: m.labelList, sideways: m.sidewaysList, touch: m.touchList } });
     }
     await ctx.close();
   }
@@ -508,9 +548,9 @@ try {
 }
 
 const pad = (s, n) => String(s).padEnd(n);
-console.log(`${pad('экран', 16)}${pad('вид', 12)}пустоты  высоты  колесо  подписи  вбок`);
-for (const r of results) console.log(`${pad(r.screen, 16)}${pad(r.view, 12)}${r.missing ? 'нет корня — окно не открылось' : `${pad(r.voids, 9)}${pad(r.uneven, 8)}${pad(r.wheel, 8)}${pad(r.labels, 9)}${r.sideways}`}`);
+console.log(`${pad('экран', 16)}${pad('вид', 12)}пустоты  высоты  колесо  подписи  вбок  касание`);
+for (const r of results) console.log(`${pad(r.screen, 16)}${pad(r.view, 12)}${r.missing ? 'нет корня — окно не открылось' : `${pad(r.voids, 9)}${pad(r.uneven, 8)}${pad(r.wheel, 8)}${pad(r.labels, 9)}${pad(r.sideways, 6)}${r.touch}`}`);
 const sum = (k) => results.reduce((a, r) => a + (r[k] || 0), 0);
-console.log(`\nИтого: пустоты ${sum('voids')} · высоты ${sum('uneven')} · колесо ${sum('wheel')} · подписи ${sum('labels')} · вбок ${sum('sideways')} · не открылось ${results.filter((r) => r.missing).length}`);
+console.log(`\nИтого: пустоты ${sum('voids')} · высоты ${sum('uneven')} · колесо ${sum('wheel')} · подписи ${sum('labels')} · вбок ${sum('sideways')} · касание (375) ${sum('touch')} · не открылось ${results.filter((r) => r.missing).length}`);
 if (JSON_OUT) writeFileSync(JSON_OUT, JSON.stringify(results, null, 1));
 if (STRICT && sum('voids') + sum('uneven') + sum('wheel') + sum('labels') + sum('sideways') + results.filter((r) => r.missing).length > 0) process.exit(1);

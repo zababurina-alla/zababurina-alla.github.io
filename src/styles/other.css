@@ -885,6 +885,11 @@
   min-width: 0;
 }
 
+/* Открыт вопрос «всё равно убрать?» — он своей строкой между шапкой и лентой, лента по-прежнему тянется */
+.dialog:has(> .dialog__ask) {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
 .dialog__head {
   display: flex;
   align-items: center;
@@ -921,6 +926,7 @@
   list-style: none;
   margin: 0;
   padding: var(--space-4);
+  padding-bottom: calc(var(--space-4) + var(--lift, 0px)); /* запас под уведомление внизу окна (Н-5) */
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -1429,16 +1435,13 @@
 }
 
 @media (max-width: 479px) {
+  /* «↰ Ответить» — со словом: один подписанный значок в шапке вместо двух безымянных (приёмка-5, Н-7) */
   .dialog__tg {
-    width: 2.5rem;
-    padding: 0;
-    justify-content: center;
-    font-size: 0;
+    padding: 0 var(--space-3);
   }
 
-  .dialog__tg > .icon {
-    width: 20px;
-    height: 20px;
+  .dialog__tg-more {
+    display: none;
   }
 }
 
@@ -1873,17 +1876,98 @@
 }
 
 /* Палец: у сообщения — в нижнем левом углу пузыря (справа — время); в списке чатов — нет */
+/* Низ пузыря на мыши — как раньше: время справа, «убрать» снаружи пузыря */
+.bubble__foot {
+  display: contents;
+}
+
+/* Палец: «убрать» — в нижней строке пузыря слева, касание 44 × 44 (приёмка-5, Н-6: было 28 × 28 в 8 px от кнопок
+   решения). У нерешённых сообщений кнопки нет — под решёнными кнопок решения тоже нет. */
 @media (hover: none), (pointer: coarse) {
+  .bubble__foot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    margin: -6px -6px -4px;
+  }
+
   .bubble__hide {
-    top: auto;
-    bottom: 0;
-    left: var(--space-1);
-    width: 1.75rem;
-    height: 1.75rem;
-    opacity: 0.7;
+    position: static;
+    width: 2.75rem;
+    height: 2.75rem;
+    margin-right: auto;
+  }
+
+  .bubble__foot > .bubble__time {
+    margin: 0 var(--space-1) 0 0;
   }
 
   .chat__hide {
+    display: none;
+  }
+
+  /* Касание 44 px во «Входящих»: кнопки решения, «Ответить», имя в шапке (приёмка-5: были 40 и 43 px) */
+  .chats .btn,
+  .chats .dialog__name {
+    min-height: var(--tap);
+  }
+}
+
+/* Шапка переписки с нерешёнными: вопрос плашкой в стиле окон, между шапкой и лентой (приёмка-5, Н-3) */
+.dialog__ask {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin: var(--space-3) var(--space-4) 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--edge), 0 0 0 1px var(--line), var(--shadow-2);
+}
+
+.dialog__ask > p {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: var(--text-md);
+}
+
+.dialog__ask > .btn {
+  flex: 1 1 auto;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dialog__ask {
+    animation: warn-in var(--dur-pop) var(--spring-pop);
+  }
+}
+
+/* «Убрать переписку с сайта» словами в конце ленты — только на телефоне (в шапке там один «Ответить») */
+.dfeed__hide {
+  display: none;
+}
+
+@media (max-width: 479px) {
+  .dialog__head > .dialog__hide {
+    display: none;
+  }
+
+  .dfeed__hide {
+    display: flex;
+    justify-content: center;
+    margin-bottom: var(--space-2);
+  }
+
+  .dfeed__hide > .btn {
+    min-height: var(--tap);
+    color: var(--ink-2);
+  }
+}
+
+/* Открыта переписка на телефоне — круглого «+» нет: он закрывал время сообщений у правого края (приёмка-5, Н-8);
+   записать платёж по сообщению — кнопками решения под ним */
+@media (max-width: 899px) {
+  .shell:has(.chats.has-open) .fab {
     display: none;
   }
 }
@@ -1940,5 +2024,12 @@
   .page__head > .inbox__clear {
     flex: 1 1 100%;
     max-width: none;
+  }
+
+  /* Касание 44 px: «Очистить прочитанное» и кнопки вопроса (приёмка-5) */
+  .page__head > button.inbox__clear,
+  .inbox__clear[role='group'] > .btn,
+  .dialog__ask > .btn {
+    min-height: var(--tap);
   }
 }
