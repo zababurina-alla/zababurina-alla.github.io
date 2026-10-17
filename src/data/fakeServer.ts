@@ -48,6 +48,8 @@ class FakeServer implements CabinetApi {
   private activity: Activity[] = ACTIVITY.map((a) => ({ ...a }));
   private tasks = new Map<string, Task>(TASKS.map((t) => [t.id, { ...t }]));
   private inbox = new Map<string, InboxItem>(INBOX.map((i) => [i.id, { ...i }]));
+  /** Скрытые на сайте сообщения «Входящих»: id → когда скрыто (вернуть можно 24 ч). */
+  private hidden = new Map<string, number>();
   private consultations = new Map<string, Consultation>(CONSULTATIONS.map((k) => [k.id, { ...k }]));
   private questions = new Map<string, Question>(QUESTIONS.map((q) => [q.id, { ...q, options: [...q.options] }]));
   private log: Change[] = [];
@@ -88,7 +90,7 @@ class FakeServer implements CabinetApi {
       activity: this.activity.map((a) => ({ ...a })),
       tasks: [...this.tasks.values()].map((t) => ({ ...t })),
       questions: [...this.questions.values()].filter((q) => q.answer === null).map((q) => ({ ...q, options: [...q.options] })),
-      inbox: [...this.inbox.values()].map((i) => ({ ...i })),
+      inbox: [...this.inbox.values()].filter((i) => !this.hidden.has(i.id)).map((i) => ({ ...i })),
       consultations: [...this.consultations.values()].map((k) => ({ ...k })),
       cursor: this.cursor,
     };
@@ -241,6 +243,27 @@ class FakeServer implements CabinetApi {
         const rec: Consultation = { ...k, id: o, version: 1, at: now() };
         this.consultations.set(rec.id, rec);
         return { ok: true, changes: [this.record('consultation', 'upsert', rec.id, o, rec)], cursor: this.cursor };
+      }
+      case 'hideInbox': {
+        const changes: Change[] = [];
+        for (const id of op.ids) {
+          if (!this.inbox.has(id)) continue;
+          if (!this.hidden.has(id)) this.hidden.set(id, Date.now());
+          changes.push(this.record('inbox', 'delete', id, o));
+        }
+        return { ok: true, changes, cursor: this.cursor, failed: [] };
+      }
+      case 'unhideInbox': {
+        const changes: Change[] = [];
+        const failed: NonNullable<Extract<WriteResult, { ok: true }>['failed']> = [];
+        for (const id of op.ids) {
+          const at = this.hidden.get(id);
+          const it = this.inbox.get(id);
+          if (at === undefined || !it || Date.now() - at > 24 * 3600_000) { failed.push({ id, code: 'VALIDATION', message: 'Вернуть можно в течение суток' }); continue; }
+          this.hidden.delete(id);
+          changes.push(this.record('inbox', 'upsert', id, o, { ...it }));
+        }
+        return { ok: true, changes, cursor: this.cursor, failed };
       }
       case 'decideInbox': {
         // Как будет на сервере (inbox.decide): принять платёж — запись в «💰 Платежи»; задача — в «🧩 Задачи».
@@ -437,6 +460,14 @@ class FakeServer implements CabinetApi {
     const res: ApplyTemplateResult = { ok: true, template: t, added, skipped };
     this.applied.set(requestId, res);
     return res;
+  }
+
+  async inboxHideAll(): Promise<{ hidden: number; ids: string[]; more: boolean }> {
+    await wait(READ_MS * 2);
+    if (!this.online) throw new Error('NETWORK');
+    const ids = [...this.inbox.values()].filter((i) => i.status !== 'new' && !this.hidden.has(i.id)).map((i) => i.id);
+    for (const id of ids) { this.hidden.set(id, Date.now()); this.record('inbox', 'delete', id, 'hideAll'); }
+    return { hidden: ids.length, ids, more: false };
   }
 
   async clientBotLink(clientId: string): Promise<BotLinkResult> {

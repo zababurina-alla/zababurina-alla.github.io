@@ -131,6 +131,8 @@ interface Store {
   /** Архив сроков клиента (флаг archive) и «Требуют внимания» (флаг attention) — чтение; null — сервер ещё не умеет. */
   archive: CabinetApi['listArchive'] | null;
   attention: CabinetApi['attention'] | null;
+  /** «Удалить» и «Очистить прочитанное» во «Входящих» — только на сайте (флаг inboxHide); null — выключено. */
+  inboxHide: { hide: (ids: string[]) => string; clearRead: () => Promise<{ hidden: number; undo: () => void }> } | null;
   /** «Ссылка для бота» (clients.botLink). null — нет флага botLink. */
   botLink: ((clientId: string) => Promise<BotLinkResult>) | null;
   /** «Не писать клиенту» после закрытия срока: срок остаётся закрытым. null — на этом сервере ещё нельзя
@@ -167,7 +169,9 @@ interface Store {
 
 const Ctx = createContext<Store | null>(null);
 
-const AREA_OF: Record<WriteOp['kind'], WriteArea> = {
+// null — запись не по разделу writes, а за своим флагом (скрытие «Входящих» только на сайте — inboxHide).
+const AREA_OF: Record<WriteOp['kind'], WriteArea | null> = {
+  hideInbox: null, unhideInbox: null,
   createConsultation: 'consultations',
   closeDeadline: 'deadlines', closeDeadlines: 'deadlines', updateTask: 'tasks', deleteTask: 'tasks', reopenDeadline: 'deadlines', addPayment: 'payments', cancelPayment: 'payments',
   updateDeadline: 'deadlines', addClient: 'clients', updateClient: 'clients', createTask: 'tasks', completeTask: 'tasks', completeTasks: 'tasks', updateDeadlines: 'deadlines', answerQuestion: 'questions', decideInbox: 'inbox',
@@ -214,11 +218,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // «Вернуть срок» зовут из уведомления, созданного в момент закрытия: его store видел список «закрыто» ДО этого срока.
   // Поэтому reopenDeadline читает текущий список отсюда, а не из замыкания (находка «Пользователя» № 19).
   const closedRef = useRef<ClosedEntry[]>([]);
+  /** Скрытые с сайта сообщения «Входящих» по requestId — для «Отменить» и для возврата при отказе. */
+  const hiddenBefore = useRef(new Map<string, InboxItem[]>());
   const deadlinesRef = useRef<DatedDeadline[]>([]);
+  const inboxRef = useRef<InboxItem[]>([]);
   /** Записи, показ которых на экране отложен на время анимации: requestId → «показать сейчас». */
   const delayed = useRef(new Map<string, () => void>());
   useEffect(() => { closedRef.current = closed; }, [closed]);
   useEffect(() => { deadlinesRef.current = deadlines; }, [deadlines]);
+  useEffect(() => { inboxRef.current = inbox; }, [inbox]);
   const [fresh, setFresh] = useState<string[]>([]);
   const [pending, setPending] = useState<OutboxItem[]>([]);
   const [counters, setCounters] = useState<Counters>({ entered: 0, sent: 0, accepted: 0, rejected: 0, applied: 0, seenInTable: 0 });
@@ -372,6 +380,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const status = op.action === 'accept' ? 'accepted' : op.action === 'task' ? 'task' : 'rejected';
         setInbox((xs) => xs.map((x) => (x.id === op.id ? { ...x, status } : x)));
       }
+    } else if (op.kind === 'hideInbox') {
+      setInbox((xs) => {
+        hiddenBefore.current.set(op.requestId, xs.filter((x) => op.ids.includes(x.id)));
+        return xs.filter((x) => !op.ids.includes(x.id));
+      });
+    } else if (op.kind === 'unhideInbox') {
+      // Вернуть то, что было на экране до «Очистить прочитанное» (ответ сервера заменит свежими строками).
+      const back = hiddenBefore.current.get(op.requestId) ?? [];
+      setInbox((xs) => back.reduce((acc, it) => upsert(acc, it), xs));
     } else if (op.kind === 'answerQuestion') {
       setQuestions((xs) => {
         const q = xs.find((x) => x.id === op.id);
@@ -453,6 +470,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // Задачу таблица не приняла окончательно (VALIDATION: «Выберите клиента», клиента нет) — убрать её с экрана, иначе
       // она стоит в списке как записанная при «Всё сохранено» (вечерняя проверка 15.10, тестовый клиент удалён).
       if (op.kind === 'createTask' && final) setTasks((xs) => xs.filter((t) => t.id !== op.task.id));
+      // Не скрылось — сообщения возвращаются на экран; не вернулось — остаются скрытыми (их уже нет на экране).
+      if (op.kind === 'hideInbox' && final) {
+        const back = hiddenBefore.current.get(op.requestId) ?? [];
+        setInbox((xs) => back.reduce((acc, it) => upsert(acc, it), xs));
+        hiddenBefore.current.delete(op.requestId);
+      }
+      if (op.kind === 'unhideInbox' && final) setInbox((xs) => xs.filter((x) => !op.ids.includes(x.id)));
       if (op.kind === 'createConsultation' && final) setConsultations((xs) => xs.filter((k) => k.id !== op.consultation.id));
       // «Сделано» не принято — галочка возвращается.
       if (op.kind === 'completeTask' && final) setTasks((xs) => xs.map((t) => (t.id === op.id ? { ...t, done: !op.done } : t)));
@@ -575,7 +599,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const send = useCallback((op: WriteOp, label: string, onApplied?: (changes: Change[], result: Applied) => void, showAfterMs = 0, holdMs = 0) => {
     // Раздел ещё только для просмотра (config.json → writes): в таблицу не пишем, говорим, где сделать.
     const area = AREA_OF[op.kind];
-    if (!canWrite(area)) {
+    if (area && !canWrite(area)) {
       setNotices((ns) => [...ns, { id: op.requestId, text: roMessage(area), info: true, key: `ro-${area}` }]);
       return;
     }
@@ -909,6 +933,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return requestId;
   }, [send]);
 
+  /** «Удалить» во «Входящих» (только на сайте, Telegram мамы не трогаем): 10 с на «Отменить», потом inbox.hide.
+   *  null — нет флага inboxHide. Возвращает requestId для undoHeld. */
+  const hideInboxNow = useCallback((ids: string[]) => {
+    const requestId = newRequestId();
+    send({ kind: 'hideInbox', requestId, ids: ids.slice(0, 20) }, `Убрать с сайта: ${ids.length}`, () => hiddenBefore.current.delete(requestId), 0, HOLD_MS);
+    return requestId;
+  }, [send]);
+
+  /** «Очистить прочитанное»: все решённые — inbox.hideAll (повторяет, пока more). Возвращает, сколько убрано, и функцию
+   *  «Отменить» (inbox.unhide по 20). Мимо очереди: без ответа сервера не знаем, что именно убрано. */
+  const clearReadNow = useCallback(async (): Promise<{ hidden: number; undo: () => void }> => {
+    const before = inboxRef.current;
+    const ids: string[] = [];
+    for (let i = 0; i < 20; i++) {
+      const r = await api.inboxHideAll();
+      ids.push(...r.ids);
+      if (!r.more) break;
+    }
+    const gone = before.filter((x) => ids.includes(x.id));
+    setInbox((xs) => xs.filter((x) => !ids.includes(x.id)));
+    const undo = () => {
+      for (let i = 0; i < ids.length; i += 20) {
+        const part = ids.slice(i, i + 20);
+        const requestId = newRequestId();
+        hiddenBefore.current.set(requestId, gone.filter((x) => part.includes(x.id)));
+        send({ kind: 'unhideInbox', requestId, ids: part }, `Вернуть во «Входящие»: ${part.length}`, () => hiddenBefore.current.delete(requestId));
+      }
+    };
+    return { hidden: ids.length, undo };
+  }, [send]);
+  const inboxHide = useMemo(() => (hasFeature('inboxHide') ? { hide: hideInboxNow, clearRead: clearReadNow } : null), [hideInboxNow, clearReadNow]);
+
   const undoHeld = useCallback(async (requestId: string) => {
     const ob = outboxRef.current;
     const op = ob?.list().find((i) => i.op.requestId === requestId)?.op;
@@ -916,6 +972,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     mine.current.delete(requestId);
     callbacks.current.delete(requestId);
     if (op.kind === 'decideInbox') setInbox((xs) => xs.map((x) => (x.id === op.id ? { ...x, status: 'new' } : x)));
+    if (op.kind === 'hideInbox') {
+      const back = hiddenBefore.current.get(requestId) ?? [];
+      setInbox((xs) => back.reduce((acc, it) => upsert(acc, it), xs));
+      hiddenBefore.current.delete(requestId);
+    }
     if (op.kind === 'answerQuestion') {
       const q = answering.current.get(requestId);
       if (q) setQuestions((xs) => upsert(xs, q));
@@ -932,10 +993,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<Store>(() => ({
     loaded, online, syncedAt, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, consultations, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateKved, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, updateDeadlines, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention, month,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateKved, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, updateDeadlines, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention, month, inboxHide,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance,
   }), [loaded, online, syncedAt, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, consultations, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateKved, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, updateDeadlines, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention, month,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateKved, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, updateDeadlines, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention, month, inboxHide,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

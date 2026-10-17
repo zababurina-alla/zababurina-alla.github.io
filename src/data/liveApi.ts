@@ -320,6 +320,27 @@ export class LiveApi implements CabinetApi {
           const env = await this.rpc<{ deadline: Deadline }>('deadlines.update', { id: op.id, baseVersion: op.baseVersion, patch: op.patch }, o);
           return { ok: true, changes: [up('deadline', env.data.deadline, env.cursor)], cursor: env.cursor };
         }
+        case 'hideInbox':
+        case 'unhideInbox': {
+          // results[] по каждому: скрыто — для сайта удаление; возвращено — сообщение снова (upsert). Уже скрытое и
+          // несуществующее при скрытии — для сайта всё равно «нет» (удаление); не вернулось (прошло 24 ч) — в failed.
+          const hide = op.kind === 'hideInbox';
+          const env = await this.rpc<{ results?: unknown[] }>(hide ? 'inbox.hide' : 'inbox.unhide', { ids: op.ids }, o);
+          const changes: Change[] = [];
+          const failed: NonNullable<Extract<WriteResult, { ok: true }>['failed']> = [];
+          for (const raw of env.data.results ?? []) {
+            const r = (raw ?? {}) as { id?: unknown; ok?: unknown; inbox?: unknown; error?: { code?: unknown; message?: unknown } };
+            const id = text(r.id);
+            if (!id) continue;
+            if (hide) { changes.push({ cursor: env.cursor, entity: 'inbox', op: 'delete', id, origin: o }); continue; }
+            if (r.ok === true && r.inbox) changes.push(up('inbox', r.inbox as { id: string }, env.cursor));
+            else {
+              const code = String(r.error?.code ?? '');
+              failed.push({ id, code: SITE_CODES.has(code) ? code as ErrorCode : 'SERVER', message: String(r.error?.message ?? 'Не вернулось') });
+            }
+          }
+          return { ok: true, changes, cursor: env.cursor, failed };
+        }
         case 'decideInbox': {
           // Ответ сервера — само сообщение и то, что из него получилось (платёж или задача); остальное — опросом.
           const payload: Record<string, unknown> = { id: op.id, action: op.action };
@@ -429,6 +450,12 @@ export class LiveApi implements CabinetApi {
     } catch (e) {
       return this.refusal(e);
     }
+  }
+
+  async inboxHideAll(): Promise<{ hidden: number; ids: string[]; more: boolean }> {
+    const env = await this.rpc<{ hidden?: unknown; ids?: unknown[]; more?: unknown }>('inbox.hideAll', {}, undefined, 2);
+    const ids = (env.data.ids ?? []).map(text).filter(Boolean);
+    return { hidden: num(env.data.hidden) ?? ids.length, ids, more: env.data.more === true };
   }
 
   async clientBotLink(clientId: string): Promise<BotLinkResult> {

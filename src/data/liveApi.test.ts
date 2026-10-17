@@ -521,6 +521,23 @@ describe('живой адаптер: чтение', () => {
     expect((await api.changesSince(1)).changes.map((c) => [c.id, c.op, c.record])).toEqual([['Q-T', 'delete', undefined]]);
   });
 
+  it('«Входящие» v5.91: inbox.hide — удаление для сайта (и уже скрытое); unhide — сообщение обратно, просроченное — в failed; hideAll — ids и more', async () => {
+    const it0 = { id: 'I-2', version: 3, at: '2026-10-16T09:00', clientId: 'C-1', clientName: 'К', type: 'question', snippet: 'а', amount: null, status: 'accepted' };
+    const s = server(
+      ok({ results: [{ id: 'I-1', ok: true }, { id: 'I-9', ok: false, error: { code: 'NOT_FOUND', message: 'нет' } }], hidden: 1, failed: 1 }, 40),
+      ok({ results: [{ id: 'I-2', ok: true, inbox: it0 }, { id: 'I-3', ok: false, error: { code: 'VALIDATION', message: 'Прошли сутки' } }], restored: 1, failed: 1 }, 41),
+      ok({ hidden: 2, ids: ['I-4', 'I-5'], more: true }),
+    );
+    const api = new LiveApi(URL_, auth(), s.fetchImpl);
+    const h = await api.write({ kind: 'hideInbox', requestId: 'R1', ids: ['I-1', 'I-9'] });
+    expect(s.sent[0]).toMatchObject({ action: 'inbox.hide', requestId: 'R1', payload: { ids: ['I-1', 'I-9'] } });
+    expect(h.ok && h.changes.map((c) => [c.id, c.op])).toEqual([['I-1', 'delete'], ['I-9', 'delete']]);
+    const u = await api.write({ kind: 'unhideInbox', requestId: 'R2', ids: ['I-2', 'I-3'] });
+    expect(u.ok && [u.changes.map((c) => [c.id, c.op]), u.failed?.map((f) => [f.id, f.code])]).toEqual([[['I-2', 'upsert']], [['I-3', 'VALIDATION']]]);
+    expect(await api.inboxHideAll()).toEqual({ hidden: 2, ids: ['I-4', 'I-5'], more: true });
+    expect(s.sent[2]).toMatchObject({ action: 'inbox.hideAll', payload: {} });
+  });
+
   it('tasks.completeMany: сделанные — изменения, не отметившиеся — в failed', async () => {
     const t = { id: 'T-1', version: 2, clientId: null, text: 'а', due: null, type: 'docs', priority: 'medium', done: true };
     const s = server(ok({ results: [{ id: 'T-1', ok: true, task: t }, { id: 'T-2', ok: false, error: { code: 'NOT_FOUND', message: 'Задачи уже нет' }, current: null }], updated: 1, failed: 1 }, 30));

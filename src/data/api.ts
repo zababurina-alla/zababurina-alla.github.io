@@ -57,7 +57,10 @@ export type WriteOp =
   | { kind: 'completeTasks'; requestId: string; ids: string[]; done: boolean }
   | { kind: 'answerQuestion'; requestId: string; id: string; text: string }
   /** inbox.decide: принять (платёж — записать с суммой), сделать задачей, отклонить. */
-  | { kind: 'decideInbox'; requestId: string; id: string; action: InboxAction; amount?: number };
+  | { kind: 'decideInbox'; requestId: string; id: string; action: InboxAction; amount?: number }
+  /** inbox.hide / inbox.unhide (v5.91): убрать сообщения только на сайте (Telegram мамы не трогаем) и вернуть (24 ч). До 20. */
+  | { kind: 'hideInbox'; requestId: string; ids: string[] }
+  | { kind: 'unhideInbox'; requestId: string; ids: string[] };
 
 export type ErrorCode = 'NETWORK' | 'CONFLICT' | 'PERIOD_OPEN' | 'NOT_FOUND' | 'SERVER' | 'VALIDATION' | 'UNDO_TOO_LATE'
   | 'DUPLICATE' | 'BUSY' | 'MAINTENANCE' | 'QUOTA' | 'RATE_LIMIT' | 'AUTH_EXPIRED' | 'AUTH_REQUIRED' | 'FORBIDDEN';
@@ -175,6 +178,8 @@ export interface CabinetApi {
   applyTemplate(clientId: string, template: DeadlineTemplate | undefined, requestId: string): Promise<ApplyTemplateResult>;
   /** Без requestId (токен — ключ входа, в листы не пишется). Ошибки — ApiError. */
   clientBotLink(clientId: string): Promise<BotLinkResult>;
+  /** inbox.hideAll: убрать все решённые (≤ 500 за раз, more — ещё). Мимо очереди: ответ (ids) нужен для «Отменить». */
+  inboxHideAll(): Promise<{ hidden: number; ids: string[]; more: boolean }>;
   /** Чтение, по кнопке «Показать архив» — не на каждый показ карточки. */
   listArchive(clientId: string, offset?: number, limit?: number): Promise<ArchivePage>;
   /** Чтение трёх листов — не чаще раза в несколько минут. */

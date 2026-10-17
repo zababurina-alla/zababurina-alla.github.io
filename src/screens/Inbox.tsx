@@ -164,7 +164,22 @@ function voiceText(it: InboxItem): string | null {
   return t === '…' || t === '...' ? '' : t;
 }
 
+/** «Убрать с сайта» (inbox.hide, флаг inboxHide): только здесь — Telegram мамы не трогаем; 10 с на «Отменить». */
+function useHide(): ((ids: string[], who: string) => void) | null {
+  const store = useStore();
+  const toast = useToast();
+  const h = store.inboxHide;
+  if (!h) return null;
+  return (ids, who) => {
+    const rid = h.hide(ids);
+    toast({ text: `Убрано с сайта: ${who} — в Telegram всё осталось`, tone: 'info', timeout: HOLD_MS, action: { label: 'Отменить', run: () => {
+      void store.undoHeld(rid).then((ok) => { if (!ok) toast({ text: 'Уже убрано — вернуть можно в течение суток, напишите Дмитрию', tone: 'info' }); });
+    } } });
+  };
+}
+
 function Bubble({ it, i }: { it: InboxItem; i: number }) {
+  const hide = useHide();
   const t = INBOX_TYPE[it.type];
   return (
     <li className={`bubble${it.status === 'new' ? ' is-new' : ''}`} style={{ '--i': i } as CSSProperties}>
@@ -177,6 +192,8 @@ function Bubble({ it, i }: { it: InboxItem; i: number }) {
         {it.file && <span className="bubble__file"><Icon name="attach" size={16} />файл приложен — открыть можно в Telegram</span>}
         {it.taxKopecks ? <p className="bubble__tax">В сообщении и налог: <span className="num">{formatMoney(it.taxKopecks)}</span></p> : null}
         <time className="bubble__time num" dateTime={it.at}>{hhmm(it.at)}</time>
+        {hide && <button type="button" className="icon-btn bubble__hide" aria-label="Убрать сообщение с сайта" title="Убрать с сайта (в Telegram останется)"
+          onClick={() => hide([it.id], it.clientName)}><Icon name="archive" size={14} /></button>}
       </div>
       {it.status === 'new' && <InboxActions it={it} />}
     </li>
@@ -186,6 +203,7 @@ function Bubble({ it, i }: { it: InboxItem; i: number }) {
 function Dialog({ chat, visible }: { chat: Thread; visible: boolean }) {
   const ui = useUi();
   const store = useStore();
+  const hide = useHide();
   // Ответить клиенту с сайта нельзя, пока сервер не дал inbox.reply — открываем его чат в Telegram по телефону из карточки
   // (находка «Пользователя» № 22). Телефона нет — просто Telegram.
   const tg = telegramLink(chat.clientId ? store.client(chat.clientId)?.phone : null);
@@ -222,6 +240,8 @@ function Dialog({ chat, visible }: { chat: Thread; visible: boolean }) {
           aria-label={tg ? 'Ответить в Telegram' : 'Открыть Telegram'}
           title={tg ? 'Откроет чат с клиентом в Telegram по телефону из карточки' : 'Телефона клиента нет в таблице — откроется Telegram'}>
           <Icon name="reply" size={16} /><span className="dialog__tg-text">{tg ? 'Ответить' : 'Открыть'}<span className="dialog__tg-more">{tg ? ' в Telegram' : ' Telegram'}</span></span></a>
+        {hide && <button type="button" className="icon-btn dialog__hide" aria-label="Убрать переписку с сайта" title="Убрать переписку с сайта (в Telegram останется)"
+          onClick={() => hide(chat.items.map((x) => x.id), chat.name)}><Icon name="archive" size={18} /></button>}
       </header>
       <ol ref={feed} className="dfeed" key={chat.key}>
         {days.map((g) => (
@@ -264,8 +284,41 @@ function useFitToWindow(ref: RefObject<HTMLElement | null>, on: boolean): void {
   }, [ref, on]);
 }
 
+/** «Очистить прочитанное»: убрать с сайта все решённые (inbox.hideAll). С подтверждением — их бывает много; после —
+ *  «Отменить» (inbox.unhide, сутки). Telegram мамы не трогаем. */
+function ClearRead() {
+  const store = useStore();
+  const toast = useToast();
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const h = store.inboxHide;
+  const done = store.inbox.filter((x) => x.status !== 'new').length;
+  if (!h || !done) return null;
+  async function run() {
+    if (!h) return;
+    setBusy(true);
+    try {
+      const r = await h.clearRead();
+      toast({ text: r.hidden ? `Убрано с сайта решённых: ${r.hidden} — в Telegram всё осталось` : 'Убирать нечего — решённых нет', tone: 'info', timeout: HOLD_MS,
+        ...(r.hidden ? { action: { label: 'Отменить', run: r.undo } } : {}) });
+    } catch (e) {
+      toast({ text: `Не получилось: ${e instanceof Error && e.name === 'ApiError' ? e.message : 'таблица не ответила'}`, tone: 'error' });
+    } finally {
+      setBusy(false); setAsking(false);
+    }
+  }
+  return asking ? (
+    <div className="inbox__clear" role="group" aria-label="Очистить прочитанное">
+      <span className="sub">Убрать с сайта решённые ({done})? В Telegram ничего не изменится.</span>
+      <button type="button" className="btn btn--primary btn--sm" disabled={busy} onClick={() => { void run(); }}>{busy ? 'Убираю…' : 'Убрать'}</button>
+      <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={() => setAsking(false)}>Отмена</button>
+    </div>
+  ) : <button type="button" className="btn btn--ghost btn--sm inbox__clear" onClick={() => setAsking(true)}><Icon name="archive" size={16} />Очистить прочитанное</button>;
+}
+
 export function Inbox() {
   const store = useStore();
+  const hide = useHide();
   const chatsRef = useRef<HTMLDivElement>(null);
   const route = useRoute();
   const readAt = useReadAt();
@@ -286,6 +339,7 @@ export function Inbox() {
           <h1 className="page__title">Входящие <em>{fresh ? `ждут решения: ${fresh}` : 'всё решено'}</em></h1>
           <p className="page__sub">Сообщения клиентов из Telegram. Решите здесь — в таблице появится само; решили в Telegram — здесь отметится.</p>
         </div>
+        <ClearRead />
       </header>
       {chats.length ? (
         <div ref={chatsRef} className={`panel chats${open ? ' has-open' : ''}`}>
@@ -301,6 +355,8 @@ export function Inbox() {
                       {c.open > 0 && <span className="chat__badge num" title="Ждут решения" aria-label={`ждут решения: ${c.open}`}>{c.open}</span>}
                     </span>
                   </a>
+                  {hide && <button type="button" className="icon-btn chat__hide" aria-label={`Убрать переписку с сайта: ${c.name}`} title="Убрать с сайта (в Telegram останется)"
+                    onClick={() => hide(c.items.map((x) => x.id), c.name)}><Icon name="archive" size={16} /></button>}
                 </li>
               ))}
             </ul>
