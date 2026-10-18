@@ -7,7 +7,7 @@
   display: grid;
   gap: var(--space-3);
   padding: var(--space-6) var(--space-6) var(--space-5);
-  border-radius: var(--radius-2xl);
+  border-radius: var(--radius-xl);
   background: var(--surface);
   box-shadow: inset 0 1px 0 var(--edge), 0 0 0 1px var(--line), var(--shadow-1);
   overflow: hidden;
@@ -32,9 +32,9 @@
 .hero__title {
   font-family: var(--display);
   font-size: var(--text-hero);
-  font-weight: var(--weight-bold);
-  line-height: 1.04;
-  letter-spacing: -0.03em;
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.02em;
   text-wrap: balance;
 }
 
@@ -49,8 +49,8 @@
 .hero__lede {
   max-width: 60ch;
   color: var(--ink-2);
-  font-size: 1.1875rem;
-  line-height: 1.45;
+  font-size: var(--text-lg);
+  line-height: var(--leading-body);
   text-wrap: pretty;
 }
 
@@ -73,12 +73,12 @@
   isolation: isolate;
   display: grid;
   align-content: start;
-  gap: 2px;
+  gap: var(--space-1);
   min-height: 7.25rem;
   padding: var(--space-4);
   border: 0;
   border-radius: var(--radius-xl);
-  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--ink);
   text-align: left;
@@ -214,7 +214,7 @@
 
 .question__text {
   font-size: var(--text-md);
-  line-height: 1.45;
+  line-height: var(--leading-body);
 }
 
 /* Ответ на вопрос: варианты кнопками в строку (переносятся), текст — поле и «Ответить». */
@@ -295,7 +295,7 @@
 
 .money-card__sum {
   font-size: var(--text-3xl);
-  line-height: 1.1;
+  line-height: var(--leading-tight);
 }
 
 .money-card .sub {
@@ -354,7 +354,7 @@
   position: absolute;
   width: 10px;
   height: 10px;
-  margin: -5px 0 0 -5px;
+  translate: -50% -50%;
   border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 0 0 3px var(--surface);
@@ -367,7 +367,7 @@
   translate: -50% 0;
   display: grid;
   padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--toast);
   color: var(--on-toast);
   font-size: var(--text-sm);
@@ -406,7 +406,7 @@
 .feed__text {
   display: grid;
   font-size: var(--text-md);
-  line-height: 1.4;
+  line-height: var(--leading-snug);
 }
 
 /* «Ещё N» — лента показывает 3 последних, остальное по нажатию (колонка не вырастает ниже соседней) */
@@ -444,10 +444,9 @@
 }
 
 .plan__title {
-  padding: 0 var(--space-1);
   font-family: var(--display);
   font-size: var(--text-xl);
-  font-weight: var(--weight-bold);
+  font-weight: var(--weight-semibold);
   letter-spacing: -0.02em;
 }
 
@@ -455,13 +454,15 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); /* 14rem: «просроченные» помещается рядом со значком (без плиток план — единственный блок, 5 шагов → 3 + 2) */
-  grid-auto-rows: 1fr; /* одна высота у всех плиток (владелец 16.10: «Ключи ЭЦП в две строки — плитки разной высоты») */
+  /* Перенос строкой, последний ряд растягивается: 5 шагов → 3 + 2 во всю ширину, без пустой ячейки (DESIGN.md §6, п. 3).
+     14rem: «просроченные» помещается рядом со значком. */
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--space-3);
 }
 
 .plan__steps > li {
+  flex: 1 1 14rem;
   display: grid;
   min-width: 0;
 }
@@ -496,7 +497,7 @@
 
 /* Номер шага — курсивная цифра с засечками, цветом шага (как «1 2 3» образца) */
 .plan__n {
-  font-size: 2rem;
+  font-size: var(--text-2xl);
   font-style: italic;
   font-weight: var(--weight-regular);
   line-height: 1;
@@ -580,7 +581,7 @@
     display: block;
     margin-inline: var(--space-3);
     padding: var(--space-2) var(--space-3);
-    line-height: 1.45;
+    line-height: var(--leading-body);
   }
 
   .hero .hint { margin-inline: 0; }
@@ -590,7 +591,7 @@
   .hint__ok {
     min-height: 0;
     margin-left: var(--space-2);
-    padding: 6px 0; /* палец: высота строки + поля ≈ 32 px, вся строка подсказки нажимается рядом */
+    padding: var(--space-2) 0; /* палец: высота строки + поля ≈ 32 px, вся строка подсказки нажимается рядом */
   }
 }
 
@@ -610,7 +611,7 @@
 }
 
 .qgroup + .qgroup {
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--wheat) 25%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--wheat) 24%, transparent);
 }
 
 .qgroup__title {
@@ -645,7 +646,7 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--wheat) 25%, transparent), inset 0 -1px 0 color-mix(in srgb, var(--wheat) 25%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--wheat) 24%, transparent), inset 0 -1px 0 color-mix(in srgb, var(--wheat) 24%, transparent);
 }
 
 .qall:focus-visible {
@@ -656,14 +657,14 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  background: color-mix(in srgb, var(--wheat-soft) 92%, var(--surface));
+  background: color-mix(in srgb, var(--wheat-soft) 70%, var(--surface));
 }
 
 /* ═════════ «Сегодня»: «Требуют внимания» (техника 16.10, оформление) ═════════ */
 /* Клиент и уровень риска — строкой, причины — под именем; высокий риск — красная метка, средний — оранжевая */
 .attention .panel__head {
   flex-wrap: wrap;
-  row-gap: 2px;
+  row-gap: var(--space-1);
 }
 
 .attention .panel__title {
@@ -683,7 +684,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 2px var(--space-2);
+  gap: var(--space-1) var(--space-2);
   padding: var(--space-2) 0;
 }
 
@@ -706,7 +707,7 @@
 
 .attention__row > .tag {
   min-height: 1.625rem;
-  padding: 0 9px;
+  padding: 0 var(--space-2);
   font-size: var(--text-sm);
   white-space: nowrap;
 }
@@ -725,4 +726,10 @@
   grid-column: 1 / -1;
   padding-left: calc(2rem + var(--space-2)); /* под именем, не под кружком с буквами */
   font-size: var(--text-sm);
+}
+
+/* Копейки крупной суммы — 26 px (DESIGN.md: 44 сумма → 26 копейки) */
+.money-card__sum .money-v__cents,
+.money-card__sum .roll__cents {
+  font-size: var(--text-xl);
 }

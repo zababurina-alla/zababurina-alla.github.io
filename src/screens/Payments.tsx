@@ -104,7 +104,8 @@ export function Payments() {
             {monthFailed && <span className="sub" role="alert">Не загрузилось из таблицы. <button type="button" className="link" onClick={retryMonth}>Ещё раз</button></span>}
           </p>
         </div>
-        <button type="button" className="btn btn--primary" onClick={() => ui.openPayment()} {...roAttrs('payments')}><Icon name="plus" />Записать платёж</button>
+        {/* «Записать платёж» здесь не дублируем: он всегда под рукой — в боковой панели (≥ 1024) и кнопкой «+» на телефоне
+            (DESIGN.md §6, п. 5: одна главная кнопка на экране) */}
       </header>
 
       <section className="hero pay-hero reveal" aria-label="Итог месяца">

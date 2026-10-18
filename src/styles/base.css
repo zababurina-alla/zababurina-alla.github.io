@@ -93,6 +93,12 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
+/* Жирный браузера — 700, в эталоне его нет (DESIGN.md §3): <strong> и <b> — полужирный 600 */
+b,
+strong {
+  font-weight: var(--weight-semibold);
+}
+
 /* Крупные числа и заголовки — с засечками (цифры Newsreader). Табличные цифры, чтобы счётчики не прыгали. */
 .display {
   font-family: var(--display);
