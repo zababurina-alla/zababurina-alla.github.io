@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { LiveApi, pause } from './liveApi';
 import type { SessionProvider } from './liveApi';
-import { ApiError, call } from './transport';
+import { ApiError, call, coldPause } from './transport';
 import type { Deadline, Payment } from './types';
 
 const URL_ = 'https://script.google.com/macros/s/TEST/exec';
@@ -55,9 +55,54 @@ describe('транспорт', () => {
     await expect(call({ url: URL_, action: 'x', fetchImpl: s.fetchImpl })).rejects.toMatchObject({ code: 'SERVER' });
   });
 
-  it('выключатель API: текст «ok» вместо JSON → DISABLED с понятным текстом', async () => {
-    const s = server('ok');
+  it('выключатель API: текст «ok» вместо JSON → DISABLED с понятным текстом (у чтения — после одного повтора)', async () => {
+    const sleep = vi.spyOn(coldPause, 'sleep').mockResolvedValue();
+    const s = server('ok', 'ok');
     await expect(call({ url: URL_, action: 'sync.snapshot', fetchImpl: s.fetchImpl })).rejects.toMatchObject({ code: 'DISABLED', message: expect.stringContaining('выключена') });
+    expect(s.sent).toHaveLength(2);
+    sleep.mockRestore();
+  });
+
+  it('холодный старт: чтение после «ok», 404-страницы или обрыва один раз тихо повторяется через 2–3 с', async () => {
+    const sleep = vi.spyOn(coldPause, 'sleep').mockResolvedValue();
+    const s = server('ok', ok({ cursor: 5 }), '<html>404 Not Found</html>', ok({ changes: [] }), new TypeError('Failed to fetch'), ok({ photos: {} }));
+    await call({ url: URL_, action: 'sync.snapshot', fetchImpl: s.fetchImpl });
+    await call({ url: URL_, action: 'sync.changes', fetchImpl: s.fetchImpl });
+    await call({ url: URL_, action: 'clients.photos', fetchImpl: s.fetchImpl });
+    expect(s.sent.map((x) => x.action)).toEqual(['sync.snapshot', 'sync.snapshot', 'sync.changes', 'sync.changes', 'clients.photos', 'clients.photos']);
+    expect(sleep).toHaveBeenCalledTimes(3);
+    expect(sleep.mock.calls.every(([ms]) => ms >= 2000 && ms <= 3000)).toBe(true);
+    sleep.mockRestore();
+  });
+
+  it('повтор только один и только на сбой связи: ответ сервера с кодом ошибки и записи — без повтора', async () => {
+    const sleep = vi.spyOn(coldPause, 'sleep').mockResolvedValue();
+    const s = server('<html>404</html>', '<html>404</html>', fail('BUSY'), new TypeError('Failed to fetch'));
+    await expect(call({ url: URL_, action: 'reports.attention', fetchImpl: s.fetchImpl })).rejects.toMatchObject({ code: 'SERVER' });
+    await expect(call({ url: URL_, action: 'sync.snapshot', fetchImpl: s.fetchImpl })).rejects.toMatchObject({ code: 'BUSY' });
+    await expect(call({ url: URL_, action: 'payments.create', requestId: 'R1', fetchImpl: s.fetchImpl })).rejects.toMatchObject({ code: 'NETWORK' });
+    expect(s.sent.map((x) => x.action)).toEqual(['reports.attention', 'reports.attention', 'sync.snapshot', 'payments.create']);
+    sleep.mockRestore();
+  });
+
+  it('тайм-аут чтения — 75 с: на 30 с запрос ещё ждёт, на 75 с прерывается и повторяется', async () => {
+    vi.useFakeTimers();
+    const sleep = vi.spyOn(coldPause, 'sleep').mockResolvedValue();
+    let calls = 0;
+    const fetchImpl = ((_u: unknown, init?: RequestInit) => new Promise((_, rej) => {
+      calls++;
+      init?.signal?.addEventListener('abort', () => rej(new DOMException('aborted', 'AbortError')));
+    })) as unknown as typeof fetch;
+    const p = call({ url: URL_, action: 'sync.snapshot', fetchImpl });
+    const check = expect(p).rejects.toMatchObject({ code: 'NETWORK' });
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(calls).toBe(1);
+    await vi.advanceTimersByTimeAsync(45_000);
+    expect(calls).toBe(2);
+    await vi.advanceTimersByTimeAsync(75_000);
+    await check;
+    sleep.mockRestore();
+    vi.useRealTimers();
   });
 
   it('тайм-аут 30 с прерывает запрос → NETWORK', async () => {
