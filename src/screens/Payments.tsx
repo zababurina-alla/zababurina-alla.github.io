@@ -147,7 +147,7 @@ export function Payments() {
         )}
         {check.length > 0 && (
           <div className="dgroup">
-            <h2 className="dgroup__title"><span>Без даты или суммы — проверьте в таблице</span>
+            <h2 className="dgroup__title"><span>{hasFeature('paymentsFill') && canWrite('payments') ? 'Без даты или суммы — допишите здесь' : 'Без даты или суммы — проверьте в таблице'}</span>
               <span className="dgroup__count">{check.length}</span></h2>
             <ul className="paylist">{check.map(row)}</ul>
           </div>

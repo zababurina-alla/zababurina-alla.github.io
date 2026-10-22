@@ -68,6 +68,19 @@ describe('платёж без даты или суммы: дописать', () 
     expect(el.querySelector('.paylist__fill')).toBeNull();
   });
 
+  it('заголовок группы: с флагом и записью — «допишите здесь»; без флага или без записи — «проверьте в таблице»', () => {
+    let el = render();
+    expect(el.querySelector('.dgroup__title')?.textContent).toContain('Без даты или суммы — допишите здесь');
+    el.remove();
+    flags.paymentsFill = false;
+    el = render();
+    expect(el.querySelector('.dgroup__title')?.textContent).toContain('Без даты или суммы — проверьте в таблице');
+    el.remove();
+    flags.paymentsFill = true; flags.canWritePayments = false;
+    el = render();
+    expect(el.querySelector('.dgroup__title')?.textContent).toContain('Без даты или суммы — проверьте в таблице');
+  });
+
   it('с флагом: у «без даты» — только дата, у «без суммы» — только сумма, у «без обоих» — оба поля', () => {
     const el = render();
     const [noDate, noSum, none] = rows(el);
