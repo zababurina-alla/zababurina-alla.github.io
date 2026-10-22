@@ -71,7 +71,7 @@ export function KvedEdit({ c }: { c: Client }) {
         {(c.kind === 'fop1' || c.kind === 'fop2') && <p className="sub">Главный КВЕД (по нему ЄП) таблица выберет сама — по наибольшей ставке.</p>}
         <div className="kved-edit__actions">
           <button type="button" className="btn btn--primary btn--sm" onClick={save}>Сохранить</button>
-          <button type="button" className="btn btn--ghost btn--sm" onClick={() => { setEdit(null); setError(''); }}>Отмена</button>
+          <button type="button" className="btn btn--ghost btn--sm" onClick={() => { setEdit(null); setInput(''); setError(''); }}>Отмена</button>
         </div>
       </div>
     );
@@ -84,7 +84,7 @@ export function KvedEdit({ c }: { c: Client }) {
       ))}</ul> : <p className="nil">КВЕД в таблице не указан</p>}
       {!hasFeature('kvedEdit') ? null : saving ? <SaveBadge state="saving" offline={!store.online} />
         : canWrite('clients')
-          ? <button type="button" className="link" onClick={() => { setEdit(c.kved.map((k) => k.code)); setBase(c.version); }}>Изменить КВЕД</button>
+          ? <button type="button" className="link" onClick={() => { setEdit(c.kved.map((k) => k.code)); setBase(c.version); setInput(''); setError(''); }}>Изменить КВЕД</button>
           : <span className="sub" {...roAttrs('clients')}>изменить — в таблице</span>}
     </>
   );

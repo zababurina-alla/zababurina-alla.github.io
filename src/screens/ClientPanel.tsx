@@ -114,8 +114,9 @@ function EditableField({ clientId, value, version, label, inputMode, empty, onSa
   const [edit, setEdit] = useState<string | null>(null);
   const [base, setBase] = useState(version);
   // В клетке телефон записан как «📞 +380 …» (так пишет сервер): значок в поле не нужен, проверка его не пропускает
-  // и «Сохранить» было не нажать (прогон 22.10, С-3). Сравнение «изменилось ли» — тоже без значка.
-  const shown = inputMode === 'tel' ? value.replace(/^[^\d+(]+/, '') : value;
+  // и «Сохранить» было не нажать (прогон 22.10, С-3). Режем только значки — подпись вроде «Мама» остаётся, и проверка
+  // честно скажет, что не так. Сравнение «изменилось ли» — тоже без значков.
+  const shown = inputMode === 'tel' ? value.replace(/\p{Extended_Pictographic}️?\s*/gu, '').trim() : value;
   const problem = edit === null ? null : inputMode === 'tel' ? phoneProblem(edit) : emailProblem(edit);
   const next = edit === null ? '' : inputMode === 'email' ? normEmail(edit) : edit.trim();
   const saving = store.pending.some((p) => p.op.kind === 'updateClient' && p.op.id === clientId);

@@ -10,6 +10,7 @@ const C = { id: 'c1', version: 9, name: 'Ромашко Іван Петрови�
   kved: [{ code: '47.21', title: '' }], kvedMain: null, phone: '📞 +380 (50) 123-45-67', email: '', keyIssuer: '', keyUntil: null,
   monthly: [], incomeKopecks: null, incomeBasis: 'quarterTurnover' } as unknown as Client;
 const C2 = { ...C, id: 'c2', name: 'Петренко Олена' } as unknown as Client;
+const C3 = { ...C, id: 'c3', name: 'Сидоренко Марія', phone: 'Мама 067 123 45 67' } as unknown as Client;
 
 const updateKved = vi.fn();
 const updatePhone = vi.fn();
@@ -28,7 +29,7 @@ vi.mock('../data/idb', () => ({
 vi.mock('../data/store', () => ({
   useStore: () => ({
     pending: [], online: true, updateKved, updatePhone, updateEmail: vi.fn(), updateIncome: vi.fn(),
-    client: (id: string) => [C, C2].find((c) => c.id === id), clients: [C, C2],
+    client: (id: string) => [C, C2, C3].find((c) => c.id === id), clients: [C, C2],
     deadlines: [], undated: [], payments: [], tasks: [], questions: [], consultations: [], photos: {},
     loadClientCard: async () => [], createDeadline: null, templates: null, botLink: null, statement: { pdf: null, preview: null, send: null },
     archive: null, attention: null, addPayment: vi.fn(),
@@ -94,6 +95,16 @@ describe('С-1: КВЕД набран, «Добавить» не нажат', ()
     expect(el.textContent).toContain('47.21 уже в списке');
   });
 
+  it('«Отмена» очищает поле: набранный и брошенный код не уходит со следующим «Сохранить» (ревью)', () => {
+    const el = render(<KvedEdit c={C} />);
+    click(btn(el, 'Изменить КВЕД'));
+    typeInto(el.querySelector('input[aria-label="Код КВЕД"]') as HTMLInputElement, '62.01');
+    click(btn(el, 'Отмена'));
+    click(btn(el, 'Изменить КВЕД'));
+    click(btn(el, 'Сохранить'));
+    expect(updateKved).toHaveBeenCalledWith('c1', ['47.21'], 9);
+  });
+
   it('поле пустое — уходит список как есть (удаление кода работает как раньше)', () => {
     const el = render(<KvedEdit c={C} />);
     click(btn(el, 'Изменить КВЕД'));
@@ -113,6 +124,13 @@ describe('С-3: телефон со значком «📞»', () => {
     expect(save.disabled).toBe(false);
     click(save);
     expect(updatePhone).not.toHaveBeenCalled();
+  });
+
+  it('режутся только значки: подпись «Мама» остаётся, проверка говорит, что не так (ревью)', () => {
+    const el = render(<ClientPanel id="c3" onClose={() => undefined} />);
+    click(btn(el, 'Изменить телефон'));
+    expect((el.querySelector('input[aria-label="Телефон"]') as HTMLInputElement).value).toBe('Мама 067 123 45 67');
+    expect(el.textContent).toContain('В телефоне только цифры');
   });
 
   it('новый номер уходит без значка', () => {
@@ -137,11 +155,21 @@ describe('С-2: черновик платежа другого клиента', 
   });
 
   it('черновик того же клиента с суммой — восстанавливается', async () => {
-    drafts.set('payment', { value: { who: 'c1', amount: '500', period: 'Октябрь 2026', method: 'cash', date: '22.10.2026' }, savedAt: Date.now() });
+    drafts.set('payment:c1', { value: { who: 'c1', amount: '500', period: 'Октябрь 2026', method: 'cash', date: '22.10.2026' }, savedAt: Date.now() });
     render(<PaymentDialog open clientId="c1" onClose={() => undefined} />);
     await flush();
     expect(document.body.textContent).toContain('Восстановлен черновик');
     expect((document.querySelector('input[inputmode="decimal"]') as HTMLInputElement).value).toBe('500');
+  });
+
+  it('черновик другого клиента не теряется: у окна из карточки свой черновик (ревью)', async () => {
+    const other = { value: { who: 'c2', amount: '500', period: 'Октябрь 2026', method: 'bank', date: '22.10.2026' }, savedAt: Date.now() };
+    drafts.set('payment:c2', other);
+    render(<PaymentDialog open clientId="c1" onClose={() => undefined} />);
+    await flush();
+    await act(async () => { await new Promise((r) => setTimeout(r, 400)); });
+    expect(drafts.get('payment:c2')).toBe(other);
+    expect(document.body.textContent).not.toContain('Восстановлен черновик');
   });
 
   it('окно без клиента (кнопка вверху) — черновик с клиентом восстанавливается, как раньше', async () => {
