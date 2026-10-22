@@ -626,10 +626,7 @@
 }
 
 @media (max-width: 559px) {
-  .dl-tools {
-    padding: 0 var(--space-3) var(--space-3);
-  }
-
+  /* Отступ слева — как у заголовка «Открытые сроки» (panel__head, --space-5): было --space-3, кнопки стояли левее (№ 6) */
   .dl-tools__by {
     flex: 1 1 100%;
   }
@@ -681,8 +678,20 @@
 
 .dfilters .input--sm {
   min-height: 2.5rem;
-  padding: 0 var(--space-3);
+  padding: 0 2.5rem 0 var(--space-4);
   border-radius: var(--radius-full);
+  /* как у кнопок-фильтров рядом («Декларации 4»): шрифт крупнее соседей выглядел чужим (проход 22.10, № 5) */
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+/* Телефон: «Статус» и «Клиент» — каждый своей строкой, подписи одной ширины, списки во всю строку: иначе списки
+   начинались с разного места и были разной длины (проход 22.10) */
+@media (max-width: 559px) {
+  .dfilters label {
+    flex: 1 1 100%;
+    grid-template-columns: 4.5rem minmax(0, 1fr);
+  }
 }
 
 .dtable__line {
@@ -762,6 +771,10 @@
    «Позвонить» и «Платёж» появляются подписанными кнопками, когда «Действия» открыты. */
 @media (hover: none), (pointer: coarse), (pointer: none), (max-width: 39.99rem) {
   .dtable__tools > .dtable__tool { display: none; }
+
+  /* «Действия» — всегда своей строкой под названием: короткое название тянуло их вправо в ту же строку, длинное —
+     вниз, и у соседних сроков кнопка стояла по-разному (проход 22.10, № 7) */
+  .dtable__tools { flex-basis: 100%; }
 
   .dtable__tools > .dactions__toggle { opacity: 1; }
 

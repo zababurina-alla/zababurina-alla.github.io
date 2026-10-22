@@ -153,7 +153,7 @@ export function Payments() {
           </div>
         )}
         {[...byDay.entries()].map(([day, list]) => (
-          <div key={day} className="dgroup">
+          <div key={day} className="dgroup dgroup--pay">
             <h2 className="dgroup__title"><span>{dayTitle(day)}</span>
               <span className="dgroup__count"><Money text={formatMoney(daySum(list))} /></span></h2>
             <ul className="paylist">{list.map(row)}</ul>

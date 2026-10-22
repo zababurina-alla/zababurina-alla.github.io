@@ -397,3 +397,17 @@
   font-size: var(--text-lg);
   font-weight: var(--weight-medium);
 }
+
+/* Итог дня — над колонкой сумм, а не у правого края: справа у строк колонка «Отменить», и суммы обрывались на 130 px
+   раньше итога (проход 22.10, № 8). Отступ = поле списка + поле строки + колонка «Отменить» + промежуток − поле заголовка. */
+@container (min-width: 760px) {
+  .dgroup--pay .dgroup__count {
+    padding-right: calc(var(--space-2) + var(--space-3) + 7.5rem + var(--space-4) - var(--space-5));
+  }
+}
+
+@container (min-width: 560px) and (max-width: 759px) {
+  .dgroup--pay .dgroup__count {
+    padding-right: calc(var(--space-2) + var(--space-3) + 6.5rem + var(--space-3) - var(--space-5));
+  }
+}
