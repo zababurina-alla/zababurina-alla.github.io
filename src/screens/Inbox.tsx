@@ -355,11 +355,11 @@ function ClearRead() {
   }
   return asking ? (
     <div className="inbox__clear" role="group" aria-label="Очистить прочитанное">
-      <span className="sub">Убрать с сайта решённые ({done})? В Telegram ничего не изменится.</span>
-      <button type="button" className="btn btn--primary btn--sm" disabled={busy} onClick={() => { void run(); }}>{busy ? 'Убираю…' : 'Убрать'}</button>
+      <span className="sub">Убрать с сайта прочитанные сообщения: {done}? В Telegram ничего не изменится.</span>
+      <button type="button" className="btn btn--primary btn--sm" disabled={busy} onClick={() => { void run(); }}>{busy ? 'Убираю…' : `Да, убрать (${done})`}</button>
       <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={() => setAsking(false)}>Отмена</button>
     </div>
-  ) : <button type="button" className="btn btn--ghost btn--sm inbox__clear" onClick={() => setAsking(true)}><Icon name="eyeOff" size={16} />Очистить прочитанное</button>;
+  ) : <button type="button" className="btn btn--ghost btn--sm inbox__clear" title="Сначала спросим, что именно убрать, — сразу ничего не пропадёт" onClick={() => setAsking(true)}><Icon name="eyeOff" size={16} />Очистить прочитанное</button>;
 }
 
 export function Inbox() {

@@ -15,12 +15,13 @@ const ITEMS: InboxItem[] = [
   msg('r1', 'c2', 'Ромашко Олена', 'accepted', '2026-10-13T09:00:00'),
 ];
 const hide = vi.fn((ids: string[]) => `rid-${ids.length}`);
+const clearRead = vi.fn(async () => ({ hidden: 0, undo: () => undefined }));
 let route = { name: 'inbox', params: [] as string[] };
 
 vi.mock('../data/store', () => ({
   HOLD_MS: 10_000,
   useStore: () => ({
-    inbox: ITEMS, inboxHide: { hide, clearRead: async () => ({ hidden: 0, undo: () => undefined }) },
+    inbox: ITEMS, inboxHide: { hide, clearRead },
     client: () => undefined, pending: [], fresh: [], online: true, undoHeld: async () => true,
   }),
 }));
@@ -35,7 +36,7 @@ Element.prototype.scrollTo ??= function scrollTo() {};
 const { Inbox } = await import('./Inbox');
 
 beforeAll(() => { (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true; });
-beforeEach(() => { hide.mockClear(); });
+beforeEach(() => { hide.mockClear(); clearRead.mockClear(); });
 
 let host: HTMLDivElement;
 afterEach(() => { host.remove(); });
@@ -76,5 +77,23 @@ describe('«Убрать с сайта»: нерешённое не убирае
     const el = render();
     expect(el.querySelectorAll('.bubble.is-new .bubble__hide')).toHaveLength(0);
     expect(el.querySelectorAll('.bubble.is-new')).toHaveLength(2);
+  });
+});
+
+describe('«Очистить прочитанное»: понятное подтверждение (приёмка-6, находка 3)', () => {
+  it('после нажатия — вопрос с числом и кнопка «Да, убрать (N)»; пока не нажали её, ничего не убрано', async () => {
+    route = { name: 'inbox', params: [] };
+    const el = render();
+    const first = el.querySelector<HTMLButtonElement>('button.inbox__clear');
+    expect(first?.textContent).toContain('Очистить прочитанное');
+    expect(first?.title).toContain('ничего не пропадёт');
+    act(() => { first?.click(); });
+    const ask = el.querySelector('.inbox__clear[role="group"]');
+    expect(ask?.textContent).toContain('Убрать с сайта прочитанные сообщения: 1?');
+    expect(clearRead).not.toHaveBeenCalled();
+    const yes = ask?.querySelector<HTMLButtonElement>('.btn--primary');
+    expect(yes?.textContent).toBe('Да, убрать (1)');
+    await act(async () => { yes?.click(); });
+    expect(clearRead).toHaveBeenCalledTimes(1);
   });
 });
