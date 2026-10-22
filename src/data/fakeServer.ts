@@ -370,9 +370,10 @@ class FakeServer implements CabinetApi {
         if (c.version !== op.baseVersion) return { ok: false, code: 'CONFLICT', message: 'Карточка изменилась в таблице', current: { ...c } };
         // КВЕД — коды; названия из справочника; главный — как сервер: по наибольшей ставке (здесь — первый с названием из
         // справочника, где выше группа ЄП; упрощённо — первый код списка).
-        const { kved, ...rest } = op.patch;
+        const { kved, income, ...rest } = op.patch;
+        if (income && !(Number.isInteger(income.amountKopecks) && income.amountKopecks >= 0)) return { ok: false, code: 'VALIDATION', message: 'Доход — целое число копеек, не меньше нуля' };
         const kvedList = kved?.map((code) => ({ code, title: c.kved.find((k) => k.code === code)?.title ?? KVEDS.find((k) => k.code === code)?.title ?? '' }));
-        const upd: Client = { ...c, ...rest, ...(kvedList ? { kved: kvedList, kvedMain: kvedList[0]?.code ?? null, kvedMainNote: kvedList.length > 1 ? 'max ставка' : null } : {}), version: this.cursor + 1 };
+        const upd: Client = { ...c, ...rest, ...(income ? { incomeKopecks: income.amountKopecks, incomeBasis: income.basis } : {}), ...(kvedList ? { kved: kvedList, kvedMain: kvedList[0]?.code ?? null, kvedMainNote: kvedList.length > 1 ? 'max ставка' : null } : {}), version: this.cursor + 1 };
         this.clients.set(c.id, upd);
         return { ok: true, changes: [this.record('client', 'upsert', c.id, o, upd), this.act(`Изменена карточка: ${short(c.name)}`, o, 'сайт')], cursor: this.cursor };
       }

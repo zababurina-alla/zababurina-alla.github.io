@@ -5,7 +5,8 @@ import { roAttrs } from '../ui/readonly';
 import { emailProblem, normEmail, phoneProblem } from '../lib/contact';
 import { play } from '../lib/sound';
 import { KeyRenew } from './KeyRenew';
-import { canWrite } from '../config';
+import { canWrite, hasFeature } from '../config';
+import { IncomeEdit, defaultIncomeBasis } from './IncomeEdit';
 import gsap from 'gsap';
 import { kindLabel } from '../data/fake';
 import { useStore } from '../data/store';
@@ -183,6 +184,8 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
   const cardNow = card && card.id === shownId ? card : null;
   const history = cardNow?.history ?? [];
   const keyDays = c?.keyUntil ? daysBetween(TODAY, c.keyUntil) : null;
+  // Доход: основа из снимка; нет её — по типу клиента, но только когда включён ввод дохода (без флага экран как был).
+  const incomeBasis = c ? c.incomeBasis ?? (hasFeature('incomeEdit') ? defaultIncomeBasis(c.kind) : null) : null;
   const [remindKey, setRemindKey] = useState(false);
   const [tplOpen, setTplOpen] = useState(false);
   const openTemplates = () => {
@@ -308,10 +311,11 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                       <button type="button" className="btn btn--secondary btn--sm cp__remind" onClick={() => setRemindKey(true)} {...roAttrs('remind')}>Напомнить про ключ</button>
                     )}
                     {remindKey && <RemindDialog open onClose={() => setRemindKey(false)} client={c} keyReminder />}</div>
-                  {c.incomeBasis && (
-                    <div><h3 className="cp__h">{c.incomeBasis === 'quarterTurnover' ? 'Оборот за квартал' : 'Прибыль за год'}</h3>
+                  {incomeBasis && (
+                    <div><h3 className="cp__h">{incomeBasis === 'quarterTurnover' ? 'Оборот за квартал' : 'Прибыль за год'}</h3>
                       <p>{c.incomeKopecks !== null && c.incomeKopecks !== undefined ? <Money text={formatMoney(c.incomeKopecks)} /> : <span className="nil">не указан</span>}</p>
-                      {c.incomeBasis === 'quarterTurnover' && <p className="sub">Годового дохода в таблице нет — предел группы по этому числу не считается.</p>}</div>
+                      {incomeBasis === 'quarterTurnover' && <p className="sub">Годового дохода в таблице нет — предел группы по этому числу не считается.</p>}
+                      {hasFeature('incomeEdit') && <IncomeEdit key={`inc-${c.id}`} c={c} basis={incomeBasis} />}</div>
                   )}
                   <div><h3 className="cp__h">Ключ выпущен</h3><p>{c.keyIssuer ? <TableText text={c.keyIssuer} tidy /> : <span className="nil">не указано</span>}</p></div>
                   <div><h3 className="cp__h">Пароль от кабинета</h3><PasswordReveal clientId={c.id} /></div>

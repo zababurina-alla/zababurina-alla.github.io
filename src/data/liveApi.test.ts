@@ -189,6 +189,15 @@ describe('живой адаптер: новые действия (очередь
     expect(c).toMatchObject({ ok: false, code: 'CONFLICT', current: { id: 'P-7', version: 6 } });
   });
 
+  it('клиент: доход уходит как clients.update patch.income { amountKopecks, basis }; в ответе incomeKopecks/incomeBasis читаются', async () => {
+    const client = { id: 'C-1', version: 11, name: 'Тест', kind: 'fop3', marks: [], employer: false, kved: [], phone: null, keyIssuer: null, keyUntil: null, monthly: [],
+      incomeKopecks: 25000000, incomeBasis: 'quarterTurnover' };
+    const s = server(ok({ client, createdDeadlines: [] }, 32));
+    const r = await new LiveApi(URL_, auth(), s.fetchImpl).write({ kind: 'updateClient', requestId: 'R24', id: 'C-1', baseVersion: 10, patch: { income: { amountKopecks: 25000000, basis: 'quarterTurnover' } } });
+    expect(s.sent[0]).toMatchObject({ action: 'clients.update', requestId: 'R24', payload: { id: 'C-1', baseVersion: 10, patch: { income: { amountKopecks: 25000000, basis: 'quarterTurnover' } } } });
+    expect(r.ok && r.changes[0]).toMatchObject({ entity: 'client', id: 'C-1', record: { incomeKopecks: 25000000, incomeBasis: 'quarterTurnover' } });
+  });
+
   it('платежи месяца: payments.list { month } без requestId', async () => {
     const s = server(ok({ payments: [], totalKopecks: 0 }));
     const r = await new LiveApi(URL_, auth(), s.fetchImpl).listPayments('2026-06');

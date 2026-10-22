@@ -1,6 +1,6 @@
 // Интерфейс данных кабинета — тот же, что будет у JSON-API в Apps Script (контракт: docs/api-contract.md, этап 3).
 // Сейчас его реализует fakeServer.ts (выдуманная «таблица»); на этапе 4 — живой адаптер. Экраны знают только это.
-import type { Activity, Client, Consultation, Deadline, DeadlineStatus, InboxItem, KvedItem, Payment, Priority, Question, Rates, Task, TaskType } from './types';
+import type { Activity, Client, Consultation, Deadline, DeadlineStatus, IncomeBasis, InboxItem, KvedItem, Payment, Priority, Question, Rates, Task, TaskType } from './types';
 
 /** Снимок данных при открытии кабинета. cursor — номер последнего изменения в таблице (выдаёт сервер, не часы браузера). */
 export interface Snapshot {
@@ -86,8 +86,10 @@ export type WriteResult =
 /** tasks.update: что поменять; null очищает срок или клиента. Сделанную задачу сервер править не даёт. */
 export interface TaskPatch { text?: string; due?: string | null; type?: TaskType; priority?: Priority; clientId?: string | null }
 
-/** clients.update: контакты, ключ; kved — весь список кодов «NN.NN» (заменяет; главный сервер выбирает сам). */
-export type ClientPatch = Partial<Pick<Client, 'phone' | 'email' | 'keyIssuer' | 'keyFrom' | 'keyUntil'>> & { kved?: string[] };
+/** clients.update: контакты, ключ; kved — весь список кодов «NN.NN» (заменяет; главный сервер выбирает сам);
+ *  income — доход (копейки, целое ≥ 0) и на чём он считается; в снимке он приходит как incomeKopecks / incomeBasis. */
+export type ClientPatch = Partial<Pick<Client, 'phone' | 'email' | 'keyIssuer' | 'keyFrom' | 'keyUntil'>>
+  & { kved?: string[]; income?: { amountKopecks: number; basis: IncomeBasis } };
 
 /** payments.update: только недостающее. date — YYYY-MM-DD, не позже завтра; amountKopecks — целое > 0. */
 export interface PaymentPatch { date?: string; amountKopecks?: number }

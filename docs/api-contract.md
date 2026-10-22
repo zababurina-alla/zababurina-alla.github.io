@@ -279,8 +279,11 @@ keyUntil } }` → `{ client /* с id от сервера */, createdDeadlines: D
 (такое имя уже есть — `current` = найденный клиент; сайт спросит «это он?»).
 
 **`clients.update`** (mama) — `{ id, baseVersion, patch: { phone?, email?, keyIssuer?, keyFrom?, keyUntil?, kved?, marks?,
-kind? } }` → `{ client, createdDeadlines: Deadline[] }` (смена типа или пометок добавляет сроки по шаблону) [п. 28]. Ошибки: `CONFLICT` (`current` — текущая карточка; сайт показывает «было / стало / вы ввели»),
+kind?, income?: { amountKopecks /* целое ≥ 0 */, basis: 'quarterTurnover' | 'yearProfit' } } }` → `{ client, createdDeadlines: Deadline[] }` (смена типа или пометок добавляет сроки по шаблону) [п. 28]. Ошибки: `CONFLICT` (`current` — текущая карточка; сайт показывает «было / стало / вы ввели»),
 `VALIDATION`, `NOT_FOUND`.
+`income` — «📈 Доход» (v5.88): сайт шлёт основу клиента из снимка (`incomeBasis`), а если её нет — по типу (ФОП 3 / ТОВ 3 —
+`quarterTurnover`, ФОП общая — `yearProfit`). Читается из `client.incomeKopecks` / `client.incomeBasis` (имена в снимке другие, чем в патче).
+Сайт: карточка клиента, флаг `incomeEdit`, область записи `clients`.
 
 **`clients.revealPassword`** (mama) — `{ id, confirm: true }` → `{ login, password, ttlSeconds: 30 }`.
 - Отдельный запрос, только по явному «Показать» с подтверждением.

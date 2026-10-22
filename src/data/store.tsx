@@ -17,7 +17,7 @@ import { Outbox } from './outbox';
 import type { Counters, OutboxEvent, OutboxItem } from './outbox';
 import { newRequestId, touchedBy } from './api';
 import type { AiAnswer, ApplyTemplateResult, BotLinkResult, CabinetApi, MonthCheck, StatementPdf, StatementPreview, StatementResult, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, DeadlinePatch, InboxAction, PaymentPatch, RemindPreview, RemindRequest, RemindResult, Snapshot, TaskPatch, WriteOp, WriteResult } from './api';
-import type { Activity, Client, Consultation, DatedDeadline, Deadline, InboxItem, Payment, Question, SaveState, Task } from './types';
+import type { Activity, Client, Consultation, DatedDeadline, Deadline, IncomeBasis, InboxItem, Payment, Question, SaveState, Task } from './types';
 import { isDated } from './types';
 import { TODAY, addDays, fmtDate, plural } from '../lib/dates';
 import { play } from '../lib/sound';
@@ -95,6 +95,8 @@ interface Store {
   updatePhone: (clientId: string, phone: string, baseVersion: number) => void;
   /** КВЕД клиента целиком (clients.update patch.kved); главный — выберет сервер по max ставке. */
   updateKved: (clientId: string, codes: string[], baseVersion: number) => void;
+  /** Доход клиента (clients.update { income }, флаг incomeEdit): на экране — «сохраняется…» из очереди, значение встаёт по ответу таблицы. */
+  updateIncome: (clientId: string, income: { amountKopecks: number; basis: IncomeBasis }, baseVersion: number) => void;
   /** Почта клиента (clients.update { email }). */
   updateEmail: (clientId: string, email: string, baseVersion: number) => void;
   addTask: (t: Omit<Task, 'id' | 'version' | 'done'>) => void;
@@ -361,7 +363,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setClients((xs) => upsert(xs, op.client));
     } else if (op.kind === 'updateClient') {
       // КВЕД приходит кодами: названия — те, что уже были у клиента (новые — пусто, подставит справочник).
-      const { kved, ...rest } = op.patch;
+      // income на экран не выносим: строка клиента показывает «сохраняется…» из очереди, а доход встанет по ответу таблицы.
+      const { kved, income: _income, ...rest } = op.patch;
+      void _income;
       setClients((xs) => xs.map((c) => (c.id === op.id
         ? { ...c, ...rest, ...(kved ? { kved: kved.map((code) => ({ code, title: c.kved.find((k) => k.code === code)?.title ?? '' })) } : {}) }
         : c)));
@@ -432,7 +436,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         callbacks.current.delete(op.requestId);
         return;
       }
-      if (e.type === 'conflict' && op.kind === 'updateClient' && e.result.current && 'phone' in e.result.current) {
+      if (e.type === 'conflict' && op.kind === 'updateClient' && !('income' in op.patch) && e.result.current && 'phone' in e.result.current) {
         setConflict({ requestId: op.requestId, clientId: op.id, mine: op.patch.phone ?? '', theirs: e.result.current.phone });
         play('attention');
         return;
@@ -460,7 +464,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setInbox((xs) => xs.map((x) => (x.id === op.id ? (cur ?? { ...x, status: 'new' }) : x)));
       }
       // Карточку не поправили (VALIDATION телефона/почты, NOT_FOUND…) — строка клиента такая, какая в таблице или была.
-      if (op.kind === 'updateClient' && final && e.type !== 'conflict') {
+      if (op.kind === 'updateClient' && final && (e.type !== 'conflict' || 'income' in op.patch)) {
         const cur = e.result.current && 'kind' in e.result.current ? e.result.current : clientsBefore.current.get(op.requestId);
         if (cur) setClients((xs) => xs.map((c) => (c.id === cur.id ? cur : c)));
         clientsBefore.current.delete(op.requestId);
@@ -739,6 +743,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (before) clientsBefore.current.set(requestId, before);
     send({ kind: 'updateClient', requestId, id: clientId, baseVersion, patch: { kved: codes } }, 'КВЕД клиента', () => clientsBefore.current.delete(requestId));
   }, [clients, send]);
+  const updateIncome = useCallback((clientId: string, income: { amountKopecks: number; basis: IncomeBasis }, baseVersion: number) => {
+    send({ kind: 'updateClient', requestId: newRequestId(), id: clientId, baseVersion, patch: { income } }, 'Доход клиента');
+  }, [send]);
   const updatePhone = useCallback((clientId: string, phone: string, baseVersion: number) => {
     updateContact(clientId, { phone }, baseVersion, 'Телефон клиента');
   }, [updateContact]);
@@ -1031,10 +1038,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<Store>(() => ({
     loaded, online, syncedAt, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, consultations, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, updatePayment, addClient, updatePhone, updateKved, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, updateDeadlines, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention, month, inboxHide, aiAsk, photos,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, updatePayment, addClient, updatePhone, updateKved, updateIncome, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, updateDeadlines, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention, month, inboxHide, aiAsk, photos,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance,
   }), [loaded, online, syncedAt, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, consultations, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, updatePayment, addClient, updatePhone, updateKved, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, updateDeadlines, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention, month, inboxHide, aiAsk, photos,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, updatePayment, addClient, updatePhone, updateKved, updateIncome, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, updateDeadlines, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention, month, inboxHide, aiAsk, photos,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
