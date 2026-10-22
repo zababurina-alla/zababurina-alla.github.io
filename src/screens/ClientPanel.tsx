@@ -113,6 +113,10 @@ function EditableField({ clientId, value, version, label, inputMode, empty, onSa
   const store = useStore();
   const [edit, setEdit] = useState<string | null>(null);
   const [base, setBase] = useState(version);
+  // В клетке телефон записан как «📞 +380 …» (так пишет сервер): значок в поле не нужен, проверка его не пропускает
+  // и «Сохранить» было не нажать (прогон 22.10, С-3). Режем только значки — подпись вроде «Мама» остаётся, и проверка
+  // честно скажет, что не так. Сравнение «изменилось ли» — тоже без значков.
+  const shown = inputMode === 'tel' ? value.replace(/\p{Extended_Pictographic}️?\s*/gu, '').trim() : value;
   const problem = edit === null ? null : inputMode === 'tel' ? phoneProblem(edit) : emailProblem(edit);
   const next = edit === null ? '' : inputMode === 'email' ? normEmail(edit) : edit.trim();
   const saving = store.pending.some((p) => p.op.kind === 'updateClient' && p.op.id === clientId);
@@ -120,12 +124,12 @@ function EditableField({ clientId, value, version, label, inputMode, empty, onSa
     return (
       <p className="row-gap">
         {value ? <span className="num">{value}</span> : <span className="nil">{empty}</span>}
-        {saving ? <SaveBadge state="saving" offline={!store.online} /> : (canWrite('clients') ? <button type="button" className="link" onClick={() => { setBase(version); setEdit(value); }}>Изменить {label === 'Почта' ? 'почту' : label.toLowerCase()}</button> : <span className="sub">изменить — в таблице</span>)}
+        {saving ? <SaveBadge state="saving" offline={!store.online} /> : (canWrite('clients') ? <button type="button" className="link" onClick={() => { setBase(version); setEdit(shown); }}>Изменить {label === 'Почта' ? 'почту' : label.toLowerCase()}</button> : <span className="sub">изменить — в таблице</span>)}
       </p>
     );
   }
   return (
-    <form className="inline-edit" onSubmit={(e) => { e.preventDefault(); if (problem) return; if (next !== value) onSave(next, base); setEdit(null); }}>
+    <form className="inline-edit" onSubmit={(e) => { e.preventDefault(); if (problem) return; if (next !== shown) onSave(next, base); setEdit(null); }}>
       <input className="input num" value={edit} onChange={(e) => setEdit(e.target.value)} inputMode={inputMode} type={inputMode === 'email' ? 'email' : 'text'} autoFocus
         aria-label={label} aria-invalid={problem !== null} aria-describedby={problem ? `${clientId}-${inputMode}-err` : undefined} />
       <button type="submit" className="btn btn--primary btn--sm" disabled={problem !== null}>{next || !value ? 'Сохранить' : 'Очистить'}</button>

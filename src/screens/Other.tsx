@@ -65,16 +65,19 @@ export function Keys() {
   const noKey = store.clients.filter((c) => !c.keyUntil);
   // Закончились и заканчиваются — разные вещи (п. 4): «7 заканчиваются», когда 4 уже закончились, вводило в заблуждение.
   const gone = withKey.filter((c) => daysBetween(TODAY, c.keyUntil ?? TODAY) < 0).length;
-  const soon = withKey.filter((c) => { const d = daysBetween(TODAY, c.keyUntil ?? TODAY); return d >= 0 && d <= 14; }).length;
-  // Заголовок — коротко, одной-двумя строками на телефоне (п. 58); что значит «скоро» — в подписи под ним.
-  const title = [gone ? `${gone} ${plural(gone, 'закончился', 'закончились', 'закончились')}` : '', soon ? `${soon} скоро` : '']
+  // Заголовок считает по тем же группам, что и список: «горят» 0–7, «скоро» 8–30. Был порог 14 дней — заголовок «2 скоро»
+  // спорил с группами «Горят — 0–7» и «Скоро — 8–30» под ним (проход 22.10, № 1).
+  const hot = withKey.filter((c) => statusByDays(daysBetween(TODAY, c.keyUntil ?? TODAY)) === 'orange').length;
+  const soon = withKey.filter((c) => statusByDays(daysBetween(TODAY, c.keyUntil ?? TODAY)) === 'yellow').length;
+  // Заголовок — коротко, одной-двумя строками на телефоне (п. 58); что значат слова — в подписи под ним.
+  const title = [gone ? `${gone} ${plural(gone, 'закончился', 'закончились', 'закончились')}` : '', hot ? `${hot} ${plural(hot, 'горит', 'горят', 'горят')}` : '', soon ? `${soon} скоро` : '']
     .filter(Boolean).join(', ') || 'продлевать пока нечего';
   return (
     <div className="page">
       <header className="page__head">
         <div>
           <h1 className="page__title">Ключи ЭЦП <em>{title}</em></h1>
-          <p className="page__sub">«Скоро» — кончаются в ближайшие 14 дней. Продлить лучше заранее — бот напомнит.</p>
+          <p className="page__sub">«Горят» — кончаются в ближайшие 7 дней, «скоро» — через 8–30. Продлить лучше заранее — бот напомнит.</p>
         </div>
       </header>
       <section className="panel" aria-label="Ключи">
@@ -114,7 +117,7 @@ function RateCards({ r }: { r: Rates }) {
       // 3 группа (процент дохода) и непонятная ставка — как в листе
       const rule = parseEpRule(g.epRule);
       const amount = rule && rule.base !== 'income' ? epAmount(rule, { pmKopecks: r.pmKopecks, mzpKopecks: r.mzpKopecks, incomeKopecks: null }) : null;
-      const limit = g.limitKopecks !== null ? `доход до ${formatMoney(g.limitKopecks)}${g.limitMzp !== null ? ` (${g.limitMzp} МЗП)` : ''}` : 'предел дохода не указан';
+      const limit = g.limitKopecks !== null ? `доход до ${formatMoney(g.limitKopecks)}${g.limitMzp !== null ? ` (${g.limitMzp.toLocaleString('ru-RU')} МЗП)` : ''}` : 'предел дохода не указан';
       return [`ЄП ${g.group} группа`, amount !== null ? <Money text={formatMoney(amount)} /> : g.epRule || '—',
         amount !== null ? `${g.epRule} в месяц · ${limit}` : limit, 'taxEp'];
     }),

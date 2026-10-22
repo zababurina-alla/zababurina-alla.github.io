@@ -840,8 +840,11 @@
 
 .chat__snippet > .icon { flex: none; }
 
-/* текст отрывка обрезается многоточием, значок скрепки — нет */
-.chat__snippet {
+/* текст отрывка обрезается многоточием, значок скрепки — нет. Многоточие — у своего блока: у flex-строки голый текст
+   резался без «…» и выглядел уползшим под кружок-счётчик (проход 22.10, № 3) */
+.chat__text {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
 }
 
@@ -938,6 +941,10 @@
     var(--surface-sunk);
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--ink-2) 45%, transparent) transparent;
+  /* Ушедшее вверх затухает в поле ленты (16 px), а не режется краем: плашка дня торчала срезанной пополам
+     (проход 22.10, № 4). Поле пустое, пока лента в начале, — первую плашку затухание не задевает. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--space-4));
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--space-4));
 }
 
 /* День — своя группа: плашка даты по центру, прилипает сверху, пока листаем этот день (как в Telegram) */
@@ -1160,6 +1167,12 @@
     overflow: visible;
     padding: var(--space-3);
     min-height: 50dvh;
+  }
+
+  /* лента листается вместе со страницей — затухать нечему (наверху стеклянная шапка) */
+  .dfeed {
+    -webkit-mask-image: none;
+    mask-image: none;
   }
 
   .bubble {

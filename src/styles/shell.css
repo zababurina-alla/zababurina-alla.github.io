@@ -136,6 +136,14 @@
   transition: transform var(--dur-pop) var(--spring-pop);
 }
 
+/* Листают вниз — «+» уходит за нижнюю панель, чтобы не закрывать строки (Shell, класс fab-away на <html>, № 2 прохода 22.10) */
+.fab-away .fab {
+  transform: translateY(calc(100% + var(--space-4) + 4.25rem));
+  pointer-events: none;
+  visibility: hidden; /* и с клавиатуры (Tab) на спрятанную не попасть */
+  transition: transform var(--dur-base) ease, visibility 0s linear var(--dur-base);
+}
+
 .fab:active {
   transform: scale(0.92);
   transition-duration: var(--dur-press);

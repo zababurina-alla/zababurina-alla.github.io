@@ -64,8 +64,14 @@ export function PaymentDialog({ open, clientId, onClose }: { open: boolean; clie
   }, [open, clientId]);
 
   // Черновик: всё введённое переживает закрытие окна, обрыв связи и перезагрузку.
-  const draft = useDraft('payment', open, { who, amount, period, method, date },
-    (v) => { setWho(v.who); setAmount(v.amount); setPeriod(v.period); setMethod(v.method); setDate(v.date); },
+  // Черновик окна из карточки — свой у каждого клиента: так черновик другого клиента не теряется и не подставляется.
+  const draft = useDraft(clientId ? `payment:${clientId}` : 'payment', open, { who, amount, period, method, date },
+    (v) => {
+      // Окно открыто из карточки клиента — черновик другого клиента не подставляем: иначе клиент в окне молча
+      // менялся на прежнего (прогон на тестовом клиенте 22.10, С-2).
+      if (clientId && v.who !== clientId) return false;
+      setWho(v.who); setAmount(v.amount); setPeriod(v.period); setMethod(v.method); setDate(v.date);
+    },
     (v) => !v.amount && (!v.who || v.who === clientId));
 
   const picked = who ? store.client(who) : undefined;

@@ -24,21 +24,31 @@ export function KvedEdit({ c }: { c: Client }) {
   const saving = store.pending.some((p) => p.op.kind === 'updateClient' && p.op.id === c.id && 'kved' in p.op.patch);
   const title = (code: string) => c.kved.find((k) => k.code === code)?.title || titles.get(code) || '';
 
-  function add() {
-    if (!edit) return;
+  /** Список с кодом из поля; null — код с ошибкой (она уже на экране). */
+  function withInput(): string[] | null {
+    if (!edit) return null;
     const code = parseKvedCode(input);
-    if (!code) { setError('Код КВЕД — в виде 47.21 (две цифры, точка, две цифры)'); return; }
+    if (!code) { setError('Код КВЕД — в виде 47.21 (две цифры, точка, две цифры)'); return null; }
     // Сервер хранит 47.20 как 47.2 (как таблица) — сравниваем без нулей в конце, иначе «47.20» рядом с «47.2» — дубль.
     const same = edit.find((k) => normalizeKved(k) === normalizeKved(code));
-    if (same) { setError(`${same} уже в списке`); return; }
-    if (edit.length >= MAX) { setError(`Не больше ${MAX} кодов`); return; }
-    setEdit([...edit, code]); setInput(''); setError('');
+    if (same) { setError(`${same} уже в списке`); return null; }
+    if (edit.length >= MAX) { setError(`Не больше ${MAX} кодов`); return null; }
+    return [...edit, code];
   }
 
+  function add() {
+    const next = withInput();
+    if (next) { setEdit(next); setInput(''); setError(''); }
+  }
+
+  // Код набран, а «Добавить» не нажат — «Сохранить» берёт и его: иначе уходил список без него, и КВЕД молча
+  // пропадал (прогон на тестовом клиенте 22.10, С-1).
   function save() {
     if (!edit) return;
-    store.updateKved(c.id, edit, base);
-    setEdit(null);
+    const list = input.trim() ? withInput() : edit;
+    if (!list) return;
+    store.updateKved(c.id, list, base);
+    setEdit(null); setInput('');
   }
 
   if (edit) {
@@ -61,7 +71,7 @@ export function KvedEdit({ c }: { c: Client }) {
         {(c.kind === 'fop1' || c.kind === 'fop2') && <p className="sub">Главный КВЕД (по нему ЄП) таблица выберет сама — по наибольшей ставке.</p>}
         <div className="kved-edit__actions">
           <button type="button" className="btn btn--primary btn--sm" onClick={save}>Сохранить</button>
-          <button type="button" className="btn btn--ghost btn--sm" onClick={() => { setEdit(null); setError(''); }}>Отмена</button>
+          <button type="button" className="btn btn--ghost btn--sm" onClick={() => { setEdit(null); setInput(''); setError(''); }}>Отмена</button>
         </div>
       </div>
     );
@@ -74,7 +84,7 @@ export function KvedEdit({ c }: { c: Client }) {
       ))}</ul> : <p className="nil">КВЕД в таблице не указан</p>}
       {!hasFeature('kvedEdit') ? null : saving ? <SaveBadge state="saving" offline={!store.online} />
         : canWrite('clients')
-          ? <button type="button" className="link" onClick={() => { setEdit(c.kved.map((k) => k.code)); setBase(c.version); }}>Изменить КВЕД</button>
+          ? <button type="button" className="link" onClick={() => { setEdit(c.kved.map((k) => k.code)); setBase(c.version); setInput(''); setError(''); }}>Изменить КВЕД</button>
           : <span className="sub" {...roAttrs('clients')}>изменить — в таблице</span>}
     </>
   );

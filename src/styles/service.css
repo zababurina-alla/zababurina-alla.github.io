@@ -244,14 +244,18 @@
   gap: var(--space-4);
   width: min(100%, 30rem);
   grid-template-columns: minmax(0, 1fr); /* текст переносится по карточке, а не по ширине кнопки Google */
-  padding: var(--space-7) var(--space-6);
+  /* Снизу — меньше на строку «Входим…» с промежутком (1,5rem + 1rem): пустая, она держит место, чтобы карточка
+     не прыгала, и под кнопкой Google стояла полоса вдвое выше верхнего поля (проход 22.10, № 9). Теперь от кнопки
+     до края столько же, сколько сверху до значка. */
+  padding: var(--space-7) var(--space-6) calc(var(--space-7) - 1.5rem - var(--space-4));
   text-align: center;
 }
 
 /* Телефон: кнопка Google 320 px должна уместиться внутри карточки (375 − 2 × 12 − 2 × 12 = 327) */
 @media (max-width: 26rem) {
   .login { padding: var(--space-3); }
-  .login__card { padding: var(--space-6) var(--space-3); }
+  /* Сверху — столько же, сколько снизу занимает пустая строка «Входим…» с промежутком (40 px): было 32 и 40 */
+  .login__card { padding: calc(1.5rem + var(--space-4)) var(--space-3) 0; }
 }
 
 .login__mark {
@@ -292,6 +296,11 @@
 .login__error {
   margin: 0;
   color: var(--st-red-ink);
+}
+
+/* Ошибка встаёт последней строкой — ей обычное нижнее поле, а не урезанное под пустую строку статуса */
+.login__card:has(> .login__error) {
+  padding-bottom: var(--space-6);
 }
 
 /* Только просмотр (config.json → writes): нейтральная плашка вместо оранжевой «нет связи». */
@@ -448,7 +457,7 @@
 
 /* «Входим… Таблица проверяет доступ» под кнопкой Google: место держим, чтобы карточка не прыгала */
 .login__status {
-  min-height: 1.5em;
+  min-height: 1.5rem;
   margin: 0;
   color: var(--ink-2);
 }
