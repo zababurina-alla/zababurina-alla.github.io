@@ -2,7 +2,7 @@
 // clients.update { income: { amountKopecks, basis } } через store.updateIncome с версией карточки; в очереди — «сохраняется…»;
 // только просмотр (writes без clients) — «изменить — в таблице»; основа — из снимка, нет её — по типу клиента.
 import { act } from 'react';
-import { createRoot } from 'react-dom/client';
+import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Client } from '../data/types';
 
@@ -41,13 +41,17 @@ beforeAll(() => {
 });
 beforeEach(() => { flags.incomeEdit = true; flags.canWriteClients = true; pending = []; client = C; updateIncome.mockClear(); });
 
+// Корни обязательно размонтируем: иначе React после конца файла (окружение уже снято) доделывает отложенную работу
+// и падает «window is not defined» — vitest считает это необработанной ошибкой и завершается с кодом 1.
 let host: HTMLDivElement;
-afterEach(() => { host.remove(); });
+let roots: Root[] = [];
+afterEach(() => { act(() => { roots.forEach((r) => r.unmount()); }); roots = []; host.remove(); });
 
 function render(node: React.ReactNode) {
   host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
+  roots.push(root);
   act(() => { root.render(node); });
   return host;
 }
