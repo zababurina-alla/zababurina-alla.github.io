@@ -228,8 +228,11 @@ export function Tasks() {
   };
   const [showDone, setShowDone] = useState(false); // «Сделано» свёрнуто: их десятки (находка «Пользователя» № 29)
   // В снимке — все задачи листа: сделанных бывают сотни, на экране — 20 последних, остальное в таблице.
+  // С флагом tasksShowAll «Показать все» раскрывает весь список из снимка (на сервер ничего не пишется).
   const done = store.tasks.filter((t) => t.done);
-  const doneShown = done.slice(-DONE_SHOWN);
+  const [allDone, setAllDone] = useState(false);
+  const canShowAll = hasFeature('tasksShowAll');
+  const doneShown = canShowAll && allDone ? done : done.slice(-DONE_SHOWN);
   const doneHidden = done.length - doneShown.length;
   const groups: [string, Task[]][] = [
     ['Просрочено', open.filter((t) => t.due && t.due < TODAY)],
@@ -328,7 +331,11 @@ export function Tasks() {
               })}
             </ul>
             )}
-            {title === 'Сделано' && showDone && doneHidden > 0 && <p className="sub tasks__more">Ещё {doneHidden} {plural(doneHidden, 'сделанная', 'сделанные', 'сделанных')} — в таблице</p>}
+            {title === 'Сделано' && showDone && doneHidden > 0 && (canShowAll
+              ? <button type="button" className="dgroup__more" onClick={() => setAllDone(true)}>Показать все — ещё {doneHidden} {plural(doneHidden, 'сделанная', 'сделанные', 'сделанных')}</button>
+              : <p className="sub tasks__more">Ещё {doneHidden} {plural(doneHidden, 'сделанная', 'сделанные', 'сделанных')} — в таблице</p>)}
+            {title === 'Сделано' && showDone && canShowAll && allDone && done.length > DONE_SHOWN && (
+              <button type="button" className="dgroup__more" onClick={() => setAllDone(false)}>Свернуть до последних {DONE_SHOWN}</button>)}
           </div>
         ))}
       </section>
