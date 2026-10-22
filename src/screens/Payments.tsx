@@ -19,7 +19,8 @@ import { Empty } from '../ui/Empty';
 import { shortName } from '../ui/names';
 import { useUi } from '../app/ui-context';
 import { roAttrs } from '../ui/readonly';
-import { canWrite } from '../config';
+import { canWrite, hasFeature } from '../config';
+import { PaymentFill } from './PaymentFill';
 
 const SOURCE: Record<string, { icon: IconName; text: string }> = {
   'сайт': { icon: 'globe', text: 'с сайта' }, 'бот': { icon: 'bot', text: 'через бота' }, 'таблица': { icon: 'sheet', text: 'в таблице' },
@@ -185,6 +186,7 @@ export function Payments() {
             onClick={() => { if (cancelId === p.id) { store.removePayment(p.id); setCancelId(null); } else setCancelId(p.id); }}>
             {cancelId === p.id ? 'Да, отменить' : 'Отменить'}</button>
         )}
+        {hasFeature('paymentsFill') && (p.date === null || p.kopecks === null) && p.save !== 'saving' && <PaymentFill p={p} who={c ? shortName(c.name) : 'клиент не указан'} />}
       </li>
     );
   }

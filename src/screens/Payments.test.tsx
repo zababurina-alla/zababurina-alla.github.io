@@ -13,7 +13,7 @@ const PAYS: Payment[] = [pay('p1', TODAY, 120000), pay('p2', null, 50000), pay('
 
 vi.mock('../data/store', () => ({
   useStore: () => ({
-    payments: PAYS, fresh: [], online: true, client: () => undefined, retry: () => undefined,
+    payments: PAYS, fresh: [], online: true, client: () => undefined, retry: () => undefined, pending: [], updatePayment: () => undefined,
     loadPaymentsMonth: async () => 0,
   }),
 }));

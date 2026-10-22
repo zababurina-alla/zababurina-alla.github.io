@@ -43,6 +43,8 @@ export type WriteOp =
   | { kind: 'reopenDeadline'; requestId: string; id: string; undoOf: string }
   | { kind: 'addPayment'; requestId: string; payment: Payment }
   | { kind: 'cancelPayment'; requestId: string; id: string; baseVersion: number }
+  /** payments.update: дописать дату и/или сумму в ПУСТУЮ ячейку платежа; заполненное поле сервер не меняет (VALIDATION с полем). */
+  | { kind: 'updatePayment'; requestId: string; id: string; baseVersion: number; patch: PaymentPatch }
   | { kind: 'addClient'; requestId: string; client: Client }
   | { kind: 'updateClient'; requestId: string; id: string; baseVersion: number; patch: ClientPatch }
   /** deadlines.update (контракт 8.3): дата, статус (кроме done — закрытие только close), заметка. */
@@ -87,6 +89,9 @@ export interface TaskPatch { text?: string; due?: string | null; type?: TaskType
 /** clients.update: контакты, ключ; kved — весь список кодов «NN.NN» (заменяет; главный сервер выбирает сам). */
 export type ClientPatch = Partial<Pick<Client, 'phone' | 'email' | 'keyIssuer' | 'keyFrom' | 'keyUntil'>> & { kved?: string[] };
 
+/** payments.update: только недостающее. date — YYYY-MM-DD, не позже завтра; amountKopecks — целое > 0. */
+export interface PaymentPatch { date?: string; amountKopecks?: number }
+
 export interface DeadlinePatch { due?: string; status?: Exclude<DeadlineStatus, 'done'>; note?: string }
 
 /** clients.get — всё о клиенте: строка целиком, его сроки, платежи (не только 90 дней), задачи и история изменений. */
@@ -100,7 +105,7 @@ export function touchedBy(op: WriteOp): [Entity, string][] {
     case 'closeDeadline': case 'reopenDeadline': case 'updateDeadline': return [['deadline', op.id]];
     case 'closeDeadlines': case 'updateDeadlines': return op.items.map((i) => ['deadline', i.id] as [Entity, string]);
     case 'addPayment': return [['payment', op.payment.id]];
-    case 'cancelPayment': return [['payment', op.id]];
+    case 'cancelPayment': case 'updatePayment': return [['payment', op.id]];
     case 'addClient': return [['client', op.client.id]];
     case 'updateClient': return [['client', op.id]];
     case 'createTask': return [['task', op.task.id]];

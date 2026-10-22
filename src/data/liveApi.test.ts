@@ -176,6 +176,19 @@ describe('живой адаптер: новые действия (очередь
     expect(r.ok && r.changes[0]).toMatchObject({ entity: 'deadline', id: 'D-3', record: { status: 'postponed' } });
   });
 
+  it('платёж: payments.update с baseVersion и patch { date?, amountKopecks? }; ответ — upsert платежа; VALIDATION и CONFLICT доходят с текстом сервера', async () => {
+    const cur: Payment = { id: 'P-7', version: 6, clientId: 'C-1', kopecks: 90000, period: 'x', method: 'bank', date: '2026-10-01', source: 'таблица' };
+    const s = server(ok({ payment: { ...cur, date: '2026-10-01', version: 7 } }, 31), fail('VALIDATION', 'Дата уже есть в таблице', { field: 'date' }), fail('CONFLICT', 'Платёж изменили в таблице', {}, cur));
+    const api = new LiveApi(URL_, auth(), s.fetchImpl);
+    const a = await api.write({ kind: 'updatePayment', requestId: 'R21', id: 'P-7', baseVersion: 6, patch: { date: '2026-10-01', amountKopecks: 90000 } });
+    expect(s.sent[0]).toMatchObject({ action: 'payments.update', requestId: 'R21', payload: { id: 'P-7', baseVersion: 6, patch: { date: '2026-10-01', amountKopecks: 90000 } } });
+    expect(a.ok && a.changes[0]).toMatchObject({ entity: 'payment', op: 'upsert', id: 'P-7', origin: 'R21', record: { version: 7 } });
+    const b = await api.write({ kind: 'updatePayment', requestId: 'R22', id: 'P-7', baseVersion: 6, patch: { date: '2026-10-02' } });
+    expect(b).toEqual({ ok: false, code: 'VALIDATION', message: 'Дата уже есть в таблице' });
+    const c = await api.write({ kind: 'updatePayment', requestId: 'R23', id: 'P-7', baseVersion: 5, patch: { amountKopecks: 100 } });
+    expect(c).toMatchObject({ ok: false, code: 'CONFLICT', current: { id: 'P-7', version: 6 } });
+  });
+
   it('платежи месяца: payments.list { month } без requestId', async () => {
     const s = server(ok({ payments: [], totalKopecks: 0 }));
     const r = await new LiveApi(URL_, auth(), s.fetchImpl).listPayments('2026-06');

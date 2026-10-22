@@ -189,6 +189,20 @@ class FakeServer implements CabinetApi {
         this.payments.delete(op.id);
         return { ok: true, changes: [this.record('payment', 'delete', op.id, o), this.act('Платёж отменён', o, 'сайт')], cursor: this.cursor };
       }
+      case 'updatePayment': {
+        // Как payments.update: пишет только в пустую ячейку; заполненное поле — VALIDATION; дата не позже завтра; сумма > 0.
+        const cur = this.payments.get(op.id);
+        if (!cur) return { ok: false, code: 'NOT_FOUND', message: 'Этого платежа уже нет' };
+        if (cur.version !== op.baseVersion) return { ok: false, code: 'CONFLICT', message: 'Платёж изменили в таблице', current: { ...cur } };
+        const { date, amountKopecks } = op.patch;
+        if (date !== undefined && cur.date !== null) return { ok: false, code: 'VALIDATION', message: 'Дата уже есть в таблице — исправьте её там' };
+        if (amountKopecks !== undefined && cur.kopecks !== null) return { ok: false, code: 'VALIDATION', message: 'Сумма уже есть в таблице — исправьте её там' };
+        if (date !== undefined && date > addDays(TODAY, 1)) return { ok: false, code: 'VALIDATION', message: 'Дата оплаты ещё не наступила' };
+        if (amountKopecks !== undefined && !(Number.isInteger(amountKopecks) && amountKopecks > 0)) return { ok: false, code: 'VALIDATION', message: 'Сумма должна быть больше нуля' };
+        const upd: Payment = { ...cur, ...(date !== undefined ? { date } : {}), ...(amountKopecks !== undefined ? { kopecks: amountKopecks } : {}), version: this.cursor + 1 };
+        this.payments.set(cur.id, upd);
+        return { ok: true, changes: [this.record('payment', 'upsert', cur.id, o, upd), this.act('Платёж дополнен', o, 'сайт')], cursor: this.cursor };
+      }
       case 'addClient': {
         // id клиента выдаёт сервер (номер в колонке A), не браузер (п. 8).
         const c: Client = { ...op.client, id: `C-${this.nextClientNo++}`, version: this.cursor + 1 };

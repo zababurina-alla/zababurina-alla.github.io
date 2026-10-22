@@ -227,6 +227,21 @@
   }
 }
 
+/* Дописать дату/сумму в группе «Без даты или суммы» (флаг paymentsFill): отдельной строкой под платежом, на всю ширину */
+.paylist__fill {
+  grid-column: 1 / -1;
+  justify-self: start;
+  padding-left: 3.125rem; /* под именем, а не под значком клиента */
+}
+
+.paylist__fill .paylist__field {
+  flex: 0 1 11rem;
+}
+
+.paylist__fill .input--sm {
+  width: 100%;
+}
+
 /* Листание месяцев (техника сайта). Оформление — за отделом дизайна. */
 .month-nav {
   display: flex;

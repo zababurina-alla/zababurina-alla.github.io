@@ -285,6 +285,10 @@ export class LiveApi implements CabinetApi {
           const env = await this.rpc<{ cancelled: string }>('payments.cancel', { id: op.id, baseVersion: op.baseVersion }, o);
           return { ok: true, changes: [{ cursor: env.cursor, entity: 'payment', op: 'delete', id: env.data.cancelled, origin: o }], cursor: env.cursor };
         }
+        case 'updatePayment': {
+          const env = await this.rpc<{ payment: Payment }>('payments.update', { id: op.id, baseVersion: op.baseVersion, patch: op.patch }, o);
+          return { ok: true, changes: [up('payment', env.data.payment, env.cursor)], cursor: env.cursor };
+        }
         case 'addClient': {
           const c = op.client;
           const env = await this.rpc<{ client: Client; createdDeadlines: Deadline[] }>('clients.create', {
