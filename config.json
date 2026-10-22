@@ -3,7 +3,12 @@
   "writes": [
     "tasks",
     "deadlines",
-    "payments"
+    "payments",
+    "clients",
+    "questions",
+    "inbox",
+    "remind",
+    "consultations"
   ],
   "features": [
     "inbox",
@@ -20,6 +25,14 @@
     "monthWrite",
     "botLink",
     "statementPdf",
-    "photos"
+    "photos",
+    "inboxHide",
+    "kvedEdit",
+    "remindPreview",
+    "dueSet",
+    "tasksShowAll",
+    "paymentsFill",
+    "incomeEdit",
+    "answerReplace"
   ]
 }
