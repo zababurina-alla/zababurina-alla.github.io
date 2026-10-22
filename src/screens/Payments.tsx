@@ -181,7 +181,7 @@ export function Payments() {
         {p.kopecks === null
           ? <span className="paylist__sum paylist__sum--none nil">сумма не указана</span>
           : <span className="paylist__sum display"><Money text={formatPayMoney(p.kopecks)} /></span>}
-        {canWrite('payments') && !p.save && (
+        {canWrite('payments') && p.save !== 'saving' && p.save !== 'failed' && (
           <button type="button" className={`link paylist__cancel${cancelId === p.id ? ' is-sure' : ''}`}
             onClick={() => { if (cancelId === p.id) { store.removePayment(p.id); setCancelId(null); } else setCancelId(p.id); }}>
             {cancelId === p.id ? 'Да, отменить' : 'Отменить'}</button>
