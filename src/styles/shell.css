@@ -140,7 +140,8 @@
 .fab-away .fab {
   transform: translateY(calc(100% + var(--space-4) + 4.25rem));
   pointer-events: none;
-  transition: transform var(--dur-base) ease;
+  visibility: hidden; /* и с клавиатуры (Tab) на спрятанную не попасть */
+  transition: transform var(--dur-base) ease, visibility 0s linear var(--dur-base);
 }
 
 .fab:active {

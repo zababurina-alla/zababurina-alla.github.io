@@ -71,6 +71,14 @@ select.input {
   cursor: pointer;
 }
 
+/* Режим высокой контрастности Windows: градиентная стрелка пропадает — возвращаем системную */
+@media (forced-colors: active) {
+  select.input {
+    -webkit-appearance: auto;
+    appearance: auto;
+  }
+}
+
 .input--icon {
   padding-left: 2.75rem;
 }

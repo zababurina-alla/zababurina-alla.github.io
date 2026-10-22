@@ -255,7 +255,10 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
       });
     };
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => { window.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf); };
+    return () => {
+      window.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf);
+      document.documentElement.classList.remove('fab-away'); // вышли и вошли снова — «+» видна, а не спрятана
+    };
   }, []);
 
   // Подпись — действие, а не состояние: «Светлая тема» на светлой читалась как «сейчас светлая» (приёмка М-5)

@@ -254,7 +254,8 @@
 /* Телефон: кнопка Google 320 px должна уместиться внутри карточки (375 − 2 × 12 − 2 × 12 = 327) */
 @media (max-width: 26rem) {
   .login { padding: var(--space-3); }
-  .login__card { padding: var(--space-6) var(--space-3) 0; }
+  /* Сверху — столько же, сколько снизу занимает пустая строка «Входим…» с промежутком (40 px): было 32 и 40 */
+  .login__card { padding: calc(1.5rem + var(--space-4)) var(--space-3) 0; }
 }
 
 .login__mark {

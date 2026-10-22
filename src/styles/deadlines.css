@@ -776,6 +776,9 @@
      вниз, и у соседних сроков кнопка стояла по-разному (проход 22.10, № 7) */
   .dtable__tools { flex-basis: 100%; }
 
+  /* «···» — ровно под названием срока: у кнопки поле слева, сдвигаем на него */
+  .dtable__tools > .dactions__toggle { margin-left: calc(-1 * var(--space-2)); }
+
   .dtable__tools > .dactions__toggle { opacity: 1; }
 
   .dtable__tools:has(> .dactions) > .dtable__tool {
