@@ -54,7 +54,7 @@ describe('config.json', () => {
 
   it('живой config.json сегодня (features inbox, cancelNotify): новое без приёмки выключено — калькулятор, недели, микрофон, правка КВЕД, Месяц, Внимание, архив', async () => {
     await loadRuntimeConfig(fetchJson({ apiUrl: 'https://x/exec', writes: ['tasks', 'deadlines', 'payments'], features: ['inbox', 'cancelNotify'] }));
-    const off = ['epCalc', 'weekLoad', 'voice', 'kvedEdit', 'month', 'attention', 'archive', 'deadlinesCreate', 'applyTemplate', 'botLink', 'statementPdf', 'sendStatement', 'completeMany', 'updateMany'] as const;
+    const off = ['epCalc', 'weekLoad', 'voice', 'kvedEdit', 'month', 'attention', 'archive', 'deadlinesCreate', 'applyTemplate', 'botLink', 'statementPdf', 'sendStatement', 'completeMany', 'updateMany', 'dueSet', 'tasksShowAll'] as const;
     expect(off.filter((f) => hasFeature(f))).toEqual([]);
     expect([hasFeature('inbox'), hasFeature('cancelNotify')]).toEqual([true, true]);
   });

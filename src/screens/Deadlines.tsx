@@ -26,6 +26,7 @@ import { OBLIGATION_ICON } from '../ui/obligationIcon';
 import { useRoute } from '../router';
 import { useUi } from '../app/ui-context';
 import { WeekLoadBar } from './WeekLoad';
+import { UndatedRow } from './UndatedRow';
 
 type Range = 'month' | 'overdue' | 'week' | 'all';
 const RANK: Record<Status, number> = { red: 4, orange: 3, yellow: 2, green: 1, grey: 0 };
@@ -280,14 +281,11 @@ export function Deadlines() {
       {store.undated.length > 0 && (
         <section className="panel reveal" aria-labelledby="undated-title">
           <header className="panel__head"><h2 id="undated-title" className="panel__title">Без даты срока<span className="sub num">{store.undated.length}</span></h2></header>
-          <p className="sub undated__hint">В таблице у этих сроков пустая дата — проверьте и впишите её там, на сайте они встанут на свой день сами.</p>
+          <p className="sub undated__hint">{hasFeature('dueSet')
+            ? 'В таблице у этих сроков пустая дата — выберите её здесь, и срок встанет на свой день.'
+            : 'В таблице у этих сроков пустая дата — проверьте и впишите её там, на сайте они встанут на свой день сами.'}</p>
           <ul className="closed">
-            {store.undated.map((d) => (
-              <li key={d.id} className="closed__row">
-                <Icon name="calendar" tile="wheat" />
-                <span className="closed__text"><strong>{(() => { const c = store.client(d.clientId); return c ? shortName(c.name) : 'клиент не найден'; })()}</strong> — <TableText text={d.what} /></span>
-              </li>
-            ))}
+            {store.undated.map((d) => <UndatedRow key={d.id} d={d} />)}
           </ul>
         </section>
       )}
