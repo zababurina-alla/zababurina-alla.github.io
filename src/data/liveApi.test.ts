@@ -166,6 +166,19 @@ describe('живой адаптер: записи', () => {
     const b = await api.write({ kind: 'answerQuestion', requestId: 'R11', id: 'Q-1', text: 'Да' });
     expect(b).toMatchObject({ ok: false, code: 'VALIDATION', current: { id: 'Q-1', answer: 'Нет' } });
   });
+
+  it('замена ответа: questions.answer с replace: true; без replace поля в запросе нет; отказ доходит с текстом сервера', async () => {
+    const q = { id: 'Q-1', version: 5, text: 'Добавить КВЕД?', type: 'choice', options: ['Да', 'Нет'], clientId: 'C-1', status: 'asked', askedAt: '2026-10-14T10:00', answer: 'Нет' };
+    const s = server(ok({ question: q }, 22), ok({ question: q }, 23), fail('VALIDATION', 'Это «Да» уже применено — изменить ответ нельзя', {}));
+    const api = new LiveApi(URL_, auth(), s.fetchImpl);
+    const a = await api.write({ kind: 'answerQuestion', requestId: 'R12', id: 'Q-1', text: 'Нет', replace: true });
+    expect(s.sent[0]).toMatchObject({ action: 'questions.answer', requestId: 'R12', payload: { id: 'Q-1', text: 'Нет', replace: true } });
+    expect(a.ok && a.changes[0]).toMatchObject({ entity: 'question', id: 'Q-1', origin: 'R12' });
+    await api.write({ kind: 'answerQuestion', requestId: 'R13', id: 'Q-1', text: 'Нет' });
+    expect((s.sent[1] as { payload: Record<string, unknown> }).payload).toEqual({ id: 'Q-1', text: 'Нет' });
+    const c = await api.write({ kind: 'answerQuestion', requestId: 'R14', id: 'Q-1', text: 'Да', replace: true });
+    expect(c).toEqual({ ok: false, code: 'VALIDATION', message: 'Это «Да» уже применено — изменить ответ нельзя' });
+  });
 });
 
 describe('живой адаптер: новые действия (очередь 15.10)', () => {

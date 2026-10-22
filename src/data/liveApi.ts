@@ -356,7 +356,7 @@ export class LiveApi implements CabinetApi {
           return { ok: true, changes, cursor: env.cursor };
         }
         case 'answerQuestion': {
-          const env = await this.rpc<{ question: Question }>('questions.answer', { id: op.id, text: op.text }, o);
+          const env = await this.rpc<{ question: Question }>('questions.answer', { id: op.id, text: op.text, ...(op.replace ? { replace: true } : {}) }, o);
           return { ok: true, changes: [up('question', env.data.question, env.cursor)], cursor: env.cursor };
         }
         case 'completeTask': {

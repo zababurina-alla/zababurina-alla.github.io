@@ -57,7 +57,8 @@ export type WriteOp =
   | { kind: 'completeTask'; requestId: string; id: string; done: boolean }
   /** tasks.completeMany (v5.89): до 20 задач одним запросом; ошибка одной — в failed, остальные сделаны. */
   | { kind: 'completeTasks'; requestId: string; ids: string[]; done: boolean }
-  | { kind: 'answerQuestion'; requestId: string; id: string; text: string }
+  /** questions.answer (8.7). replace: true — заменить уже записанный ответ (флаг answerReplace); без него — первый ответ. */
+  | { kind: 'answerQuestion'; requestId: string; id: string; text: string; replace?: boolean }
   /** inbox.decide: принять (платёж — записать с суммой), сделать задачей, отклонить. */
   | { kind: 'decideInbox'; requestId: string; id: string; action: InboxAction; amount?: number }
   /** inbox.hide / inbox.unhide (v5.91): убрать сообщения только на сайте (Telegram мамы не трогаем) и вернуть (24 ч). До 20. */

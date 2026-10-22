@@ -323,7 +323,8 @@ class FakeServer implements CabinetApi {
         // Как сервер (контракт v2.1, у. 6): уже отвечен в Telegram — отказ с текущим ответом; choice — только из вариантов.
         const q = this.questions.get(op.id);
         if (!q) return { ok: false, code: 'NOT_FOUND', message: 'Этого вопроса уже нет' };
-        if (q.answer !== null) return { ok: false, code: 'VALIDATION', message: `Уже ответили в Telegram: ${q.answer}`, current: { ...q } };
+        // replace: true — замена записанного ответа (контракт 8.7); без него отвеченный вопрос — отказ.
+        if (q.answer !== null && !op.replace) return { ok: false, code: 'VALIDATION', message: `Уже ответили в Telegram: ${q.answer}`, current: { ...q } };
         if (q.type === 'choice' && !q.options.includes(op.text)) return { ok: false, code: 'VALIDATION', message: 'Выберите один из вариантов' };
         if (q.type === 'number' && !/^-?\d+([.,]\d+)?$/.test(op.text.trim())) return { ok: false, code: 'VALIDATION', message: 'Здесь нужно число' };
         const upd: Question = { ...q, answer: op.text, version: this.cursor + 1 };

@@ -19,8 +19,10 @@ export type Feature = 'inbox' | 'remindPreview' | 'cancelNotify' | 'deadlinesCre
   // paymentsFill — «Платежи → Без даты или суммы»: дописать дату/сумму (payments.update)
   | 'paymentsFill'
   // incomeEdit — карточка клиента: ввод дохода (clients.update { income })
-  | 'incomeEdit';
-const FEATURES: readonly Feature[] = ['inbox', 'remindPreview', 'cancelNotify', 'deadlinesCreate', 'applyTemplate', 'botLink', 'statementPdf', 'sendStatement', 'archive', 'attention', 'completeMany', 'updateMany', 'month', 'epCalc', 'weekLoad', 'voice', 'kvedEdit', 'monthWrite', 'inboxHide', 'aiChat', 'photos', 'dueSet', 'tasksShowAll', 'paymentsFill', 'incomeEdit'];
+  | 'incomeEdit'
+  // answerReplace — «Вопросы»: «Изменить» уже записанный ответ (questions.answer { replace: true })
+  | 'answerReplace';
+const FEATURES: readonly Feature[] = ['inbox', 'remindPreview', 'cancelNotify', 'deadlinesCreate', 'applyTemplate', 'botLink', 'statementPdf', 'sendStatement', 'archive', 'attention', 'completeMany', 'updateMany', 'month', 'epCalc', 'weekLoad', 'voice', 'kvedEdit', 'monthWrite', 'inboxHide', 'aiChat', 'photos', 'dueSet', 'tasksShowAll', 'paymentsFill', 'incomeEdit', 'answerReplace'];
 
 /** OAuth client ID проекта Google Cloud «zababurina-alla» (…apps.googleusercontent.com). */
 export const GOOGLE_CLIENT_ID = '1078049272948-bnvonl9qah7npdq63gktbio1rm2lbgvb.apps.googleusercontent.com';

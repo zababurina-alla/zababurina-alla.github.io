@@ -157,7 +157,8 @@ interface Store {
   deleteTask: (id: string) => void;
   /** Ответ на вопрос маме (questions.answer). */
   /** Ответ ждёт 10 с в окне «Отменить» (undoHeld); возвращает requestId. */
-  answerQuestion: (id: string, text: string, onSaved?: () => void) => string;
+  /** replace: true — заменить уже записанный ответ (флаг answerReplace): сразу, без 10 с; отказ сервера — уведомлением с его текстом. */
+  answerQuestion: (id: string, text: string, onSaved?: () => void, replace?: boolean) => string;
   dismissNotice: (id: string) => void;
   toggleTask: (id: string, done: boolean) => void;
   completeTasks: (ids: string[], done: boolean) => void;
@@ -952,10 +953,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return requestId;
   }, [inbox, send]);
 
-  const answerQuestion = useCallback((id: string, text: string, onSaved?: () => void) => {
+  const answerQuestion = useCallback((id: string, text: string, onSaved?: () => void, replace = false) => {
     const requestId = newRequestId();
-    // Ответ в таблице сайт изменить не может — 10 с на «Отменить» до отправки (находка № 2).
-    send({ kind: 'answerQuestion', requestId, id, text }, 'Ответ на вопрос', () => onSaved?.(), 0, HOLD_MS);
+    // Первый ответ в таблице без флага answerReplace сайт изменить не может — 10 с на «Отменить» до отправки (находка № 2).
+    // Замена (replace) — осознанное «Изменить»: без ожидания.
+    if (replace) send({ kind: 'answerQuestion', requestId, id, text, replace: true }, 'Изменение ответа', () => onSaved?.(), 0, 0);
+    else send({ kind: 'answerQuestion', requestId, id, text }, 'Ответ на вопрос', () => onSaved?.(), 0, HOLD_MS);
     return requestId;
   }, [send]);
 

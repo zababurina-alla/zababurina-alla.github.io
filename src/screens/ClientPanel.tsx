@@ -22,7 +22,7 @@ import { URGENCY_ICON } from './DeadlineTable';
 import { Modal } from '../ui/Modal';
 import { useUi } from '../app/ui-context';
 import { TableText } from '../ui/TableText';
-import { QuestionAnswer } from './Questions';
+import { QuestionAnswer, QuestionEdits } from './Questions';
 import { DeadlineTable } from './DeadlineTable';
 import { useRoute } from '../router';
 import { ConsultationsTab } from './Consultations';
@@ -245,6 +245,7 @@ export function ClientPanel({ id, onClose }: { id: string | null; onClose: () =>
                     ))}
                   </section>
                 )}
+                <QuestionEdits clientId={c.id} />
                 <section className="cp__block">
                   <h3 className="cp__h">Задачи по клиенту</h3>
                   {/* Шаблоны задач — как меню таблицы «✨ Шаблоны задач»: одно нажатие, срок и важность — как там. */}
