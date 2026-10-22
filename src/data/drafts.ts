@@ -9,7 +9,7 @@ const MAX_AGE_MS = 7 * 24 * 3600 * 1000;
 
 interface Saved<T> { value: T; savedAt: number }
 
-export function useDraft<T>(key: string, open: boolean, value: T, restore: (v: T) => void, isEmpty: (v: T) => boolean) {
+export function useDraft<T>(key: string, open: boolean, value: T, restore: (v: T) => unknown, isEmpty: (v: T) => boolean) {
   const [restoredAt, setRestoredAt] = useState<number | null>(null);
   const ready = useRef(false);
   const restoreRef = useRef(restore);
@@ -23,8 +23,8 @@ export function useDraft<T>(key: string, open: boolean, value: T, restore: (v: T
     void kvGet<Saved<T>>('drafts', key).then((d) => {
       if (!alive) return;
       if (d && Date.now() - d.savedAt < MAX_AGE_MS && !isEmptyRef.current(d.value)) {
-        restoreRef.current(d.value);
-        setRestoredAt(d.savedAt);
+        // restore вернул false — черновик к этой форме не подходит (чужой клиент): не подставляем и не пишем «восстановлен».
+        setRestoredAt(restoreRef.current(d.value) === false ? null : d.savedAt);
       } else setRestoredAt(null);
       ready.current = true;
     });
