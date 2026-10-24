@@ -19,7 +19,8 @@ import { Empty } from '../ui/Empty';
 import { shortName } from '../ui/names';
 import { useUi } from '../app/ui-context';
 import { roAttrs } from '../ui/readonly';
-import { canWrite } from '../config';
+import { canWrite, hasFeature } from '../config';
+import { PaymentFill } from './PaymentFill';
 
 const SOURCE: Record<string, { icon: IconName; text: string }> = {
   'сайт': { icon: 'globe', text: 'с сайта' }, 'бот': { icon: 'bot', text: 'через бота' }, 'таблица': { icon: 'sheet', text: 'в таблице' },
@@ -104,7 +105,8 @@ export function Payments() {
             {monthFailed && <span className="sub" role="alert">Не загрузилось из таблицы. <button type="button" className="link" onClick={retryMonth}>Ещё раз</button></span>}
           </p>
         </div>
-        <button type="button" className="btn btn--primary" onClick={() => ui.openPayment()} {...roAttrs('payments')}><Icon name="plus" />Записать платёж</button>
+        {/* «Записать платёж» здесь не дублируем: он всегда под рукой — в боковой панели (≥ 1024) и кнопкой «+» на телефоне
+            (DESIGN.md §6, п. 5: одна главная кнопка на экране) */}
       </header>
 
       <section className="hero pay-hero reveal" aria-label="Итог месяца">
@@ -146,13 +148,13 @@ export function Payments() {
         )}
         {check.length > 0 && (
           <div className="dgroup">
-            <h2 className="dgroup__title"><span>Без даты или суммы — проверьте в таблице</span>
+            <h2 className="dgroup__title"><span>{hasFeature('paymentsFill') && canWrite('payments') ? 'Без даты или суммы — допишите здесь' : 'Без даты или суммы — проверьте в таблице'}</span>
               <span className="dgroup__count">{check.length}</span></h2>
             <ul className="paylist">{check.map(row)}</ul>
           </div>
         )}
         {[...byDay.entries()].map(([day, list]) => (
-          <div key={day} className="dgroup">
+          <div key={day} className="dgroup dgroup--pay">
             <h2 className="dgroup__title"><span>{dayTitle(day)}</span>
               <span className="dgroup__count"><Money text={formatMoney(daySum(list))} /></span></h2>
             <ul className="paylist">{list.map(row)}</ul>
@@ -180,11 +182,12 @@ export function Payments() {
         {p.kopecks === null
           ? <span className="paylist__sum paylist__sum--none nil">сумма не указана</span>
           : <span className="paylist__sum display"><Money text={formatPayMoney(p.kopecks)} /></span>}
-        {canWrite('payments') && !p.save && (
+        {canWrite('payments') && p.save !== 'saving' && p.save !== 'failed' && (
           <button type="button" className={`link paylist__cancel${cancelId === p.id ? ' is-sure' : ''}`}
             onClick={() => { if (cancelId === p.id) { store.removePayment(p.id); setCancelId(null); } else setCancelId(p.id); }}>
             {cancelId === p.id ? 'Да, отменить' : 'Отменить'}</button>
         )}
+        {hasFeature('paymentsFill') && (p.date === null || p.kopecks === null) && p.save !== 'saving' && <PaymentFill p={p} who={c ? shortName(c.name) : 'клиент не указан'} />}
       </li>
     );
   }

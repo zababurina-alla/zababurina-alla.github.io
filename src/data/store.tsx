@@ -16,8 +16,8 @@ import { readSnap, readSnapAt, saveSnap } from './snapCache';
 import { Outbox } from './outbox';
 import type { Counters, OutboxEvent, OutboxItem } from './outbox';
 import { newRequestId, touchedBy } from './api';
-import type { AiAnswer, ApplyTemplateResult, BotLinkResult, CabinetApi, MonthCheck, StatementPdf, StatementPreview, StatementResult, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, DeadlinePatch, InboxAction, RemindPreview, RemindRequest, RemindResult, Snapshot, TaskPatch, WriteOp, WriteResult } from './api';
-import type { Activity, Client, Consultation, DatedDeadline, Deadline, InboxItem, Payment, Question, SaveState, Task } from './types';
+import type { AiAnswer, ApplyTemplateResult, BotLinkResult, CabinetApi, MonthCheck, StatementPdf, StatementPreview, StatementResult, CancelNotifyResult, Change, CreateDeadlineResult, DeadlineTemplate, NewDeadline, DeadlinePatch, InboxAction, PaymentPatch, RemindPreview, RemindRequest, RemindResult, Snapshot, TaskPatch, WriteOp, WriteResult } from './api';
+import type { Activity, Client, Consultation, DatedDeadline, Deadline, IncomeBasis, InboxItem, Payment, Question, SaveState, Task } from './types';
 import { isDated } from './types';
 import { TODAY, addDays, fmtDate, plural } from '../lib/dates';
 import { play } from '../lib/sound';
@@ -88,11 +88,15 @@ interface Store {
   reopenDeadline: (id: string) => void;
   addPayment: (p: Omit<Payment, 'id' | 'version' | 'source' | 'save'>, onSaved?: () => void) => string;
   removePayment: (id: string) => void;
+  /** Дописать дату и/или сумму платежу (payments.update, флаг paymentsFill): только в пустую ячейку; запись — в очередь. */
+  updatePayment: (id: string, patch: PaymentPatch, label: string) => void;
   addClient: (c: Omit<Client, 'id' | 'version'>, onSaved?: (created: Deadline[], client: Client) => void) => Client;
   /** baseVersion — версия, которую мама видела, когда начала править (бриф, п. 6: конфликт). */
   updatePhone: (clientId: string, phone: string, baseVersion: number) => void;
   /** КВЕД клиента целиком (clients.update patch.kved); главный — выберет сервер по max ставке. */
   updateKved: (clientId: string, codes: string[], baseVersion: number) => void;
+  /** Доход клиента (clients.update { income }, флаг incomeEdit): на экране — «сохраняется…» из очереди, значение встаёт по ответу таблицы. */
+  updateIncome: (clientId: string, income: { amountKopecks: number; basis: IncomeBasis }, baseVersion: number) => void;
   /** Почта клиента (clients.update { email }). */
   updateEmail: (clientId: string, email: string, baseVersion: number) => void;
   addTask: (t: Omit<Task, 'id' | 'version' | 'done'>) => void;
@@ -153,7 +157,8 @@ interface Store {
   deleteTask: (id: string) => void;
   /** Ответ на вопрос маме (questions.answer). */
   /** Ответ ждёт 10 с в окне «Отменить» (undoHeld); возвращает requestId. */
-  answerQuestion: (id: string, text: string, onSaved?: () => void) => string;
+  /** replace: true — заменить уже записанный ответ (флаг answerReplace): сразу, без 10 с; отказ сервера — уведомлением с его текстом. */
+  answerQuestion: (id: string, text: string, onSaved?: () => void, replace?: boolean) => string;
   dismissNotice: (id: string) => void;
   toggleTask: (id: string, done: boolean) => void;
   completeTasks: (ids: string[], done: boolean) => void;
@@ -178,7 +183,7 @@ const Ctx = createContext<Store | null>(null);
 const AREA_OF: Record<WriteOp['kind'], WriteArea | null> = {
   hideInbox: null, unhideInbox: null,
   createConsultation: 'consultations',
-  closeDeadline: 'deadlines', closeDeadlines: 'deadlines', updateTask: 'tasks', deleteTask: 'tasks', reopenDeadline: 'deadlines', addPayment: 'payments', cancelPayment: 'payments',
+  closeDeadline: 'deadlines', closeDeadlines: 'deadlines', updateTask: 'tasks', deleteTask: 'tasks', reopenDeadline: 'deadlines', addPayment: 'payments', cancelPayment: 'payments', updatePayment: 'payments',
   updateDeadline: 'deadlines', addClient: 'clients', updateClient: 'clients', createTask: 'tasks', completeTask: 'tasks', completeTasks: 'tasks', updateDeadlines: 'deadlines', answerQuestion: 'questions', decideInbox: 'inbox',
 };
 
@@ -359,7 +364,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setClients((xs) => upsert(xs, op.client));
     } else if (op.kind === 'updateClient') {
       // КВЕД приходит кодами: названия — те, что уже были у клиента (новые — пусто, подставит справочник).
-      const { kved, ...rest } = op.patch;
+      // income на экран не выносим: строка клиента показывает «сохраняется…» из очереди, а доход встанет по ответу таблицы.
+      const { kved, income: _income, ...rest } = op.patch;
+      void _income;
       setClients((xs) => xs.map((c) => (c.id === op.id
         ? { ...c, ...rest, ...(kved ? { kved: kved.map((code) => ({ code, title: c.kved.find((k) => k.code === code)?.title ?? '' })) } : {}) }
         : c)));
@@ -430,7 +437,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         callbacks.current.delete(op.requestId);
         return;
       }
-      if (e.type === 'conflict' && op.kind === 'updateClient' && e.result.current && 'phone' in e.result.current) {
+      if (e.type === 'conflict' && op.kind === 'updateClient' && !('income' in op.patch) && e.result.current && 'phone' in e.result.current) {
         setConflict({ requestId: op.requestId, clientId: op.id, mine: op.patch.phone ?? '', theirs: e.result.current.phone });
         play('attention');
         return;
@@ -458,7 +465,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setInbox((xs) => xs.map((x) => (x.id === op.id ? (cur ?? { ...x, status: 'new' }) : x)));
       }
       // Карточку не поправили (VALIDATION телефона/почты, NOT_FOUND…) — строка клиента такая, какая в таблице или была.
-      if (op.kind === 'updateClient' && final && e.type !== 'conflict') {
+      if (op.kind === 'updateClient' && final && (e.type !== 'conflict' || 'income' in op.patch)) {
         const cur = e.result.current && 'kind' in e.result.current ? e.result.current : clientsBefore.current.get(op.requestId);
         if (cur) setClients((xs) => xs.map((c) => (c.id === cur.id ? cur : c)));
         clientsBefore.current.delete(op.requestId);
@@ -472,7 +479,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // Правку срока таблица не приняла — срок возвращается таким, какой он в таблице.
       if (op.kind === 'updateDeadline' && e.result.current && 'periodicity' in e.result.current) putOpen(e.result.current);
       // Отмену платежа сервер не выполнил — платёж возвращается на экран таким, каким он стал в таблице.
-      if (op.kind === 'cancelPayment' && e.result.current && 'kopecks' in e.result.current) {
+      if ((op.kind === 'cancelPayment' || op.kind === 'updatePayment') && e.result.current && 'kopecks' in e.result.current) {
         const cur = e.result.current;
         setPayments((xs) => upsert(xs, cur));
       }
@@ -704,6 +711,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     send({ kind: 'cancelPayment', requestId: newRequestId(), id, baseVersion: p.version }, 'Отменить платёж');
   }, [send]);
 
+  /** Правка пустой ячейки платежа: на экране строка остаётся с «сохраняется…» (в очереди), встаёт на место после ответа таблицы. */
+  const updatePayment = useCallback((id: string, patch: PaymentPatch, label: string) => {
+    const p = paymentsRef.current.find((x) => x.id === id);
+    if (!p) return;
+    send({ kind: 'updatePayment', requestId: newRequestId(), id, baseVersion: p.version, patch }, label);
+  }, [send]);
+
   const addClient = useCallback((data: Omit<Client, 'id' | 'version'>, onSaved?: (created: Deadline[], client: Client) => void) => {
     const requestId = newRequestId();
     // Временный id только для экрана; настоящий выдаёт сервер (контракт v2, п. 8) — подменяем по ответу.
@@ -730,6 +744,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (before) clientsBefore.current.set(requestId, before);
     send({ kind: 'updateClient', requestId, id: clientId, baseVersion, patch: { kved: codes } }, 'КВЕД клиента', () => clientsBefore.current.delete(requestId));
   }, [clients, send]);
+  const updateIncome = useCallback((clientId: string, income: { amountKopecks: number; basis: IncomeBasis }, baseVersion: number) => {
+    send({ kind: 'updateClient', requestId: newRequestId(), id: clientId, baseVersion, patch: { income } }, 'Доход клиента');
+  }, [send]);
   const updatePhone = useCallback((clientId: string, phone: string, baseVersion: number) => {
     updateContact(clientId, { phone }, baseVersion, 'Телефон клиента');
   }, [updateContact]);
@@ -936,10 +953,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return requestId;
   }, [inbox, send]);
 
-  const answerQuestion = useCallback((id: string, text: string, onSaved?: () => void) => {
+  const answerQuestion = useCallback((id: string, text: string, onSaved?: () => void, replace = false) => {
     const requestId = newRequestId();
-    // Ответ в таблице сайт изменить не может — 10 с на «Отменить» до отправки (находка № 2).
-    send({ kind: 'answerQuestion', requestId, id, text }, 'Ответ на вопрос', () => onSaved?.(), 0, HOLD_MS);
+    // Первый ответ в таблице без флага answerReplace сайт изменить не может — 10 с на «Отменить» до отправки (находка № 2).
+    // Замена (replace) — осознанное «Изменить»: без ожидания.
+    if (replace) send({ kind: 'answerQuestion', requestId, id, text, replace: true }, 'Изменение ответа', () => onSaved?.(), 0, 0);
+    else send({ kind: 'answerQuestion', requestId, id, text }, 'Ответ на вопрос', () => onSaved?.(), 0, HOLD_MS);
     return requestId;
   }, [send]);
 
@@ -1022,10 +1041,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<Store>(() => ({
     loaded, online, syncedAt, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, consultations, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateKved, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, updateDeadlines, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention, month, inboxHide, aiAsk, photos,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, updatePayment, addClient, updatePhone, updateKved, updateIncome, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, updateDeadlines, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention, month, inboxHide, aiAsk, photos,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance,
   }), [loaded, online, syncedAt, stale, clients, deadlines, undated, payments, activity, tasks, questions, inbox, consultations, notices, loadError, closed, fresh, pending, counters, cursor, conflict,
-    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, addClient, updatePhone, updateKved, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, updateDeadlines, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention, month, inboxHide, aiAsk, photos,
+    client, closeDeadline, closeDeadlines, reopenDeadline, addPayment, removePayment, updatePayment, addClient, updatePhone, updateKved, updateIncome, updateEmail, addTask, addConsultation, toggleTask, completeTasks, updateTask, deleteTask, resolveConflict, revealPassword, answerQuestion, undoHeld, dismissNotice, reload, updateDeadline, updateDeadlines, renewKey, loadPaymentsMonth, refreshQuestions, decideInbox, loadClientCard, remindClient, remindPreview, cancelCloseNotice, createDeadline, templates, botLink, statement, archive, attention, month, inboxHide, aiAsk, photos,
     retry, discard, syncNow, external, setOnline, failNextWrite, setSlow, setMaintenance]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

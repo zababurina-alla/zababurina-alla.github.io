@@ -13,9 +13,11 @@ export function LoadProgress() {
     return () => window.clearInterval(t);
   }, []);
   const share = Math.min(0.95, 1 - Math.exp(-sec / (EXPECTED_S / 2.5)));
+  // Дольше 10 с — почти всегда холодный старт Google (22.10: до минуты): спокойно, без слова «ошибка».
   const text = sec < 3 ? 'Связываемся с таблицей…'
-    : sec < 18 ? 'Загружаем клиентов, сроки и платежи из таблицы…'
-      : 'Таблица сегодня отвечает медленно — ещё немного, ничего не потеряется';
+    : sec < 10 ? 'Загружаем клиентов, сроки и платежи из таблицы…'
+      : sec < 90 ? 'Таблица просыпается — это бывает до минуты, ничего не потеряется'
+        : 'Таблица просыпается дольше обычного — ещё немного, пробую снова';
   return (
     <div className="load-progress" role="status">
       <p className="load-progress__text">{text}{sec >= 3 && <span className="sub"> {sec} с</span>}</p>

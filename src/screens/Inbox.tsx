@@ -355,11 +355,11 @@ function ClearRead() {
   }
   return asking ? (
     <div className="inbox__clear" role="group" aria-label="Очистить прочитанное">
-      <span className="sub">Убрать с сайта решённые ({done})? В Telegram ничего не изменится.</span>
-      <button type="button" className="btn btn--primary btn--sm" disabled={busy} onClick={() => { void run(); }}>{busy ? 'Убираю…' : 'Убрать'}</button>
+      <span className="sub">Убрать с сайта прочитанные сообщения: {done}? В Telegram ничего не изменится.</span>
+      <button type="button" className="btn btn--primary btn--sm" disabled={busy} onClick={() => { void run(); }}>{busy ? 'Убираю…' : `Да, убрать (${done})`}</button>
       <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={() => setAsking(false)}>Отмена</button>
     </div>
-  ) : <button type="button" className="btn btn--ghost btn--sm inbox__clear" onClick={() => setAsking(true)}><Icon name="eyeOff" size={16} />Очистить прочитанное</button>;
+  ) : <button type="button" className="btn btn--ghost btn--sm inbox__clear" title="Сначала спросим, что именно убрать, — сразу ничего не пропадёт" onClick={() => setAsking(true)}><Icon name="eyeOff" size={16} />Очистить прочитанное</button>;
 }
 
 export function Inbox() {
@@ -397,7 +397,7 @@ export function Inbox() {
                     <Avatar name={c.name} {...(c.clientId ? { clientId: c.clientId } : {})} photo={clientPhoto(c.clientId ? store.client(c.clientId) : null)} />
                     <span className="chat__top"><strong className="chat__name">{c.clientId ? shortName(c.name) : c.name}</strong><span className="chat__time num">{listTime(c.last.at)}</span></span>
                     <span className="chat__bottom">
-                      <span className="chat__snippet">{c.last.file && <Icon name="attach" size={14} />}{voiceText(c.last) !== null ? <><Icon name="mic" size={14} />{voiceText(c.last) || 'Голосовое'}</> : keepNumbers(c.last.snippet)}</span>
+                      <span className="chat__snippet">{c.last.file && <Icon name="attach" size={14} />}{voiceText(c.last) !== null ? <><Icon name="mic" size={14} /><span className="chat__text">{voiceText(c.last) || 'Голосовое'}</span></> : <span className="chat__text">{keepNumbers(c.last.snippet)}</span>}</span>
                       {c.open > 0 && <span className="chat__badge num" title="Ждут решения" aria-label={`ждут решения: ${c.open}`}>{c.open}</span>}
                     </span>
                   </a>

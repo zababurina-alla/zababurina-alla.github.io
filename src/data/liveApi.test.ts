@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { LiveApi, pause } from './liveApi';
 import type { SessionProvider } from './liveApi';
-import { ApiError, call } from './transport';
+import { ApiError, call, coldPause } from './transport';
 import type { Deadline, Payment } from './types';
 
 const URL_ = 'https://script.google.com/macros/s/TEST/exec';
@@ -55,9 +55,54 @@ describe('транспорт', () => {
     await expect(call({ url: URL_, action: 'x', fetchImpl: s.fetchImpl })).rejects.toMatchObject({ code: 'SERVER' });
   });
 
-  it('выключатель API: текст «ok» вместо JSON → DISABLED с понятным текстом', async () => {
-    const s = server('ok');
+  it('выключатель API: текст «ok» вместо JSON → DISABLED с понятным текстом (у чтения — после одного повтора)', async () => {
+    const sleep = vi.spyOn(coldPause, 'sleep').mockResolvedValue();
+    const s = server('ok', 'ok');
     await expect(call({ url: URL_, action: 'sync.snapshot', fetchImpl: s.fetchImpl })).rejects.toMatchObject({ code: 'DISABLED', message: expect.stringContaining('выключена') });
+    expect(s.sent).toHaveLength(2);
+    sleep.mockRestore();
+  });
+
+  it('холодный старт: чтение после «ok», 404-страницы или обрыва один раз тихо повторяется через 2–3 с', async () => {
+    const sleep = vi.spyOn(coldPause, 'sleep').mockResolvedValue();
+    const s = server('ok', ok({ cursor: 5 }), '<html>404 Not Found</html>', ok({ changes: [] }), new TypeError('Failed to fetch'), ok({ photos: {} }));
+    await call({ url: URL_, action: 'sync.snapshot', fetchImpl: s.fetchImpl });
+    await call({ url: URL_, action: 'sync.changes', fetchImpl: s.fetchImpl });
+    await call({ url: URL_, action: 'clients.photos', fetchImpl: s.fetchImpl });
+    expect(s.sent.map((x) => x.action)).toEqual(['sync.snapshot', 'sync.snapshot', 'sync.changes', 'sync.changes', 'clients.photos', 'clients.photos']);
+    expect(sleep).toHaveBeenCalledTimes(3);
+    expect(sleep.mock.calls.every(([ms]) => ms >= 2000 && ms <= 3000)).toBe(true);
+    sleep.mockRestore();
+  });
+
+  it('повтор только один и только на сбой связи: ответ сервера с кодом ошибки и записи — без повтора', async () => {
+    const sleep = vi.spyOn(coldPause, 'sleep').mockResolvedValue();
+    const s = server('<html>404</html>', '<html>404</html>', fail('BUSY'), new TypeError('Failed to fetch'));
+    await expect(call({ url: URL_, action: 'reports.attention', fetchImpl: s.fetchImpl })).rejects.toMatchObject({ code: 'SERVER' });
+    await expect(call({ url: URL_, action: 'sync.snapshot', fetchImpl: s.fetchImpl })).rejects.toMatchObject({ code: 'BUSY' });
+    await expect(call({ url: URL_, action: 'payments.create', requestId: 'R1', fetchImpl: s.fetchImpl })).rejects.toMatchObject({ code: 'NETWORK' });
+    expect(s.sent.map((x) => x.action)).toEqual(['reports.attention', 'reports.attention', 'sync.snapshot', 'payments.create']);
+    sleep.mockRestore();
+  });
+
+  it('тайм-аут чтения — 75 с: на 30 с запрос ещё ждёт, на 75 с прерывается и повторяется', async () => {
+    vi.useFakeTimers();
+    const sleep = vi.spyOn(coldPause, 'sleep').mockResolvedValue();
+    let calls = 0;
+    const fetchImpl = ((_u: unknown, init?: RequestInit) => new Promise((_, rej) => {
+      calls++;
+      init?.signal?.addEventListener('abort', () => rej(new DOMException('aborted', 'AbortError')));
+    })) as unknown as typeof fetch;
+    const p = call({ url: URL_, action: 'sync.snapshot', fetchImpl });
+    const check = expect(p).rejects.toMatchObject({ code: 'NETWORK' });
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(calls).toBe(1);
+    await vi.advanceTimersByTimeAsync(45_000);
+    expect(calls).toBe(2);
+    await vi.advanceTimersByTimeAsync(75_000);
+    await check;
+    sleep.mockRestore();
+    vi.useRealTimers();
   });
 
   it('тайм-аут 30 с прерывает запрос → NETWORK', async () => {
@@ -166,6 +211,19 @@ describe('живой адаптер: записи', () => {
     const b = await api.write({ kind: 'answerQuestion', requestId: 'R11', id: 'Q-1', text: 'Да' });
     expect(b).toMatchObject({ ok: false, code: 'VALIDATION', current: { id: 'Q-1', answer: 'Нет' } });
   });
+
+  it('замена ответа: questions.answer с replace: true; без replace поля в запросе нет; отказ доходит с текстом сервера', async () => {
+    const q = { id: 'Q-1', version: 5, text: 'Добавить КВЕД?', type: 'choice', options: ['Да', 'Нет'], clientId: 'C-1', status: 'asked', askedAt: '2026-10-14T10:00', answer: 'Нет' };
+    const s = server(ok({ question: q }, 22), ok({ question: q }, 23), fail('VALIDATION', 'Это «Да» уже применено — изменить ответ нельзя', {}));
+    const api = new LiveApi(URL_, auth(), s.fetchImpl);
+    const a = await api.write({ kind: 'answerQuestion', requestId: 'R12', id: 'Q-1', text: 'Нет', replace: true });
+    expect(s.sent[0]).toMatchObject({ action: 'questions.answer', requestId: 'R12', payload: { id: 'Q-1', text: 'Нет', replace: true } });
+    expect(a.ok && a.changes[0]).toMatchObject({ entity: 'question', id: 'Q-1', origin: 'R12' });
+    await api.write({ kind: 'answerQuestion', requestId: 'R13', id: 'Q-1', text: 'Нет' });
+    expect((s.sent[1] as { payload: Record<string, unknown> }).payload).toEqual({ id: 'Q-1', text: 'Нет' });
+    const c = await api.write({ kind: 'answerQuestion', requestId: 'R14', id: 'Q-1', text: 'Да', replace: true });
+    expect(c).toEqual({ ok: false, code: 'VALIDATION', message: 'Это «Да» уже применено — изменить ответ нельзя' });
+  });
 });
 
 describe('живой адаптер: новые действия (очередь 15.10)', () => {
@@ -174,6 +232,28 @@ describe('живой адаптер: новые действия (очередь
     const r = await new LiveApi(URL_, auth(), s.fetchImpl).write({ kind: 'updateDeadline', requestId: 'R20', id: 'D-3', baseVersion: 3, patch: { status: 'postponed', due: '2026-11-01' } });
     expect(s.sent[0]).toMatchObject({ action: 'deadlines.update', requestId: 'R20', payload: { id: 'D-3', baseVersion: 3, patch: { status: 'postponed', due: '2026-11-01' } } });
     expect(r.ok && r.changes[0]).toMatchObject({ entity: 'deadline', id: 'D-3', record: { status: 'postponed' } });
+  });
+
+  it('платёж: payments.update с baseVersion и patch { date?, amountKopecks? }; ответ — upsert платежа; VALIDATION и CONFLICT доходят с текстом сервера', async () => {
+    const cur: Payment = { id: 'P-7', version: 6, clientId: 'C-1', kopecks: 90000, period: 'x', method: 'bank', date: '2026-10-01', source: 'таблица' };
+    const s = server(ok({ payment: { ...cur, date: '2026-10-01', version: 7 } }, 31), fail('VALIDATION', 'Дата уже есть в таблице', { field: 'date' }), fail('CONFLICT', 'Платёж изменили в таблице', {}, cur));
+    const api = new LiveApi(URL_, auth(), s.fetchImpl);
+    const a = await api.write({ kind: 'updatePayment', requestId: 'R21', id: 'P-7', baseVersion: 6, patch: { date: '2026-10-01', amountKopecks: 90000 } });
+    expect(s.sent[0]).toMatchObject({ action: 'payments.update', requestId: 'R21', payload: { id: 'P-7', baseVersion: 6, patch: { date: '2026-10-01', amountKopecks: 90000 } } });
+    expect(a.ok && a.changes[0]).toMatchObject({ entity: 'payment', op: 'upsert', id: 'P-7', origin: 'R21', record: { version: 7 } });
+    const b = await api.write({ kind: 'updatePayment', requestId: 'R22', id: 'P-7', baseVersion: 6, patch: { date: '2026-10-02' } });
+    expect(b).toEqual({ ok: false, code: 'VALIDATION', message: 'Дата уже есть в таблице' });
+    const c = await api.write({ kind: 'updatePayment', requestId: 'R23', id: 'P-7', baseVersion: 5, patch: { amountKopecks: 100 } });
+    expect(c).toMatchObject({ ok: false, code: 'CONFLICT', current: { id: 'P-7', version: 6 } });
+  });
+
+  it('клиент: доход уходит как clients.update patch.income { amountKopecks, basis }; в ответе incomeKopecks/incomeBasis читаются', async () => {
+    const client = { id: 'C-1', version: 11, name: 'Тест', kind: 'fop3', marks: [], employer: false, kved: [], phone: null, keyIssuer: null, keyUntil: null, monthly: [],
+      incomeKopecks: 25000000, incomeBasis: 'quarterTurnover' };
+    const s = server(ok({ client, createdDeadlines: [] }, 32));
+    const r = await new LiveApi(URL_, auth(), s.fetchImpl).write({ kind: 'updateClient', requestId: 'R24', id: 'C-1', baseVersion: 10, patch: { income: { amountKopecks: 25000000, basis: 'quarterTurnover' } } });
+    expect(s.sent[0]).toMatchObject({ action: 'clients.update', requestId: 'R24', payload: { id: 'C-1', baseVersion: 10, patch: { income: { amountKopecks: 25000000, basis: 'quarterTurnover' } } } });
+    expect(r.ok && r.changes[0]).toMatchObject({ entity: 'client', id: 'C-1', record: { incomeKopecks: 25000000, incomeBasis: 'quarterTurnover' } });
   });
 
   it('платежи месяца: payments.list { month } без requestId', async () => {

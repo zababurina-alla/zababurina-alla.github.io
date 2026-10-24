@@ -1,9 +1,19 @@
 // Транспорт к Apps Script по контракту (docs/api-contract.md, раздел 2): один адрес, POST text/plain без своих
 // заголовков (иначе браузер шлёт preflight, а Apps Script его не обслуживает), ответ всегда HTTP 200 с ok/error в теле.
-// Таймаут 30 с. Ничего не логирует: в теле бывают сеанс, ID-токен и (у revealPassword) пароль.
+// Таймаут 30 с, у чтений первой загрузки — 75 с и один тихий повтор (холодный старт, см. READ_TIMEOUT_MS).
+// Ничего не логирует: в теле бывают сеанс, ID-токен и (у revealPassword) пароль.
 import type { ErrorCode } from './api';
 
 export const TIMEOUT_MS = 30_000;
+
+/** Холодный старт Apps Script (замер 22.10 с ПК владельца): сам код отвечает за 1–7 с, но первый запрос после паузы
+ *  ждёт запуска 30–52 с (bootMs p95 179 с) и иногда приходит 404-страницей Google или телом «ok» вместо JSON.
+ *  Чтения, с которых начинается работа, ждут дольше и при таком сбое один раз тихо повторяются. Записям хватает 30 с:
+ *  у них очередь с повтором. */
+export const READ_TIMEOUT_MS = 75_000;
+const COLD_READS = /^(sync\.(snapshot|changes)|clients\.photos|reports\.)/;
+/** Пауза перед повтором (2–3 с); в тестах подменяется. */
+export const coldPause = { sleep: (ms: number) => new Promise<void>((r) => setTimeout(r, ms)) };
 
 export interface Envelope<T> {
   ok: true;
@@ -49,7 +59,27 @@ export interface CallArgs {
   timeoutMs?: number;
 }
 
-export async function call<T>({ url, action, payload = {}, session, requestId, fetchImpl = fetch, timeoutMs = TIMEOUT_MS }: CallArgs): Promise<Envelope<T>> {
+/** Сбои, похожие на холодный старт: обрыв или таймаут, не-JSON, «ok». Ответ сервера с кодом ошибки сюда не входит. */
+const coldLike = new WeakSet<ApiError>();
+function cold(err: ServerError): ApiError {
+  const e = new ApiError(err);
+  coldLike.add(e);
+  return e;
+}
+
+export async function call<T>(args: CallArgs): Promise<Envelope<T>> {
+  if (!COLD_READS.test(args.action)) return callOnce<T>(args);
+  const read = { ...args, timeoutMs: args.timeoutMs ?? READ_TIMEOUT_MS };
+  try {
+    return await callOnce<T>(read);
+  } catch (e) {
+    if (!(e instanceof ApiError) || !coldLike.has(e)) throw e;
+    await coldPause.sleep(2000 + Math.random() * 1000);
+    return callOnce<T>(read);
+  }
+}
+
+async function callOnce<T>({ url, action, payload = {}, session, requestId, fetchImpl = fetch, timeoutMs = TIMEOUT_MS }: CallArgs): Promise<Envelope<T>> {
   // sentAt — часы браузера (мс): сервер считает по нему время пути до своего кода (arriveMs в diag.counters) — так видны
   // холодные старты Apps Script (координатор 16.10, разбор зависаний auth.nonce).
   const body: Record<string, unknown> = { v: 1, action, payload, sentAt: Date.now() };
@@ -69,7 +99,7 @@ export async function call<T>({ url, action, payload = {}, session, requestId, f
       signal: ctrl.signal,
     });
   } catch {
-    throw new ApiError({ code: 'NETWORK', message: 'Нет связи с таблицей' });
+    throw cold({ code: 'NETWORK', message: 'Нет связи с таблицей' });
   } finally {
     clearTimeout(timer);
   }
@@ -77,21 +107,21 @@ export async function call<T>({ url, action, payload = {}, session, requestId, f
   try {
     text = await res.text();
   } catch {
-    throw new ApiError({ code: 'NETWORK', message: 'Нет связи с таблицей' });
+    throw cold({ code: 'NETWORK', message: 'Нет связи с таблицей' });
   }
-  // Выключатель API на сервере: вместо JSON — просто «ok».
+  // Выключатель API на сервере: вместо JSON — просто «ok». Так же бывает на холодном старте — чтение повторится раз.
   if (text.trim().toLowerCase() === 'ok') {
-    throw new ApiError({ code: 'DISABLED', message: 'Связь сайта с таблицей сейчас выключена — работайте в таблице или через бота' });
+    throw cold({ code: 'DISABLED', message: 'Связь сайта с таблицей сейчас выключена — работайте в таблице или через бота' });
   }
   let json: unknown;
   try {
     json = JSON.parse(text);
   } catch {
-    // Не JSON: страница входа Google, ошибка развёртывания, обрыв посреди ответа.
-    throw new ApiError({ code: 'SERVER', message: 'Таблица ответила непонятно — попробуйте ещё раз' });
+    // Не JSON: страница входа Google, 404 развёртывания на холодном старте, обрыв посреди ответа.
+    throw cold({ code: 'SERVER', message: 'Таблица ответила непонятно — попробуйте ещё раз' });
   }
   if (!json || typeof json !== 'object' || !('ok' in json)) {
-    throw new ApiError({ code: 'SERVER', message: 'Таблица ответила непонятно — попробуйте ещё раз' });
+    throw cold({ code: 'SERVER', message: 'Таблица ответила непонятно — попробуйте ещё раз' });
   }
   const env = json as { ok: boolean; error?: ServerError; current?: unknown };
   if (!env.ok) {

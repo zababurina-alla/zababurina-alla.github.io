@@ -189,6 +189,20 @@ class FakeServer implements CabinetApi {
         this.payments.delete(op.id);
         return { ok: true, changes: [this.record('payment', 'delete', op.id, o), this.act('Платёж отменён', o, 'сайт')], cursor: this.cursor };
       }
+      case 'updatePayment': {
+        // Как payments.update: пишет только в пустую ячейку; заполненное поле — VALIDATION; дата не позже завтра; сумма > 0.
+        const cur = this.payments.get(op.id);
+        if (!cur) return { ok: false, code: 'NOT_FOUND', message: 'Этого платежа уже нет' };
+        if (cur.version !== op.baseVersion) return { ok: false, code: 'CONFLICT', message: 'Платёж изменили в таблице', current: { ...cur } };
+        const { date, amountKopecks } = op.patch;
+        if (date !== undefined && cur.date !== null) return { ok: false, code: 'VALIDATION', message: 'Дата уже есть в таблице — исправьте её там' };
+        if (amountKopecks !== undefined && cur.kopecks !== null) return { ok: false, code: 'VALIDATION', message: 'Сумма уже есть в таблице — исправьте её там' };
+        if (date !== undefined && date > addDays(TODAY, 1)) return { ok: false, code: 'VALIDATION', message: 'Дата оплаты ещё не наступила' };
+        if (amountKopecks !== undefined && !(Number.isInteger(amountKopecks) && amountKopecks > 0)) return { ok: false, code: 'VALIDATION', message: 'Сумма должна быть больше нуля' };
+        const upd: Payment = { ...cur, ...(date !== undefined ? { date } : {}), ...(amountKopecks !== undefined ? { kopecks: amountKopecks } : {}), version: this.cursor + 1 };
+        this.payments.set(cur.id, upd);
+        return { ok: true, changes: [this.record('payment', 'upsert', cur.id, o, upd), this.act('Платёж дополнен', o, 'сайт')], cursor: this.cursor };
+      }
       case 'addClient': {
         // id клиента выдаёт сервер (номер в колонке A), не браузер (п. 8).
         const c: Client = { ...op.client, id: `C-${this.nextClientNo++}`, version: this.cursor + 1 };
@@ -309,7 +323,8 @@ class FakeServer implements CabinetApi {
         // Как сервер (контракт v2.1, у. 6): уже отвечен в Telegram — отказ с текущим ответом; choice — только из вариантов.
         const q = this.questions.get(op.id);
         if (!q) return { ok: false, code: 'NOT_FOUND', message: 'Этого вопроса уже нет' };
-        if (q.answer !== null) return { ok: false, code: 'VALIDATION', message: `Уже ответили в Telegram: ${q.answer}`, current: { ...q } };
+        // replace: true — замена записанного ответа (контракт 8.7); без него отвеченный вопрос — отказ.
+        if (q.answer !== null && !op.replace) return { ok: false, code: 'VALIDATION', message: `Уже ответили в Telegram: ${q.answer}`, current: { ...q } };
         if (q.type === 'choice' && !q.options.includes(op.text)) return { ok: false, code: 'VALIDATION', message: 'Выберите один из вариантов' };
         if (q.type === 'number' && !/^-?\d+([.,]\d+)?$/.test(op.text.trim())) return { ok: false, code: 'VALIDATION', message: 'Здесь нужно число' };
         const upd: Question = { ...q, answer: op.text, version: this.cursor + 1 };
@@ -356,9 +371,10 @@ class FakeServer implements CabinetApi {
         if (c.version !== op.baseVersion) return { ok: false, code: 'CONFLICT', message: 'Карточка изменилась в таблице', current: { ...c } };
         // КВЕД — коды; названия из справочника; главный — как сервер: по наибольшей ставке (здесь — первый с названием из
         // справочника, где выше группа ЄП; упрощённо — первый код списка).
-        const { kved, ...rest } = op.patch;
+        const { kved, income, ...rest } = op.patch;
+        if (income && !(Number.isInteger(income.amountKopecks) && income.amountKopecks >= 0)) return { ok: false, code: 'VALIDATION', message: 'Доход — целое число копеек, не меньше нуля' };
         const kvedList = kved?.map((code) => ({ code, title: c.kved.find((k) => k.code === code)?.title ?? KVEDS.find((k) => k.code === code)?.title ?? '' }));
-        const upd: Client = { ...c, ...rest, ...(kvedList ? { kved: kvedList, kvedMain: kvedList[0]?.code ?? null, kvedMainNote: kvedList.length > 1 ? 'max ставка' : null } : {}), version: this.cursor + 1 };
+        const upd: Client = { ...c, ...rest, ...(income ? { incomeKopecks: income.amountKopecks, incomeBasis: income.basis } : {}), ...(kvedList ? { kved: kvedList, kvedMain: kvedList[0]?.code ?? null, kvedMainNote: kvedList.length > 1 ? 'max ставка' : null } : {}), version: this.cursor + 1 };
         this.clients.set(c.id, upd);
         return { ok: true, changes: [this.record('client', 'upsert', c.id, o, upd), this.act(`Изменена карточка: ${short(c.name)}`, o, 'сайт')], cursor: this.cursor };
       }

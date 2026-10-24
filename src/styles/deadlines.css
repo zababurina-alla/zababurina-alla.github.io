@@ -266,7 +266,7 @@
 
   .dtable__row,
   .dtable--noclient .dtable__row {
-    grid-template-columns: 2.75rem minmax(0, 1fr) 11rem;
+    grid-template-columns: 2.75rem minmax(0, 1fr) 12rem; /* 11rem: «просрочено 24 дн.» вылезало из колонки на 7 px, в поле листа (17.10) */
     gap: 2px var(--space-3);
   }
 
@@ -557,6 +557,15 @@
   padding: 0 var(--space-5) var(--space-3);
 }
 
+/* Выбор даты у срока без даты (флаг dueSet): за текстом, кнопка в конце строки */
+.undated__set {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
 /* Группировка и фишки видов отчёта на «Сроках» */
 .dl-tools {
   display: flex;
@@ -617,10 +626,7 @@
 }
 
 @media (max-width: 559px) {
-  .dl-tools {
-    padding: 0 var(--space-3) var(--space-3);
-  }
-
+  /* Отступ слева — как у заголовка «Открытые сроки» (panel__head, --space-5): было --space-3, кнопки стояли левее (№ 6) */
   .dl-tools__by {
     flex: 1 1 100%;
   }
@@ -672,8 +678,20 @@
 
 .dfilters .input--sm {
   min-height: 2.5rem;
-  padding: 0 var(--space-3);
+  padding: 0 calc(var(--space-6) + var(--space-2)) 0 var(--space-4);
   border-radius: var(--radius-full);
+  /* как у кнопок-фильтров рядом («Декларации 4»): шрифт крупнее соседей выглядел чужим (проход 22.10, № 5) */
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+/* Телефон: «Статус» и «Клиент» — каждый своей строкой, подписи одной ширины, списки во всю строку: иначе списки
+   начинались с разного места и были разной длины (проход 22.10) */
+@media (max-width: 559px) {
+  .dfilters label {
+    flex: 1 1 100%;
+    grid-template-columns: 4.5rem minmax(0, 1fr);
+  }
 }
 
 .dtable__line {
@@ -754,6 +772,13 @@
 @media (hover: none), (pointer: coarse), (pointer: none), (max-width: 39.99rem) {
   .dtable__tools > .dtable__tool { display: none; }
 
+  /* «Действия» — всегда своей строкой под названием: короткое название тянуло их вправо в ту же строку, длинное —
+     вниз, и у соседних сроков кнопка стояла по-разному (проход 22.10, № 7) */
+  .dtable__tools { flex-basis: 100%; }
+
+  /* «···» — ровно под названием срока: у кнопки поле слева, сдвигаем на него */
+  .dtable__tools > .dactions__toggle { margin-left: calc(-1 * var(--space-2)); }
+
   .dtable__tools > .dactions__toggle { opacity: 1; }
 
   .dtable__tools:has(> .dactions) > .dtable__tool {
@@ -786,9 +811,11 @@
   display: grid;
   justify-items: start;
   gap: 1px;
+  max-width: 100%;
   padding-block: 6px;
   text-align: left;
   line-height: 1.2;
+  white-space: normal; /* 375: «с пометкой «отложено» до этой даты» вылезала за край меню на 7 px */
 }
 
 .dactions__hint {

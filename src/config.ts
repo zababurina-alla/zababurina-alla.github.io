@@ -13,8 +13,16 @@ export const WRITE_AREAS: readonly WriteArea[] = ['payments', 'tasks', 'question
  *  старый сервер флаг не знает и отправил бы настоящее сообщение. */
 export type Feature = 'inbox' | 'remindPreview' | 'cancelNotify' | 'deadlinesCreate' | 'applyTemplate' | 'botLink' | 'statementPdf' | 'sendStatement' | 'archive' | 'attention' | 'completeMany' | 'updateMany' | 'month'
   // Новое видимое без стилей и приёмки — на живом выключено до приёмки «Пользователя» (координатор 16.10)
-  | 'epCalc' | 'weekLoad' | 'voice' | 'kvedEdit' | 'monthWrite' | 'inboxHide' | 'aiChat' | 'photos';
-const FEATURES: readonly Feature[] = ['inbox', 'remindPreview', 'cancelNotify', 'deadlinesCreate', 'applyTemplate', 'botLink', 'statementPdf', 'sendStatement', 'archive', 'attention', 'completeMany', 'updateMany', 'month', 'epCalc', 'weekLoad', 'voice', 'kvedEdit', 'monthWrite', 'inboxHide', 'aiChat', 'photos'];
+  | 'epCalc' | 'weekLoad' | 'voice' | 'kvedEdit' | 'monthWrite' | 'inboxHide' | 'aiChat' | 'photos'
+  // dueSet — «Сроки → Без даты срока»: выбор даты (deadlines.update { due }); tasksShowAll — «Задачи»: «Показать все» сделанные
+  | 'dueSet' | 'tasksShowAll'
+  // paymentsFill — «Платежи → Без даты или суммы»: дописать дату/сумму (payments.update)
+  | 'paymentsFill'
+  // incomeEdit — карточка клиента: ввод дохода (clients.update { income })
+  | 'incomeEdit'
+  // answerReplace — «Вопросы»: «Изменить» уже записанный ответ (questions.answer { replace: true })
+  | 'answerReplace';
+const FEATURES: readonly Feature[] = ['inbox', 'remindPreview', 'cancelNotify', 'deadlinesCreate', 'applyTemplate', 'botLink', 'statementPdf', 'sendStatement', 'archive', 'attention', 'completeMany', 'updateMany', 'month', 'epCalc', 'weekLoad', 'voice', 'kvedEdit', 'monthWrite', 'inboxHide', 'aiChat', 'photos', 'dueSet', 'tasksShowAll', 'paymentsFill', 'incomeEdit', 'answerReplace'];
 
 /** OAuth client ID проекта Google Cloud «zababurina-alla» (…apps.googleusercontent.com). */
 export const GOOGLE_CLIENT_ID = '1078049272948-bnvonl9qah7npdq63gktbio1rm2lbgvb.apps.googleusercontent.com';

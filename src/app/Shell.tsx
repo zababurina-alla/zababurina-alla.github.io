@@ -193,13 +193,26 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
   const pillRef = useRef<HTMLSpanElement>(null);
 
   // Подсветка выбранного раздела переезжает к новому пункту пружиной (только transform) — видно, куда перешли.
+  // Высота — по пункту: на ноутбуке пункты 38 и 34 px (Р-4), а подсветка была 44 — выше пункта на 6–10 px, слово
+  // не по центру, низ наезжал на соседний пункт (17.10). Окно сменило высоту — пункты другие, подсветка следом.
+  // Меню и при смене размера окна: открыли узким (меню скрыто, offsetTop 0), растянули — подсветка стояла на
+  // «Сегодня», а открыт другой раздел (проход 22.10).
   useLayoutEffect(() => {
-    const active = navRef.current?.querySelector<HTMLElement>('.nav__item[aria-current="page"]');
-    const pill = pillRef.current;
-    if (!pill) return;
-    if (!active) { pill.style.opacity = '0'; return; }
-    pill.style.opacity = '1';
-    pill.style.transform = `translateY(${active.offsetTop}px)`;
+    const nav = navRef.current, pill = pillRef.current;
+    if (!nav || !pill) return;
+    const place = () => {
+      if (!nav.offsetHeight) return; // меню скрыто (телефон) — подсветку не трогаем, встанет при показе
+      const active = nav.querySelector<HTMLElement>('.nav__item[aria-current="page"]');
+      if (!active) { pill.style.opacity = '0'; return; }
+      pill.style.opacity = '1';
+      pill.style.transform = `translateY(${active.offsetTop}px)`;
+      pill.style.height = `${active.offsetHeight}px`;
+    };
+    place();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(place);
+    ro.observe(nav);
+    return () => ro.disconnect();
   }, [route]);
 
   // Горячие клавиши (ноутбук): Alt+N — платёж, Ctrl+K или «/» — поиск клиента. Без анимации: действие частое.
@@ -226,14 +239,29 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
   }, [ui]);
 
   // Шапка телефона: после прокрутки — тень под стеклом (класс на <html>, одно чтение на кадр).
+  // Кнопка «+» на телефоне закрывала время, суммы и значки под собой (проход 22.10, № 2): листаем вниз — она уходит,
+  // чуть вверх или к началу — возвращается. Внизу страницы запас 9rem, там она ничего не закрывает — тоже видна.
   useEffect(() => {
     let raf = 0;
+    let lastY = window.scrollY;
     const onScroll = () => {
       if (raf) return;
-      raf = requestAnimationFrame(() => { raf = 0; document.documentElement.classList.toggle('is-scrolled', window.scrollY > 8); });
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const y = window.scrollY;
+        const root = document.documentElement;
+        root.classList.toggle('is-scrolled', y > 8);
+        const atEnd = y + window.innerHeight >= root.scrollHeight - 8;
+        if (y < 80 || atEnd || y < lastY - 4) root.classList.remove('fab-away');
+        else if (y > lastY + 4) root.classList.add('fab-away');
+        if (Math.abs(y - lastY) > 4) lastY = y;
+      });
     };
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => { window.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf); };
+    return () => {
+      window.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf);
+      document.documentElement.classList.remove('fab-away'); // вышли и вошли снова — «+» видна, а не спрятана
+    };
   }, []);
 
   // Подпись — действие, а не состояние: «Светлая тема» на светлой читалась как «сейчас светлая» (приёмка М-5)

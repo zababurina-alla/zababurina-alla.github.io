@@ -11,6 +11,9 @@ export type ClientKind = 'fop1' | 'fop2' | 'fop3' | 'fopGeneral' | 'tov3' | 'tov
 /** [п. 16] Пометки колонки L. allUkraine — только fop1/fop2; pensioner + employed вместе нельзя. */
 export type ClientMark = 'pensioner' | 'employed' | 'allUkraine';
 
+/** На чём считается «📈 Доход» клиента: оборот последнего квартала (ФОП 3 / ТОВ 3) или прибыль года (ФОП общая). */
+export type IncomeBasis = 'quarterTurnover' | 'yearProfit';
+
 export interface Client {
   id: string;
   version: number;
@@ -28,7 +31,7 @@ export interface Client {
   /** «📈 Доход», копейки (v5.88): у ФОП 3 / ТОВ 3 — оборот последнего квартала, у ФОП общей — прибыль года.
    *  Годового дохода в таблице нет — предел группы по нему не считаем. null — не указан или не нужен. */
   incomeKopecks?: number | null;
-  incomeBasis?: 'quarterTurnover' | 'yearProfit' | null;
+  incomeBasis?: IncomeBasis | null;
   /** «🏦 Банк» — та же клетка, что keyIssuer. */
   bank?: string | null;
   /** Язык клиентского бота. */

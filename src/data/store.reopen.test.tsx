@@ -11,9 +11,11 @@ window.matchMedia ??= ((q: string) => ({ matches: false, media: q, addEventListe
 
 const D: Deadline = { id: 'D-1', version: 1, clientId: 'C-1', what: 'ЄП за вересень', periodicity: 'month', due: '2026-10-20', periodEnd: '2026-09-30', status: 'new', closedAt: null };
 const sent: WriteOp['kind'][] = [];
+let answered = 0; // ответов таблицы выдано: тест не кончается, пока не пришли все — иначе ответ долетает после снятия окружения
 const write = vi.fn(async (op: WriteOp): Promise<WriteResult> => {
   sent.push(op.kind);
   await new Promise((r) => setTimeout(r, 30));
+  answered += 1;
   if (op.kind === 'closeDeadline') {
     return { ok: true, changes: [{ cursor: 2, entity: 'deadline', op: 'upsert', id: 'D-1', origin: op.requestId, record: { ...D, status: 'done', closedAt: '2026-10-16', version: 2 } }], cursor: 2, notifyAt: null };
   }
@@ -30,6 +32,7 @@ vi.mock('./session', () => ({
 }));
 
 const { StoreProvider, useStore } = await import('./store');
+const settle = async () => { for (let i = 0; i < 50 && answered < sent.length; i++) await tick(); await tick(); };
 const tick = () => act(async () => { await new Promise((r) => setTimeout(r, 20)); });
 
 describe('«Вернуть срок» из уведомления', () => {
@@ -55,6 +58,7 @@ describe('«Вернуть срок» из уведомления', () => {
     expect(box.s?.closed).toHaveLength(0);
     for (let i = 0; i < 50 && !sent.includes('reopenDeadline'); i++) await tick();
     expect(sent).toEqual(['closeDeadline', 'reopenDeadline']);
+    await settle();
     act(() => root.unmount());
   });
 });
@@ -62,6 +66,7 @@ describe('«Вернуть срок» из уведомления', () => {
 describe('строка-«призрак» (№ 24): ответ таблицы раньше конца анимации', () => {
   it('закрытие с показом через 3 с, таблица ответила раньше — «закрыто» сразу, «Вернуть срок» работает', async () => {
     sent.length = 0;
+    answered = 0;
     const box: { s: ReturnType<typeof useStore> | null } = { s: null };
     function Grab() { const s = useStore(); useEffect(() => { box.s = s; }); return null; }
     const root = createRoot(document.createElement('div'));
@@ -75,6 +80,7 @@ describe('строка-«призрак» (№ 24): ответ таблицы р
     await act(async () => { undo?.(); });
     for (let i = 0; i < 50 && !box.s?.deadlines.length; i++) await tick();
     expect(box.s?.deadlines.map((d) => d.id)).toEqual(['D-1']);
+    await settle();
     act(() => root.unmount());
   });
 });
