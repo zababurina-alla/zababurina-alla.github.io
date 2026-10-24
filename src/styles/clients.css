@@ -754,7 +754,7 @@
 .kv {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   white-space: nowrap;
 }
 
@@ -771,17 +771,17 @@
    кода без неё (1280, 17.10). Без звезды — пустое место под неё, заголовок «КВЕД» — над кодами. */
 @container (min-width: 760px) {
   .ctable__head > :nth-child(2) {
-    padding-left: calc(14px + 6px);
+    padding-left: calc(var(--kv-star) + var(--space-2));
   }
 
   .ctable__row .kv:not(:has(> .kv__star))::before {
     content: '';
     flex: none;
-    width: 14px;
+    width: var(--kv-star);
   }
 
   .ctable__kved > .nil {
-    padding-left: calc(14px + 6px);
+    padding-left: calc(var(--kv-star) + var(--space-2));
   }
 }
 
