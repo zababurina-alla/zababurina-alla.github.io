@@ -678,7 +678,7 @@
 
 .dfilters .input--sm {
   min-height: 2.5rem;
-  padding: 0 2.5rem 0 var(--space-4);
+  padding: 0 calc(var(--space-6) + var(--space-2)) 0 var(--space-4);
   border-radius: var(--radius-full);
   /* как у кнопок-фильтров рядом («Декларации 4»): шрифт крупнее соседей выглядел чужим (проход 22.10, № 5) */
   font-size: var(--text-sm);

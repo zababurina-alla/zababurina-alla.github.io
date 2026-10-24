@@ -17,9 +17,9 @@
 }
 
 .pay-hero__value {
-  font-size: clamp(2.5rem, 3vw + 1.5rem, 4rem);
-  line-height: 1.05;
-  letter-spacing: -0.03em;
+  font-size: var(--text-3xl);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.02em;
 }
 
 .pay-hero__note {
@@ -50,15 +50,15 @@
   display: grid;
   grid-template-columns: repeat(31, 1fr);
   align-items: end;
-  gap: 3px;
+  gap: var(--space-1);
   height: 9rem;
   padding-bottom: 1.5rem;
 }
 
 .bars__bar {
   height: 100%;
-  border-radius: 5px 5px 2px 2px;
-  background: color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: var(--radius-full) var(--radius-full) 0 0;
+  background: color-mix(in srgb, var(--accent) 70%, transparent);
   transition: background-color var(--dur-fast) ease;
 }
 
@@ -102,13 +102,32 @@
 .paylist__row {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(13rem, 1.3fr) minmax(10rem, 1fr) auto 9.5rem 7.5rem; /* последняя — «Отменить» */
+  grid-template-columns: minmax(13rem, 1.3fr) minmax(10rem, 1fr) auto 9.5rem var(--pay-cancel-w); /* последняя — «Отменить» */
   align-items: center;
   gap: var(--space-4);
   min-height: 4rem;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
   transition: background-color var(--dur-fast) ease;
+}
+
+/* Сумма — у правого края, по одной вертикали с итогом дня (DESIGN.md §6, п. 3). Раньше справа от неё стояла
+   колонка «Отменить», а та видна только при наведении — 120 px пустоты в каждой строке. Теперь «Отменить» — перед
+   суммой; записи с сайта выключены (кнопки нет) — колонки под неё нет. */
+@container (min-width: 760px) {
+  .paylist__row {
+    grid-template-columns: minmax(13rem, 1.3fr) minmax(10rem, 1fr) auto var(--pay-cancel-w) 9.5rem;
+  }
+
+  .paylist__row > .paylist__cancel { grid-row: 1; grid-column: 4; }
+
+  .paylist__row > .paylist__sum { grid-row: 1; grid-column: 5; }
+
+  .paylist__row:not(:has(> .paylist__cancel)) {
+    grid-template-columns: minmax(13rem, 1.3fr) minmax(10rem, 1fr) auto 9.5rem;
+  }
+
+  .paylist__row:not(:has(> .paylist__cancel)) > .paylist__sum { grid-column: 4; }
 }
 
 .paylist__row + .paylist__row::before {
@@ -128,7 +147,7 @@
 }
 
 .paylist__row.is-saving {
-  background: color-mix(in srgb, var(--accent) 5%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 /* Не в кассе («ожидается», «не пришло») — приглушённо, сумма зачёркнута не будет: она просто не в итоге */
@@ -155,7 +174,7 @@
 .paylist__how {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
@@ -169,14 +188,14 @@
 
 .paylist__sum {
   justify-self: end;
-  font-size: 1.375rem;
-  line-height: 1.2;
+  font-size: var(--text-lg);
+  line-height: var(--leading-tight);
 }
 
 @container (max-width: 759px) {
   .paylist__row {
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 2px var(--space-3);
+    gap: var(--space-1) var(--space-3);
     padding: var(--space-3);
   }
 
@@ -188,7 +207,7 @@
   .paylist__how,
   .paylist__row > :nth-child(3) {
     grid-column: 1 / -1;
-    padding-left: 3.125rem;
+    padding-left: calc(var(--avatar-md) + var(--space-3));
   }
 
   .paylist__row > :nth-child(3):empty {
@@ -231,7 +250,7 @@
 .paylist__fill {
   grid-column: 1 / -1;
   justify-self: start;
-  padding-left: 3.125rem; /* под именем, а не под значком клиента */
+  padding-left: calc(var(--avatar-md) + var(--space-3)); /* под именем, а не под значком клиента */
 }
 
 .paylist__fill .paylist__field {
@@ -288,7 +307,7 @@
     grid-column: 2;
     justify-self: end;
     margin-left: 0;
-    padding-left: 11px; /* как у .pill: общее правило :nth-child(3) выше давало пустоту 3,125rem внутри метки */
+    padding-left: var(--space-3); /* как у .pill: общее правило :nth-child(3) выше давало пустоту под аватар внутри метки */
   }
 
   .paylist__row:has(> .pill) > .paylist__how {
@@ -321,7 +340,7 @@
    (приёмка 16.10, С-7) */
 @container (min-width: 560px) and (max-width: 759px) {
   .paylist__row {
-    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) auto auto 6.5rem;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) auto auto var(--pay-cancel-w-sm);
     gap: var(--space-3);
     padding: var(--space-2) var(--space-3);
   }
@@ -398,16 +417,17 @@
   font-weight: var(--weight-medium);
 }
 
-/* Итог дня — над колонкой сумм, а не у правого края: справа у строк колонка «Отменить», и суммы обрывались на 130 px
-   раньше итога (проход 22.10, № 8). Отступ = поле списка + поле строки + колонка «Отменить» + промежуток − поле заголовка. */
-@container (min-width: 760px) {
+/* Итог дня — над колонкой сумм (проход 22.10, № 8). На листе 560–759 справа у строк колонка «Отменить», и суммы
+   обрывались на 120 px раньше итога. Отступ = поле списка + поле строки + колонка «Отменить» + промежуток − поле
+   заголовка. От 760 px сумма — последняя колонка, у края (DESIGN.md §6, п. 3), сдвиг не нужен. */
+@container (min-width: 560px) and (max-width: 759px) {
   .dgroup--pay .dgroup__count {
-    padding-right: calc(var(--space-2) + var(--space-3) + 7.5rem + var(--space-4) - var(--space-5));
+    padding-right: calc(var(--space-2) + var(--space-3) + var(--pay-cancel-w-sm) + var(--space-3) - var(--space-5));
   }
 }
 
-@container (min-width: 560px) and (max-width: 759px) {
-  .dgroup--pay .dgroup__count {
-    padding-right: calc(var(--space-2) + var(--space-3) + 6.5rem + var(--space-3) - var(--space-5));
-  }
+/* Копейки крупной суммы — 26 px (DESIGN.md: 44 сумма → 26 копейки) */
+.pay-hero__value .money-v__cents,
+.pay-hero__value .roll__cents {
+  font-size: var(--text-xl);
 }

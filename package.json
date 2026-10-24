@@ -12,6 +12,7 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "contrast": "node --experimental-strip-types --no-warnings scripts/contrast.ts",
+    "design": "node --experimental-strip-types --no-warnings scripts/design-audit.ts",
     "visual": "playwright test",
     "visual:update": "playwright test --update-snapshots",
     "visual:selftest": "node tests/visual/selftest.mjs"
