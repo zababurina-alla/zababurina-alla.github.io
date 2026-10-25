@@ -1,7 +1,8 @@
 /* Помощник (ai.ask, флаг aiChat): кнопка ✦ и панель с перепиской. Обе — position: fixed, в потоке страницы места не
    занимают (раньше кнопка стояла блоком после .shell: страница длиннее на 34 px, меню в конце прокрутки уезжало вверх).
    Телефон: кнопка слева от «+» (вид A: «+» в нижней панели — кнопка над ней), в конце прокрутки не закрывает строки
-   (поля .main), листая вниз — прячется вместе с «+». Ноутбук: в правом нижнем углу. Вид A — look-a/look.css. */
+   (поля .main), листая вниз — прячется вместе с «+». Ноутбук: в правом нижнем углу. Вид A: кнопка не плавает, а стоит
+   в шапке телефона и в меню ноутбука (.ai-fab--slot, AiChat кладёт её в [data-ai-slot] оболочки) — look-a/look.css. */
 
 .ai-fab,
 .ai-panel {
@@ -11,11 +12,14 @@
   --ai-bottom: calc(4.25rem + var(--space-4) + var(--space-2) + env(safe-area-inset-bottom)); /* над вкладками, по середине «+» */
 }
 
-.ai-fab {
+.ai-fab:not(.ai-fab--slot) {
   position: fixed;
   right: var(--ai-right);
   bottom: var(--ai-bottom);
   z-index: 35;
+}
+
+.ai-fab {
   display: grid;
   place-items: center;
   width: var(--ai-size);
@@ -40,11 +44,16 @@
 }
 
 /* Листают вниз — уходит за нижнюю панель вместе с «+» (Shell, класс fab-away); открытую панель не прячем */
-.fab-away .ai-fab:not(.is-open) {
+.fab-away .ai-fab:not(.is-open, .ai-fab--slot) {
   transform: translateY(calc(100% + var(--space-4) + 4.25rem));
   pointer-events: none;
   visibility: hidden;
   transition: transform var(--dur-base) ease, visibility 0s linear var(--dur-base);
+}
+
+/* Место кнопки в оболочке (вид A): без кнопки — не занимает ничего */
+.ai-slot:empty {
+  display: none;
 }
 
 /* Записывать нельзя — «+» скрыта, кнопка встаёт в правый угол */
@@ -197,7 +206,7 @@
     max-height: min(36rem, calc(100dvh - var(--ai-bottom) - var(--ai-size) - var(--space-3) - var(--space-4)));
   }
 
-  .fab-away .ai-fab:not(.is-open) {
+  .fab-away .ai-fab:not(.is-open, .ai-fab--slot) {
     transform: none;
     pointer-events: auto;
     visibility: visible;

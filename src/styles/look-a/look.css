@@ -233,17 +233,40 @@
   padding: var(--space-4) var(--space-4) calc(var(--space-8) + var(--space-5) + env(safe-area-inset-bottom));
 }
 
-/* ═════════ Помощник (ai.css): «+» в нижней панели — кнопка помощника стоит над ней, а не рядом ═════════ */
-@media (max-width: 1023px) {
-  [data-look='a'] .ai-fab,
-  [data-look='a'] .ai-panel {
-    --ai-right: var(--space-4);
-    --ai-bottom: calc(4rem + var(--space-4) + env(safe-area-inset-bottom));
-  }
+/* ═════════ Помощник (ai.css): кнопка ✦ не плавает — она в шапке телефона и в меню ноутбука (AiChat кладёт её в [data-ai-slot]) ═════════ */
+[data-look='a'] .ai-slot {
+  display: flex;
+}
 
-  /* Поля внизу: конец страницы выше кнопки (панель 64 + зазор 16 + кнопка 48 + зазор 16), иначе она закрывает последние строки */
-  [data-look='a']:has(.ai-fab) .main {
-    padding-bottom: calc(var(--space-8) * 2 + var(--space-4) + env(safe-area-inset-bottom));
+[data-look='a'] .ai-slot:empty {
+  display: none;
+}
+
+[data-look='a'] .ai-fab--slot {
+  width: var(--tap);
+  height: var(--tap);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--accent);
+  box-shadow: none;
+}
+
+[data-look='a'] .ai-fab--slot.is-open {
+  background: var(--surface-sunk);
+  color: var(--accent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  [data-look='a'] .ai-fab--slot:hover {
+    background: var(--surface-sunk);
+  }
+}
+
+/* Телефон: панель над нижними вкладками, под шапкой */
+@media (max-width: 1023px) {
+  [data-look='a'] .ai-panel {
+    bottom: calc(4rem + var(--space-4) + env(safe-area-inset-bottom));
+    max-height: min(36rem, calc(100dvh - 8rem - var(--space-4) * 2 - env(safe-area-inset-bottom)));
   }
 }
 
@@ -276,11 +299,6 @@
   [data-look='a'] .main {
     padding: var(--space-6) var(--space-6) var(--space-7);
   }
-
-  /* Кнопка помощника — в углу окна (12 + 48): конец страницы выше неё */
-  [data-look='a']:has(.ai-fab) .main {
-    padding-bottom: var(--space-8);
-  }
 }
 
 /* Окно ноутбука ниже 880 px: меню целиком, отступы плотнее (как в прежнем виде, Р-4) */
@@ -288,6 +306,33 @@
   [data-look='a'] .rail {
     gap: var(--space-3);
     padding-block: var(--space-4);
+  }
+}
+
+/* Ноутбук: панель помощника — у меню, откуда открыта; кнопка ✦ — справа от «Закрыто сегодня» (на ней и закрывается) */
+@media (min-width: 1024px) {
+  [data-look='a'] .ai-panel {
+    right: auto;
+    bottom: var(--space-4);
+    left: calc(var(--rail-w) + var(--space-4));
+    max-height: min(36rem, calc(100dvh - var(--space-4) * 2));
+  }
+
+  [data-look='a'] .rail__foot {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  [data-look='a'] .rail__foot > .me {
+    grid-column: 1 / -1;
+  }
+
+  [data-look='a'] .rail__foot > .ai-slot {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  [data-look='a'] .rail .ai-fab--slot {
+    background: var(--surface-sunk);
   }
 }
 

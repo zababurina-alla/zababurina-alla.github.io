@@ -303,6 +303,7 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
         </nav>
         <div className="rail__foot">
           <ClosedCounter />
+          <span className="ai-slot" data-ai-slot />
           {/* Профиль одной карточкой: кто вошёл, тема и звук значками, выход — меню целиком на 800 px (Р-4) */}
           <Me tools={<>
             <button type="button" className="icon-btn" onClick={toggleTheme} aria-label={themeLabel} title={themeLabel}>
@@ -319,6 +320,7 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
           <SyncStatus />
           <ClosedCounter compact />
           <a href="#/clients/search" className="icon-btn" aria-label="Поиск клиента"><Icon name="search" /></a>
+          <span className="ai-slot" data-ai-slot />
           <button type="button" className="icon-btn" onClick={toggleTheme} aria-label={themeLabel}>
             <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
           </button>

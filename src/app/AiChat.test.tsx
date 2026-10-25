@@ -83,4 +83,26 @@ describe('помощник', () => {
     expect([q()?.disabled, q()?.placeholder]).toEqual([true, 'Помощник выключен']);
     act(() => root.unmount());
   });
+
+  it('вид A: кнопка стоит в местах оболочки [data-ai-slot], а не плавает; без них — плавающая', async () => {
+    document.documentElement.dataset.look = 'a';
+    const slots = [document.createElement('span'), document.createElement('span')];
+    slots.forEach((el) => { el.dataset.aiSlot = ''; document.body.append(el); });
+    try {
+      const { host, root } = await mount(null);
+      expect(host.querySelector('.ai-fab')).toBeNull();
+      expect(slots.map((el) => el.querySelectorAll('.ai-fab.ai-fab--slot').length)).toEqual([1, 1]);
+      await act(async () => { slots[0]?.querySelector<HTMLButtonElement>('.ai-fab')?.click(); });
+      expect(host.querySelector('.ai-panel')).not.toBeNull();
+      expect(slots.map((el) => el.querySelector('.ai-fab')?.getAttribute('aria-expanded'))).toEqual(['true', 'true']);
+      act(() => root.unmount());
+      slots.forEach((el) => el.remove());
+      const again = await mount(null);
+      expect(again.host.querySelector('.ai-fab:not(.ai-fab--slot)')).not.toBeNull();
+      act(() => again.root.unmount());
+    } finally {
+      delete document.documentElement.dataset.look;
+      slots.forEach((el) => el.remove());
+    }
+  });
 });

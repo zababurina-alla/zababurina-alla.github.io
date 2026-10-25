@@ -1,8 +1,10 @@
-// Помощник (ai.ask, флаг aiChat): кнопка в углу → панель с перепиской. Если открыта карточка клиента — вопрос уходит
+// Помощник (ai.ask, флаг aiChat): кнопка (в углу; в виде A — в шапке/меню) → панель с перепиской. Если открыта карточка клиента — вопрос уходит
 // с его clientId. История — только в памяти вкладки (компонент живёт, пока открыт сайт): на сервере вопросы не хранятся,
 // в localStorage / IndexedDB не пишем. Ответ — простым текстом (без разметки). Оформление — за отделом дизайна.
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from '../data/store';
+import { isLookA } from '../lib/look';
 import { Icon } from '../ui/Icon';
 import { shortName } from '../ui/names';
 
@@ -24,6 +26,12 @@ export function AiChat({ clientId }: { clientId: string | null }) {
   const list = useRef<HTMLOListElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const client = clientId ? store.client(clientId) : undefined;
+  // Вид A: кнопка не плавает над страницей, а стоит в шапке телефона и в меню ноутбука — места [data-ai-slot] в Shell
+  // (в каждом по одному, лишнее скрыто стилем). Нет мест (оболочки нет) — как раньше, плавающей.
+  const [slots, setSlots] = useState<HTMLElement[]>([]);
+  // Места появляются в DOM вместе с этим кадром (Shell рядом) — читаем их после вставки, до отрисовки.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useLayoutEffect(() => { if (isLookA()) setSlots([...document.querySelectorAll<HTMLElement>('[data-ai-slot]')]); }, []);
 
   // Новое сообщение — лента к низу; открыли — курсор в поле.
   useEffect(() => { const el = list.current; if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'instant' }); }, [msgs, thinking, open]);
@@ -54,11 +62,15 @@ export function AiChat({ clientId }: { clientId: string | null }) {
     }
   }
 
+  const fab = (
+    <button type="button" className={`ai-fab${slots.length ? ' ai-fab--slot' : ''}${open ? ' is-open' : ''}`} aria-expanded={open} aria-controls={`${ids}-panel`}
+      aria-label={open ? 'Закрыть помощника' : 'Спросить помощника'} title="Помощник: спросите о клиенте, сроке или налоге"
+      onClick={() => setOpen((o) => !o)}><Icon name={open ? 'close' : 'assistant'} size={22} /></button>
+  );
+
   return (
     <>
-      <button type="button" className={`ai-fab${open ? ' is-open' : ''}`} aria-expanded={open} aria-controls={`${ids}-panel`}
-        aria-label={open ? 'Закрыть помощника' : 'Спросить помощника'} title="Помощник: спросите о клиенте, сроке или налоге"
-        onClick={() => setOpen((o) => !o)}><Icon name={open ? 'close' : 'assistant'} size={22} /></button>
+      {slots.length ? slots.map((slot, i) => createPortal(fab, slot, `ai-fab-${i}`)) : fab}
       {open && (
         <section id={`${ids}-panel`} className="ai-panel" role="dialog" aria-label="Помощник" onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false); }}>
           <header className="ai-panel__head">
