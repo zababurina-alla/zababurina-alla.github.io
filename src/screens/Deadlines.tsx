@@ -182,7 +182,7 @@ export function Deadlines() {
   };
 
   return (
-    <div ref={scope} className="page">
+    <div ref={scope} className="page page--deadlines">
       <header className="page__head reveal">
         <div>
           <h1 className="page__title">Сроки <em>{overdue ? `${overdue} ${plural(overdue, 'просрочен', 'просрочены', 'просрочено')}` : 'без просрочек'}</em></h1>

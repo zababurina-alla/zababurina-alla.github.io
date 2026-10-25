@@ -29,6 +29,12 @@
   font-weight: var(--weight-semibold);
 }
 
+/* Главная кнопка — радиусом 8, как все кнопки (DESIGN.md §2), а не таблеткой */
+[data-look='a'] .btn--primary,
+[data-look='a'] .btn--primary.btn--sm {
+  border-radius: var(--radius-md);
+}
+
 [data-look='a'] .btn--secondary {
   background: var(--surface-sunk);
   color: var(--ink);
@@ -99,6 +105,11 @@
   box-shadow: none;
 }
 
+/* Лист с полями: снизу те же 24, что сверху (правило выше оставляло 8 под нижней строкой) */
+[data-look='a'] .panel--pad {
+  padding-bottom: var(--space-5);
+}
+
 [data-look='a'] .panel__head {
   padding: var(--space-5) var(--space-5) var(--space-4);
 }
@@ -159,6 +170,12 @@
 [data-look='a'] .topbar {
   height: 4rem;
   padding: 0 var(--space-2) 0 var(--space-4);
+}
+
+/* Закрыт срок — в шапке появляется «✓ N»: всем не хватало 43 px (351 при 394), значок наезжал на «Бухгалтерия».
+   Тогда в шапке — только знак, слово остаётся для чтеца экрана (aria-label ссылки). */
+[data-look='a'] .topbar:has(.closed-chip.is-on) .brand__name {
+  display: none;
 }
 
 [data-look='a'] .is-scrolled .topbar,

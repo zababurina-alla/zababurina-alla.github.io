@@ -1,0 +1,312 @@
+/*
+  Вид A «Тихий премиум», экран «Сроки» (DESIGN.md §1–7, 25.10.2026; образец — docs/дизайн/борд-бухгалтерия/A/index.html).
+  Каждое правило — под [data-look='a']: без флажка (?look=a) файл ничего не меняет. Значения — токены look-a/tokens.css
+  и шкала A (сторож — scripts/design-scale.test.ts, блок «вид A»).
+  Вкладки, переключатель и таблица сроков общие с «Сегодня»: полосы тоном, без рамок и теней (DESIGN.md §5).
+*/
+
+/* ═════════ Вкладки и переключатель: полоса тоном, выбранное светлее — без рамки и тени ═════════ */
+/* Поле полосы 4 (было 3): высоту подложки Tabs (ui/kit.tsx) считает от этого поля */
+[data-look='a'] .tabs {
+  padding: var(--space-1);
+  box-shadow: none;
+}
+
+[data-look='a'] .tabs__ind {
+  top: var(--space-1);
+  bottom: var(--space-1);
+  box-shadow: none;
+}
+
+[data-look='a'] .seg--fill {
+  gap: var(--space-1);
+  padding: var(--space-1);
+  box-shadow: none;
+}
+
+[data-look='a'] .seg--fill .seg__opt[aria-pressed='true'] {
+  box-shadow: none;
+}
+
+/* Второе нажатие «Да, закрыть N» — кнопка как все, радиус 8, а не таблетка */
+[data-look='a'] .btn--danger {
+  border-radius: var(--radius-md);
+}
+
+/* ═════════ Экран: между блоками 16, одна главная кнопка ═════════ */
+[data-look='a'] .page--deadlines,
+[data-look='a'] .page--deadlines .deadlines-grid {
+  gap: var(--space-4);
+}
+
+/* Календарь едет за списком, прижатый низом: 16 px от низа окна (как липкие колонки «Сегодня»). Стоит в конце своей
+   ячейки, поэтому в начале страницы верх вровень со списком, в конце — низ (§7.10; прижатый верхом оставлял под собой
+   90 px фона внизу страницы). Лист вида A — position: relative (под свет): без этого правила календарь не лип,
+   а top сдвигал его на 16 px ниже списка. Прилипший — без тени и обводки. */
+@media (min-width: 1200px) {
+  [data-look='a'] .deadlines-grid > aside {
+    position: sticky;
+    top: auto;
+    bottom: var(--space-4);
+    align-self: end;
+  }
+}
+
+[data-look='a'] .deadlines-grid > aside.is-stuck {
+  box-shadow: none;
+}
+
+/* Главная кнопка экрана — в меню («Записать платёж») и «+» в нижней панели; «Новый срок» — второй, тоном (§7.5) */
+[data-look='a'] .page--deadlines .page__actions .btn--primary {
+  background: var(--surface-sunk);
+  color: var(--ink);
+}
+
+/* ═════════ Календарь месяца ═════════ */
+[data-look='a'] .month__title {
+  font-weight: var(--weight-display);
+  line-height: var(--leading-snug);
+}
+
+[data-look='a'] .month__title em {
+  font-style: normal;
+}
+
+[data-look='a'] .month__grid {
+  gap: var(--space-1);
+}
+
+[data-look='a'] .month__day {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-look='a'] .month__n {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-display);
+}
+
+/* Выбранный день — зелёный, без тени: в покое теней нет */
+[data-look='a'] .month__day[aria-pressed='true'] {
+  box-shadow: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  [data-look='a'] .month__day:hover:not([aria-pressed='true']):not(.is-today) {
+    box-shadow: none;
+  }
+
+  [data-look='a'] .month__day:hover:not([aria-pressed='true']):not([class*='month__day--']) {
+    background: var(--surface-sunk);
+  }
+}
+
+[data-look='a'] .month__legend > span {
+  gap: var(--space-1);
+}
+
+[data-look='a'] .month__legend .icon {
+  margin-right: 0;
+}
+
+/* Нагрузка по неделям: отделена воздухом, без линии */
+[data-look='a'] .wload {
+  margin-top: var(--space-5);
+  padding-top: 0;
+  box-shadow: none;
+}
+
+[data-look='a'] .wload__week {
+  gap: var(--space-1);
+}
+
+[data-look='a'] .wload__bar {
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: color-mix(in srgb, var(--accent) 24%, var(--surface-sunk));
+}
+
+/* ═════════ Инструменты списка: фишки тоном, поля радиусом 8, всё одной высоты 48 ═════════ */
+[data-look='a'] .dl-tools__select {
+  min-height: 3rem;
+}
+
+[data-look='a'] .dfilters .input--sm {
+  border-radius: var(--radius-md);
+}
+
+[data-look='a'] .dl-tools__kinds .chip {
+  gap: var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunk);
+  box-shadow: none;
+}
+
+[data-look='a'] .dl-tools__kinds .chip[aria-pressed='true'] {
+  background: var(--btn);
+  color: var(--on-btn);
+}
+
+[data-look='a'] .dl-tools__kinds .chip__n {
+  margin-left: 0;
+}
+
+/* ═════════ Группы и строки сроков ═════════ */
+[data-look='a'] .dgroup__title {
+  letter-spacing: 0;
+}
+
+/* Прилипший заголовок дня — та же линия снизу, без размытой тени (теней у листа нет, §5) */
+[data-look='a'] .dgroup__title.is-stuck {
+  box-shadow: 0 1px 0 var(--line);
+}
+
+/* Шапка телефона в A — 4rem: заголовок дня и строка выбора липнут под ней, а не на 4 px под неё */
+@media (max-width: 1023px) {
+  [data-look='a'] .dgroup__title,
+  [data-look='a'] .dsel-bar {
+    top: 4rem;
+  }
+}
+
+[data-look='a'] .dgroup__more {
+  border: 0;
+  background: var(--surface-sunk);
+}
+
+@container (min-width: 480px) and (max-width: 639px) {
+  [data-look='a'] .dtable__row,
+  [data-look='a'] .dtable--noclient .dtable__row {
+    row-gap: var(--space-1);
+  }
+}
+
+@container (max-width: 479px) {
+  [data-look='a'] .dtable__row,
+  [data-look='a'] .dtable--noclient .dtable__row {
+    row-gap: var(--space-1);
+  }
+}
+
+[data-look='a'] .tag--status {
+  padding: 0 var(--space-2);
+}
+
+[data-look='a'] .dtable__tools {
+  gap: var(--space-1);
+}
+
+/* Меню «Действия» в строке — бумагой внутри листа, без обводки */
+[data-look='a'] .dactions {
+  border-radius: var(--radius-md);
+  background: var(--canvas);
+  box-shadow: none;
+}
+
+[data-look='a'] .dactions__date {
+  gap: var(--space-1);
+}
+
+[data-look='a'] .dactions__btn {
+  gap: 0;
+  padding-block: var(--space-2);
+}
+
+[data-look='a'] .dsel {
+  border-radius: var(--radius-md);
+}
+
+[data-look='a'] .dtable__row:has(.dsel:checked) {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+/* Кнопки строки поверх выбранного срока — на подложке его цвета, а не серым пятном */
+@media (hover: hover) and (pointer: fine) and (min-width: 40rem) {
+  [data-look='a'] .dtable__row:has(.dsel:checked) .dtable__line > .dtable__tools {
+    background: linear-gradient(to right, transparent, color-mix(in srgb, var(--accent) 8%, var(--surface)) var(--space-5));
+  }
+}
+
+[data-look='a'] .dsel-bar {
+  box-shadow: var(--shadow-2);
+}
+
+/* Узкий список: «N выбрано» и ссылки — первой строкой, все кнопки — второй (раньше «В работе» оставалась одна справа) */
+@container (max-width: 899px) {
+  [data-look='a'] .dsel-bar__grow {
+    flex-basis: 100%;
+  }
+}
+
+/* Телефон: кнопки строки выбора — две ровные пары, а не «Закрыть 2» одна в последнем ряду */
+@container (max-width: 479px) {
+  [data-look='a'] .dsel-bar > .btn {
+    flex: 1 1 40%;
+  }
+}
+
+/* «Закрыто сегодня» и «Без даты» на узком листе: значок слева от текста, статус и кнопки — под текстом
+   (раньше галочка стояла одна строкой выше текста) */
+@container (max-width: 639px) {
+  [data-look='a'] .closed__row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: var(--space-2) var(--space-3);
+  }
+
+  [data-look='a'] .closed__row > :not(:first-child) {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+/* ═════════ Телефон ═════════ */
+@media (max-width: 759px) {
+  /* Кнопки шапки — во всю ширину, одна под другой: разной длины слева выглядели рвано */
+  [data-look='a'] .page--deadlines .page__actions {
+    display: grid;
+    flex: 1 1 100%;
+  }
+
+  /* Поля листа на телефоне — 16 (DESIGN.md §1) */
+  [data-look='a'] .deadlines-grid > aside.panel--pad {
+    padding: var(--space-4);
+  }
+}
+
+/* Касание: ячейки дня 44 px — семь в строку влезают только без зазора между столбцами */
+@media (hover: none), (pointer: coarse) {
+  [data-look='a'] .month__grid {
+    gap: var(--space-1) 0;
+  }
+}
+
+@media (max-width: 559px) {
+  /* Период — в одну строку (вкладки в две строки запрещены, §7.9): число под словом, как у плиток образца */
+  [data-look='a'] .page--deadlines .panel__head .tabs {
+    flex-wrap: nowrap;
+  }
+
+  [data-look='a'] .page--deadlines .panel__head .tabs__tab {
+    flex-direction: column;
+    gap: 0;
+    min-width: 0;
+    padding: var(--space-1) var(--space-2);
+    line-height: var(--leading-snug);
+  }
+
+  [data-look='a'] .page--deadlines .panel__head .tabs__count {
+    min-width: 0;
+  }
+
+  /* «Выбрать несколько» — во всю строку (справа оставалась пустота шире трети), фишки видов делят строку поровну */
+  [data-look='a'] .dl-tools__select {
+    flex: 1 1 100%;
+  }
+
+  [data-look='a'] .dl-tools__kinds .chip {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}

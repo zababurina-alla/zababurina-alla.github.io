@@ -130,7 +130,7 @@ export function Tabs<T extends string>({ items, value, onChange, label }: {
   const ind = useRef<HTMLSpanElement>(null);
   // Подложка выбранного пункта — по точным (дробным) размерам кнопки: целые offset* на экране с масштабом 125 %
   // сдвигали её на полпикселя вверх-вниз (владелец 17.10, карточка клиента). По высоте в одну строку её держит CSS
-  // (top/bottom 3 px) — всегда по центру; JS двигает только вбок и задаёт ширину. Пересчёт — и при смене размеров
+  // (top/bottom — поле полосы) — всегда по центру; JS двигает только вбок и задаёт ширину. Пересчёт — и при смене размеров
   // (догрузился шрифт, сузилось окно). Не помещается — края полосы затухают, выбранный пункт прокручивается в вид.
   useLayoutEffect(() => {
     const box = wrap.current;
@@ -144,18 +144,19 @@ export function Tabs<T extends string>({ items, value, onChange, label }: {
         const b = btn.getBoundingClientRect();
         const r = box.getBoundingClientRect();
         const x = b.left - r.left - box.clientLeft + box.scrollLeft;
+        const pad = parseFloat(getComputedStyle(box).paddingTop) || 0; // поле полосы: 3 px, в виде A — 4
         // Перенос — пункты стоят больше чем в одну строку (любой ниже первого), не только выбранный
         const all = [...box.querySelectorAll<HTMLElement>('.tabs__tab')];
         const wrapped = all.some((t) => Math.abs(t.offsetTop - (all[0]?.offsetTop ?? 0)) > 1);
         if (wrapped) {
           // Перенос в две строки (телефон): по высоте — строка выбранного пункта
           const y = b.top - r.top - box.clientTop + box.scrollTop;
-          mark.style.transform = `translate(${x}px, ${y - 3}px)`;
+          mark.style.transform = `translate(${x}px, ${y - pad}px)`;
           mark.style.height = `${b.height}px`;
         } else {
-          // Одна строка: высота — полоса без отступов 3 + 3 px, подложка ровно по центру
+          // Одна строка: высота — полоса без полей сверху и снизу, подложка ровно по центру
           mark.style.transform = `translateX(${x}px)`;
-          mark.style.height = `${r.height - box.clientTop * 2 - 6}px`;
+          mark.style.height = `${r.height - box.clientTop * 2 - pad * 2}px`;
         }
         mark.style.width = `${b.width}px`;
       }
