@@ -613,8 +613,11 @@
     grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
   }
 
+  /* Короткая колонка липнет: низ — у низа окна, в конце страницы — вровень с длинной (top считает useStickyColumns) */
+  [data-look='a'] .today-main,
   [data-look='a'] .today-side {
-    position: static;
+    position: sticky;
+    top: var(--stick-top, var(--space-4));
   }
 }
 

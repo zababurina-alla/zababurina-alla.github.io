@@ -25,6 +25,7 @@ import { Hint } from '../ui/Hint';
 import { navigate } from '../router';
 import { AttentionPanel } from './Attention';
 import { useBalance } from './useBalance';
+import { useStickyColumns } from './useStickyColumns';
 import { greeting, kyivHour } from '../ui/greeting';
 import { isLookA } from '../lib/look';
 import { Ledger } from '../ui/Ledger';
@@ -268,6 +269,7 @@ export function Today() {
   const left = useBalance(gridRef, tailKeys, `${filter}:${list.length}:${store.inbox.length}:${store.questions.length}:${todayTasks.length}:${keys.length}:${store.activity.length}:${moreAct}`);
   const leftTail = tailKeys.filter((k) => left.includes(k));
   const rightTail = tailKeys.filter((k) => !left.includes(k));
+  useStickyColumns(gridRef, lookA);
 
   // Приветствие и план дня. В виде A они — один лист «тоном» с разлиновкой, рядом с деньгами месяца.
   const heroPlan = (
