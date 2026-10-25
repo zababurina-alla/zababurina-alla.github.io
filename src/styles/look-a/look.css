@@ -1,0 +1,641 @@
+/*
+  Вид A «Тихий премиум» (DESIGN.md, 25.10.2026): оболочка и «Сегодня». Образец — docs/дизайн/борд-бухгалтерия/A/index.html.
+  Каждое правило — под [data-look='a']: без флажка (?look=a) файл ничего не меняет. Значения — только токены
+  look-a/tokens.css и шкала A (сторож — scripts/design-scale.test.ts, блок «вид A»).
+  Знак стиля: ровные листы без теней и рамок, тёплая бумага, один зелёный; разлиновка учётной книги в приветствии
+  (ui/Ledger.tsx), свет за курсором на странице и светящийся край листа под курсором (ui/fx.ts). Звука нет.
+*/
+
+/* ═════════ Страница: свет за курсором вместо двух свечений ═════════ */
+[data-look='a'] body::before {
+  background: radial-gradient(560px circle at var(--lx, 50%) var(--ly, 30%), var(--glow-a), transparent 70%);
+  opacity: var(--lo, 0);
+  transition: opacity 1.2s ease;
+}
+
+[data-look='a'] ::selection {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+[data-look='a'] :focus-visible {
+  outline-width: 2px;
+  border-radius: var(--radius-md);
+}
+
+/* ═════════ Детали: кнопки, клавиши, ссылки, подписи ═════════ */
+[data-look='a'] .btn {
+  border: 0;
+  font-weight: var(--weight-semibold);
+}
+
+[data-look='a'] .btn--secondary {
+  background: var(--surface-sunk);
+  color: var(--ink);
+}
+
+[data-look='a'] .kbd {
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--canvas);
+  box-shadow: none;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height: 1;
+}
+
+[data-look='a'] .kbd--on-btn {
+  background: color-mix(in srgb, var(--on-accent) 16%, transparent);
+  color: var(--on-accent);
+}
+
+[data-look='a'] .link {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--accent);
+  text-decoration: none;
+}
+
+/* Ссылка на цветной плашке (учебный режим, нет связи) — цветом текста плашки, иначе зелёная на зелёном */
+[data-look='a'] .offline .link {
+  color: inherit;
+  text-decoration: underline;
+}
+
+/* Ссылка в шапке листа — по краю текста: и справа от заголовка, и когда перенеслась под него */
+[data-look='a'] .panel__head .link {
+  padding-inline: 0;
+}
+
+[data-look='a'] .eyebrow {
+  font-weight: var(--weight-medium);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+[data-look='a'] .display {
+  font-weight: var(--weight-display);
+  letter-spacing: -0.02em;
+}
+
+[data-look='a'] .page__title {
+  font-weight: var(--weight-display);
+  letter-spacing: -0.04em;
+}
+
+[data-look='a'] .page__title em {
+  font-style: normal;
+}
+
+/* ═════════ Лист: ровный, без тени и рамки; под курсором — свет внутри и светящийся край ═════════ */
+[data-look='a'] .panel {
+  position: relative;
+  isolation: isolate;
+  padding-bottom: var(--space-2);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: none;
+}
+
+[data-look='a'] .panel__head {
+  padding: var(--space-5) var(--space-5) var(--space-4);
+}
+
+[data-look='a'] .panel__title {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-display);
+  line-height: var(--leading-snug);
+  letter-spacing: -0.02em;
+}
+
+[data-look='a'] .panel__title .sub {
+  font-size: var(--text-sm);
+  letter-spacing: 0;
+}
+
+[data-look='a'] .panel::after,
+[data-look='a'] .today-hello::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%);
+  opacity: var(--fx-on, 0);
+  transition: opacity 0.5s ease;
+}
+
+[data-look='a'] .panel::before,
+[data-look='a'] .today-hello::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border: 1.5px solid transparent; /* толщина светящегося края (образец A), не отступ */
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(380px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--accent) 70%, transparent), transparent 70%) border-box;
+  -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0) border-box;
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0) border-box;
+  mask-composite: exclude;
+  opacity: var(--fx-on, 0);
+  transition: opacity 0.5s ease;
+}
+
+[data-look='a'] .money-card::after,
+[data-look='a'] .money-card::before {
+  background: radial-gradient(380px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--on-accent) 40%, transparent), transparent 70%) border-box;
+}
+
+[data-look='a'] .money-card::after {
+  background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--on-accent) 12%, transparent), transparent 70%);
+}
+
+/* ═════════ Телефон: шапка без линии, вкладки стеклом, «+» — внутри нижней панели ═════════ */
+[data-look='a'] .topbar {
+  height: 4rem;
+  padding: 0 var(--space-2) 0 var(--space-4);
+}
+
+[data-look='a'] .is-scrolled .topbar,
+[data-look='a'].is-scrolled .topbar {
+  box-shadow: none;
+}
+
+/* Пять пунктов и «+» посередине: ячейке «+» — ровно по кнопке, подписям — остальное (на 375 «Сегодня» и «Клиенты»
+   слипались при шести равных колонках) */
+[data-look='a'] .tabbar {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) 3.5rem repeat(3, minmax(0, 1fr));
+  align-items: center;
+  padding: 0 0 env(safe-area-inset-bottom);
+  box-shadow: none;
+}
+
+[data-look='a'] .tabbar__item {
+  gap: var(--space-1);
+  min-width: 0;
+  min-height: 4rem;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height: 1.3;
+  letter-spacing: -0.02em; /* образец: подписи плотнее, иначе «Сегодня» и «Клиенты» почти касаются на 375 */
+}
+
+[data-look='a'] .tabbar__item[aria-current='page'] {
+  color: var(--accent);
+  font-weight: var(--weight-semibold);
+}
+
+[data-look='a'] .tabbar__icon {
+  width: auto;
+  height: auto;
+  background: none;
+}
+
+[data-look='a'] .tabbar__item[aria-current='page'] .tabbar__icon {
+  background: none;
+  color: var(--accent);
+}
+
+[data-look='a'] .tabbar__badge {
+  top: 0;
+  right: calc(-1 * var(--space-1));
+}
+
+/* «+» стоит в нижней панели третьей ячейкой (Shell): ничего не закрывает, при прокрутке не прячется */
+[data-look='a'] .fab {
+  position: static;
+  justify-self: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: none;
+  transition: transform 0.5s var(--ease-a);
+}
+
+[data-look='a'].fab-away .fab {
+  transform: none;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+[data-look='a'] .fab:active {
+  transform: scale(0.94);
+}
+
+[data-look='a'] .main {
+  padding: var(--space-4) var(--space-4) calc(var(--space-8) + var(--space-5) + env(safe-area-inset-bottom));
+}
+
+/* ═════════ Ноутбук: боковая панель прижата к краю окна сверху, слева и снизу — без зазора и обводки ═════════ */
+@media (min-width: 1024px) {
+  [data-look='a'] .shell {
+    grid-template-columns: var(--rail-w) minmax(0, 1fr);
+  }
+
+  [data-look='a'] .rail {
+    top: 0;
+    height: 100dvh;
+    margin: 0;
+    gap: var(--space-5);
+    padding: var(--space-5) var(--space-4);
+    border-radius: 0;
+    box-shadow: none;
+    scrollbar-width: none; /* полоса прокрутки съедала место справа: пункты не по центру (12 / 22 px, 25.10) */
+    overscroll-behavior: contain;
+  }
+
+  [data-look='a'] .rail::-webkit-scrollbar {
+    display: none;
+  }
+
+  [data-look='a'] .main {
+    padding: var(--space-6) var(--space-6) var(--space-7);
+  }
+}
+
+/* Окно ноутбука ниже 880 px: меню целиком, отступы плотнее (как в прежнем виде, Р-4) */
+@media (min-width: 1024px) and (max-height: 880px) {
+  [data-look='a'] .rail {
+    gap: var(--space-3);
+    padding-block: var(--space-4);
+  }
+}
+
+@media (min-width: 1440px) {
+  [data-look='a'] .main {
+    padding-inline: var(--space-7);
+  }
+}
+
+/* ═════════ Меню ═════════ */
+[data-look='a'] .brand {
+  padding: 0;
+}
+
+[data-look='a'] .brand__name {
+  font-family: var(--font);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-display);
+  letter-spacing: -0.02em;
+}
+
+[data-look='a'] .rail > .sync {
+  margin: 0;
+  gap: var(--space-2);
+  padding: 0;
+}
+
+[data-look='a'] .sync__dot {
+  background: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+[data-look='a'] .rail__cta,
+[data-look='a'] .rail__search {
+  width: 100%;
+  min-height: 3rem;
+  gap: var(--space-3);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  font-size: var(--text-md);
+  justify-content: flex-start;
+}
+
+[data-look='a'] .rail__cta {
+  background: var(--btn);
+  color: var(--on-btn);
+  font-weight: var(--weight-semibold);
+}
+
+[data-look='a'] .rail__search {
+  background: var(--surface-sunk);
+  color: var(--ink);
+  font-weight: var(--weight-medium);
+}
+
+[data-look='a'] .rail__search .kbd {
+  margin-left: auto;
+}
+
+[data-look='a'] .nav {
+  gap: var(--space-1);
+  margin-top: 0;
+}
+
+/* Подсветка выбранного — тон «утопленного», без тени и рамки */
+[data-look='a'] .nav__pill {
+  border-radius: var(--radius-md);
+  background: var(--surface-sunk);
+  box-shadow: none;
+}
+
+[data-look='a'] .nav__item {
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--ink-2);
+  font-weight: var(--weight-medium);
+}
+
+[data-look='a'] .nav__item[aria-current='page'] {
+  color: var(--ink);
+  font-weight: var(--weight-semibold);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  [data-look='a'] .nav__item:hover:not([aria-current='page']) {
+    background: color-mix(in srgb, var(--surface-sunk) 70%, transparent);
+  }
+}
+
+/* «Справка» — без подписи-капители: второе меню отделено воздухом, как в образце (для чтеца экрана текст остаётся) */
+[data-look='a'] .nav__group {
+  height: 0;
+  margin: var(--space-3) 0 0;
+  overflow: hidden;
+  color: transparent;
+}
+
+[data-look='a'] .nav__badge {
+  min-width: 1.5rem;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-md);
+  font-weight: var(--weight-semibold);
+}
+
+[data-look='a'] .rail__foot {
+  gap: var(--space-2);
+}
+
+[data-look='a'] .closed-chip,
+[data-look='a'] .me {
+  border-radius: var(--radius-md);
+  box-shadow: none;
+}
+
+/* ═════════ «Сегодня» ═════════ */
+[data-look='a'] .today {
+  gap: var(--space-4);
+}
+
+/* Верхний ряд: приветствие с планом (тон) и деньги месяца (зелёный лист) — одной высоты */
+[data-look='a'] .today-top {
+  display: grid;
+  gap: var(--space-4);
+  align-items: stretch;
+}
+
+[data-look='a'] .today-hello {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+  padding: var(--space-5);
+  border-radius: var(--radius-xl);
+  background: var(--surface-sunk);
+  overflow: hidden;
+}
+
+[data-look='a'] .today-hello > canvas {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, rgb(0 0 0 / 0.4) 0, rgb(0 0 0 / 0.4) 160px, #000 240px);
+  mask-image: linear-gradient(to bottom, rgb(0 0 0 / 0.4) 0, rgb(0 0 0 / 0.4) 160px, #000 240px);
+}
+
+[data-look='a'] .hero {
+  gap: var(--space-3);
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  overflow: visible;
+}
+
+[data-look='a'] .hero::before,
+[data-look='a'] .hero::after {
+  content: none;
+}
+
+[data-look='a'] .hero__title {
+  max-width: 18ch;
+  font-family: var(--font);
+  font-size: var(--text-hero);
+  font-weight: var(--weight-display);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.04em;
+}
+
+[data-look='a'] .hero__title em {
+  font-style: normal;
+  font-weight: var(--weight-display);
+  color: var(--ink-2);
+}
+
+[data-look='a'] .hero__title em.is-red {
+  color: var(--st-red-ink);
+}
+
+/* План — столбиком строк, номер в круге (как «1 · 2 · 3» образца) */
+[data-look='a'] .plan {
+  margin-top: auto;
+  gap: var(--space-3);
+}
+
+[data-look='a'] .plan__title {
+  font-family: var(--font);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
+}
+
+[data-look='a'] .plan__steps {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: var(--space-2);
+}
+
+[data-look='a'] .plan__steps > li {
+  flex: none;
+}
+
+[data-look='a'] .plan__step {
+  grid-template-columns: 2rem minmax(0, 1fr) 1.25rem;
+  gap: var(--space-3);
+  min-height: 3.5rem;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: none;
+  transition: background-color 0.3s ease, transform 0.5s var(--ease-a);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  [data-look='a'] .plan__step:hover {
+    background: var(--canvas);
+    box-shadow: none;
+  }
+}
+
+[data-look='a'] .plan__step:active {
+  transform: scale(0.99);
+}
+
+[data-look='a'] .plan__n {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--surface-sunk);
+  font-family: var(--font);
+  font-size: var(--text-sm);
+  font-style: normal;
+  font-weight: var(--weight-display);
+  letter-spacing: 0;
+}
+
+[data-look='a'] .plan__done {
+  border-radius: var(--radius-md);
+}
+
+/* Деньги месяца — зелёный лист: сумма крупно, график и подписи цветом бумаги */
+[data-look='a'] .money-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+[data-look='a'] .money-card .panel__title,
+[data-look='a'] .money-card .link,
+[data-look='a'] .money-card .sub,
+[data-look='a'] .money-card .up,
+[data-look='a'] .money-card .trend-down,
+[data-look='a'] .money-card .panel__note {
+  color: var(--on-accent);
+}
+
+[data-look='a'] .money-card .sub {
+  opacity: 0.82;
+}
+
+/* Копейки на зелёном — цветом бумаги, тише (чернильный --ink-2 на акценте не читается) */
+[data-look='a'] .money-card .money-v__cents,
+[data-look='a'] .money-card .roll__cents {
+  color: color-mix(in srgb, var(--on-accent) 70%, transparent);
+}
+
+[data-look='a'] .money-card__body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+[data-look='a'] .money-card__sum {
+  font-size: var(--text-3xl);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  white-space: nowrap;
+}
+
+/* График занимает всё место под суммой: карточка ростом с первый экран, иначе посередине — пустое зелёное поле */
+[data-look='a'] .money-card .chart-wrap {
+  flex: 1 1 5rem;
+  margin-top: var(--space-4);
+}
+
+[data-look='a'] .money-card .chart {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+}
+
+[data-look='a'] .money-card .chart__grid {
+  stroke: color-mix(in srgb, var(--on-accent) 24%, transparent);
+}
+
+[data-look='a'] .money-card .chart__area {
+  fill: var(--on-accent);
+  opacity: 0.16;
+}
+
+[data-look='a'] .money-card .chart__line,
+[data-look='a'] .money-card .chart__cursor {
+  stroke: var(--on-accent);
+}
+
+/* Точка конца линии в растянутом графике сплющивается в чёрточку — её роль играет точка под курсором (.chart__hdot) */
+[data-look='a'] .money-card .chart__dot {
+  display: none;
+}
+
+[data-look='a'] .money-card .chart__hdot {
+  background: var(--on-accent);
+  box-shadow: 0 0 0 3px var(--accent);
+}
+
+/* Нижний ряд: сроки и боковая колонка. Колонки не тянем: нижние карточки раскладывает useBalance по высоте
+   колонок — растянутая колонка сбивала бы его замер (список сроков рос на всю высоту, под ним — пустота). */
+[data-look='a'] .today-grid {
+  gap: var(--space-4);
+  align-items: start;
+}
+
+[data-look='a'] .today-main,
+[data-look='a'] .today-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+@media (min-width: 1280px) {
+  [data-look='a'] .today-top {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  }
+
+  [data-look='a'] .today-grid {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  }
+
+  [data-look='a'] .today-side {
+    position: static;
+  }
+}
+
+@media (min-width: 760px) and (max-width: 1279px) {
+  [data-look='a'] .today-side {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    columns: auto;
+  }
+
+  [data-look='a'] .today-side > * {
+    margin-bottom: 0;
+  }
+}
+
+@media (max-width: 759px) {
+  [data-look='a'] .today-hello {
+    padding: var(--space-4);
+  }
+
+  [data-look='a'] .plan__step {
+    padding: var(--space-2) var(--space-3);
+  }
+}

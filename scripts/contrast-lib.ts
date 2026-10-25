@@ -54,6 +54,16 @@ export function readThemes(css: string) {
   return { light, dark, mediaDark };
 }
 
+/** Цвета вида A (styles/look-a/tokens.css) поверх общих: те же три темы, блоки с [data-look='a']. */
+export function readThemesA(baseCss: string, aCss: string) {
+  const base = readThemes(baseCss);
+  const light = { ...base.light, ...parseVars(blockBody(aCss, ":root[data-look='a'] {")) };
+  const dark = { ...light, ...parseVars(blockBody(aCss, ":root[data-look='a'][data-theme='dark'] {")) };
+  const mediaAt = aCss.indexOf('@media (prefers-color-scheme: dark)');
+  const mediaDark = { ...light, ...parseVars(blockBody(aCss, ":root[data-look='a']:not([data-theme='light']) {", mediaAt)) };
+  return { light, dark, mediaDark };
+}
+
 export interface Pair {
   fg: string;
   bg: string;
