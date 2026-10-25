@@ -110,6 +110,15 @@
   margin-right: 0;
 }
 
+/* 760–1199: календарь во всю ширину над списком — квадратные дни по 85 px растягивали его до 700 px пустоты;
+   день высотой 48, как поля и кнопки */
+@media (min-width: 760px) and (max-width: 1199px) {
+  [data-look='a'] .month__day {
+    aspect-ratio: auto;
+    height: 3rem;
+  }
+}
+
 /* Нагрузка по неделям: отделена воздухом, без линии */
 [data-look='a'] .wload {
   margin-top: var(--space-5);
