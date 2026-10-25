@@ -22,6 +22,21 @@ export const SCALE = {
   shadowTokens: ['--shadow-1', '--shadow-2', '--shadow-3'],
 };
 
+export type Scale = typeof SCALE;
+
+/** Шкалы вида A «Тихий премиум» (DESIGN.md, 25.10.2026) — для src/styles/look-a/. Старые файлы — по SCALE, пока не переведены. */
+export const SCALE_A: Scale = {
+  radius: ['0', '8px', '28px', '999px', '50%', 'inherit'],
+  spacing: SCALE.spacing,
+  fontSize: ['15px', '16px', '20px', '24px', '40px', 'inherit', '1em'],
+  fontWeight: ['400', '500', '600', '650', 'inherit', 'normal'],
+  lineHeight: ['1', '1.04', '1.3', '1.5', 'inherit', 'normal'],
+  letterSpacing: ['-0.04em', '-0.02em', '0', '0.02em', 'normal', 'inherit'],
+  fontFamily: SCALE.fontFamily,
+  mix: [0, 8, 12, 16, 24, 40, 70, 100],
+  shadowTokens: SCALE.shadowTokens,
+};
+
 /** Устаревшие имена токенов: шкала сужена 18.10.2026, они равны ближайшему значению эталона. В новых правилах не писать. */
 export const RETIRED_TOKENS = ['--radius-xs', '--radius-sm', '--radius-lg', '--radius-2xl', '--text-xs', '--weight-bold'];
 
@@ -81,15 +96,15 @@ const SPACING_PROP = /^(padding|margin)(-(top|right|bottom|left|inline|block)(-(
 
 /** Отступ в шкале: 0, auto, шаг шкалы (и минус шаг), env(). calc() проверяется как написан: числа в нём — только шаги
  *  шкалы, ссылки на токены (размер значка, кнопки) можно — так пишется «отступ под аватар». */
-function spacingOk(raw: string, tok: Record<string, string>): boolean {
+function spacingOk(raw: string, tok: Record<string, string>, scale: Scale): boolean {
   if (/^(calc|max|min|clamp)\(/.test(raw)) {
     const lens = raw.replace(/var\([^()]*\)/g, '').match(/-?\d*\.?\d+(px|rem|em|%|vh|vw|mm)/g) ?? [];
-    return lens.every((l) => SCALE.spacing.includes(Math.abs(parseFloat(resolve(l, tok)))) && /(px|rem)$/.test(l));
+    return lens.every((l) => scale.spacing.includes(Math.abs(parseFloat(resolve(l, tok)))) && /(px|rem)$/.test(l));
   }
   const part = resolve(raw, tok);
   if (part === 'auto' || part === 'inherit' || /^env\(/.test(part)) return true;
   const m = /^(-?\d*\.?\d+)(px)?$/.exec(part);
-  return !!m && SCALE.spacing.includes(Math.abs(Number(m[1])));
+  return !!m && scale.spacing.includes(Math.abs(Number(m[1])));
 }
 
 /** Слой тени без размытия (рамка, линия, кольцо фокуса) или токен тени. */
@@ -102,7 +117,7 @@ function shadowLayerOk(raw: string, tok: Record<string, string>): boolean {
 }
 
 /** Проверить одно объявление; tokens.css (место, где шкала задаётся) не проверяется. */
-export function check(d: Decl, tok: Record<string, string>): Violation[] {
+export function check(d: Decl, tok: Record<string, string>, scale: Scale = SCALE): Violation[] {
   const out: Violation[] = [];
   const bad = (rule: Rule, why: string) => out.push({ ...d, rule, why });
   const { prop, value } = d;
@@ -112,25 +127,25 @@ export function check(d: Decl, tok: Record<string, string>): Violation[] {
     for (const c of value.match(COLOR_LITERAL) ?? []) bad('color', `цвет «${c}» не из палитры`);
   }
   for (const m of value.matchAll(/color-mix\([^,]+,\s*[^,]*?(\d+(?:\.\d+)?)%/g)) {
-    if (!SCALE.mix.includes(Number(m[1]))) bad('color', `прозрачность ${m[1]} % вне шкалы ${SCALE.mix.join('/')}`);
+    if (!scale.mix.includes(Number(m[1]))) bad('color', `прозрачность ${m[1]} % вне шкалы ${scale.mix.join('/')}`);
   }
   if (prop.startsWith('--')) return out;
 
   const r = resolve(value.replace(/\s*!important$/, ''), tok);
   if (/^border(-[a-z]+)*-radius$/.test(prop)) {
-    for (const p of split(r)) if (!SCALE.radius.includes(p)) bad('radius', `радиус ${p}`);
+    for (const p of split(r)) if (!scale.radius.includes(p)) bad('radius', `радиус ${p}`);
   } else if (SPACING_PROP.test(prop)) {
-    for (const p of split(value.replace(/\s*!important$/, ''))) if (!spacingOk(p, tok)) bad('spacing', `отступ ${resolve(p, tok)}`);
+    for (const p of split(value.replace(/\s*!important$/, ''))) if (!spacingOk(p, tok, scale)) bad('spacing', `отступ ${resolve(p, tok)}`);
   } else if (prop === 'font-size') {
-    if (!SCALE.fontSize.includes(r) && !/^var\(--text-hero\)$/.test(value.trim())) bad('fontSize', `размер ${r}`);
+    if (!scale.fontSize.includes(r) && !/^var\(--text-hero\)$/.test(value.trim())) bad('fontSize', `размер ${r}`);
   } else if (prop === 'font-weight') {
-    if (!SCALE.fontWeight.includes(r)) bad('fontWeight', `начертание ${r}`);
+    if (!scale.fontWeight.includes(r)) bad('fontWeight', `начертание ${r}`);
   } else if (prop === 'line-height') {
-    if (!SCALE.lineHeight.includes(r)) bad('lineHeight', `межстрочный ${r}`);
+    if (!scale.lineHeight.includes(r)) bad('lineHeight', `межстрочный ${r}`);
   } else if (prop === 'letter-spacing') {
-    if (!SCALE.letterSpacing.includes(r)) bad('letterSpacing', `трекинг ${r}`);
+    if (!scale.letterSpacing.includes(r)) bad('letterSpacing', `трекинг ${r}`);
   } else if (prop === 'font-family') {
-    if (!SCALE.fontFamily.includes(value.trim())) bad('fontFamily', `шрифт ${value}`);
+    if (!scale.fontFamily.includes(value.trim())) bad('fontFamily', `шрифт ${value}`);
   } else if (prop === 'box-shadow' || prop === 'text-shadow') {
     for (const layer of split(value.replace(/\s*!important$/, ''), ',')) if (!shadowLayerOk(layer, tok)) bad('shadow', `своя тень «${layer}»`);
   }
@@ -152,6 +167,22 @@ export function checkAll(stylesDir: string): FileReport[] {
       const decls = declarations(readFileSync(join(stylesDir, f), 'utf8'), f);
       const violations = EXEMPT.includes(f) ? [] : decls.flatMap((d) => check(d, tok));
       return { file: f, decls, violations };
+    });
+}
+
+/** Файлы вида A (src/styles/look-a, кроме его tokens.css) — по шкале A, токены A поверх общих. */
+export function checkLookA(stylesDir: string): FileReport[] {
+  const dir = join(stylesDir, 'look-a');
+  const tok = {
+    ...readTokens(readFileSync(join(stylesDir, 'tokens.css'), 'utf8')),
+    ...readTokens(readFileSync(join(dir, 'tokens.css'), 'utf8')),
+  };
+  return readdirSync(dir)
+    .filter((f) => f.endsWith('.css') && f !== 'tokens.css')
+    .sort()
+    .map((f) => {
+      const decls = declarations(readFileSync(join(dir, f), 'utf8'), `look-a/${f}`);
+      return { file: `look-a/${f}`, decls, violations: decls.flatMap((d) => check(d, tok, SCALE_A)) };
     });
 }
 

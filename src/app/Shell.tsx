@@ -1,5 +1,5 @@
 // Оболочка: плавающее стеклянное меню слева на ноутбуке; верхняя полоса, нижние вкладки и кнопка «+» на телефоне.
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { hasFeature } from '../config';
 import { auth, useAuth } from '../data/session';
 import { roAttrs } from '../ui/readonly';
@@ -18,6 +18,7 @@ import { useUi } from './ui-context';
 import { demoWords, readOnlyAreas, visibleAreas } from '../config';
 import '../ui/fx';
 import { BrandMark } from '../ui/BrandMark';
+import { isLookA } from '../lib/look';
 
 const NAV: { id: RouteName; label: string; icon: IconName; group: 'work' | 'ref' }[] = [
   { id: 'today', label: 'Сегодня', icon: 'today', group: 'work' },
@@ -264,6 +265,10 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
     };
   }, []);
 
+  // Вид A (?look=a): «+» — третьей ячейкой нижней панели, как в образце, а не плавающей кнопкой над строками
+  const lookA = isLookA();
+  const fab = <button type="button" className="fab" onClick={() => ui.openPayment()} aria-label="Записать платёж" {...roAttrs('payments')}><Icon name="plus" size={26} /></button>;
+
   // Подпись — действие, а не состояние: «Светлая тема» на светлой читалась как «сейчас светлая» (приёмка М-5)
   const themeLabel = theme === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему';
   const navLink = (n: (typeof NAV)[number]) => (
@@ -298,6 +303,7 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
         </nav>
         <div className="rail__foot">
           <ClosedCounter />
+          <span className="ai-slot" data-ai-slot />
           {/* Профиль одной карточкой: кто вошёл, тема и звук значками, выход — меню целиком на 800 px (Р-4) */}
           <Me tools={<>
             <button type="button" className="icon-btn" onClick={toggleTheme} aria-label={themeLabel} title={themeLabel}>
@@ -314,6 +320,7 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
           <SyncStatus />
           <ClosedCounter compact />
           <a href="#/clients/search" className="icon-btn" aria-label="Поиск клиента"><Icon name="search" /></a>
+          <span className="ai-slot" data-ai-slot />
           <button type="button" className="icon-btn" onClick={toggleTheme} aria-label={themeLabel}>
             <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
           </button>
@@ -324,18 +331,21 @@ export function Shell({ route, children }: { route: RouteName; children: ReactNo
         <div key={route} className="screen">{children}</div>
       </main>
 
-      {/* На «Ещё» записывать нечего, а «+» закрывал нижний лист (находка № 25) */}
-      {route !== 'more' && <button type="button" className="fab" onClick={() => ui.openPayment()} aria-label="Записать платёж" {...roAttrs('payments')}><Icon name="plus" size={26} /></button>}
+      {/* На «Ещё» записывать нечего, а «+» закрывал нижний лист (находка № 25). В виде A «+» — в нижней панели. */}
+      {route !== 'more' && !lookA && fab}
 
       <nav className="tabbar" aria-label="Разделы">
-        {PHONE_NAV.map((id) => {
+        {PHONE_NAV.map((id, i) => {
           const n = NAV.find((x) => x.id === id);
           if (!n) return null;
           return (
-            <a key={id} href={toHash({ name: id, params: [] })} className="tabbar__item" aria-current={route === id ? 'page' : undefined}>
-              <span className="tabbar__icon"><Icon name={n.icon} />{id === 'deadlines' && overdue > 0 && <><span className="tabbar__badge" aria-hidden="true" /><span className="visually-hidden">, просрочено: {overdue}</span></>}</span>
-              <span>{n.label}</span>
-            </a>
+            <Fragment key={id}>
+              {lookA && i === 2 && fab}
+              <a href={toHash({ name: id, params: [] })} className="tabbar__item" aria-current={route === id ? 'page' : undefined}>
+                <span className="tabbar__icon"><Icon name={n.icon} />{id === 'deadlines' && overdue > 0 && <><span className="tabbar__badge" aria-hidden="true" /><span className="visually-hidden">, просрочено: {overdue}</span></>}</span>
+                <span>{n.label}</span>
+              </a>
+            </Fragment>
           );
         })}
         <a href="#/more" className="tabbar__item" aria-current={route === 'more' || route === 'keys' || route === 'reference' || route === 'tasks' ? 'page' : undefined}>

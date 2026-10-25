@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { check, checkAll, declarations, readTokens, type Rule } from './design-lib.ts';
+import { check, checkAll, checkLookA, declarations, readTokens, SCALE_A, type Rule } from './design-lib.ts';
 
 const STYLES = fileURLToPath(new URL('../src/styles', import.meta.url));
 const tok = readTokens(readFileSync(`${STYLES}/tokens.css`, 'utf8'));
@@ -62,6 +62,26 @@ describe('переведённые на эталон файлы — без ед�
     const rep = reports.find((r) => r.file === file);
     expect(rep, `нет файла ${file}`).toBeDefined();
     expect(rep?.violations.map((v) => `${v.file}:${v.line} ${v.prop}: ${v.why}`)).toEqual([]);
+  });
+});
+
+// Вид A «Тихий премиум» (DESIGN.md, 25.10.2026): свои шкалы, файлы src/styles/look-a — без единого нарушения.
+describe('вид A — по своей шкале', () => {
+  const tokA = { ...tok, ...readTokens(readFileSync(`${STYLES}/look-a/tokens.css`, 'utf8')) };
+  const rulesA = (css: string) => declarations(css, 'проба.css').flatMap((d) => check(d, tokA, SCALE_A)).map((v) => v.rule);
+  it('ловит значения старой шкалы: радиус 12 и 20, размер 17, начертание 700', () => {
+    expect(rulesA('.a { border-radius: 12px; }')).toContain('radius');
+    expect(rulesA('.a { border-radius: 20px; }')).toContain('radius');
+    expect(rulesA('.a { font-size: 17px; }')).toContain('fontSize');
+    expect(rulesA('.a { font-weight: 700; }')).toContain('fontWeight');
+  });
+  it('значения A проходят', () => {
+    expect(rulesA(`.a { border-radius: var(--radius-md); border-radius: var(--radius-xl); font-size: var(--text-md);
+      font-size: var(--text-xl); font-weight: var(--weight-display); line-height: var(--leading-tight);
+      letter-spacing: -0.04em; background: color-mix(in srgb, var(--accent) 12%, transparent); }`)).toEqual([]);
+  });
+  it.each(checkLookA(STYLES).map((r) => [r.file, r] as const))('%s — 0 нарушений', (_file, rep) => {
+    expect(rep.violations.map((v) => `${v.file}:${v.line} ${v.prop}: ${v.why}`)).toEqual([]);
   });
 });
 

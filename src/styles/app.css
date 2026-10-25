@@ -10,5 +10,10 @@
 @import './service.css';
 @import './overlay.css';
 @import './fx.css';
+@import './ai.css';
 @import './touch.css';
+/* Пробный вид A «Тихий премиум» — только под <html data-look="a"> (?look=a), DESIGN.md 25.10 */
+@import './look-a/tokens.css';
+@import './look-a/look.css';
+@import './look-a/deadlines.css';
 @import './print.css';

@@ -6,7 +6,8 @@
 //   вне шкалы — значения, которых нет в DESIGN.md (шкалы — scripts/design-lib.ts).
 // Плюс снимок экрана целиком в папку --out (для глаз проверяющего).
 // Запуск (на собранной dist, как приёмка): npm run build; npm run preview -- --port 4180 --strictPort
-//   node scripts/design-dom-audit.mjs http://localhost:4180/ [--only сегодня,платежи] [--out папка] [--json файл]
+//   node scripts/design-dom-audit.mjs http://localhost:4180/ [--only сегодня,платежи] [--out папка] [--json файл] [--look a]
+// --look a — вид A «Тихий премиум» (флажок ?look=a) и его шкала (DESIGN.md §1–3); без него — старый вид (§9).
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from '@playwright/test';
@@ -17,6 +18,7 @@ const BASE = args.find((a) => /^https?:/.test(a)) ?? 'http://localhost:4180/';
 const ONLY = flag('--only')?.split(',');
 const OUT = flag('--out');
 const JSON_OUT = flag('--json');
+const LOOK_A = flag('--look') === 'a';
 
 const SCREENS = [
   { name: 'сегодня', hash: '#/today' },
@@ -30,11 +32,18 @@ const SCREENS = [
 ].filter((s) => !ONLY || ONLY.includes(s.name));
 
 // Шкалы DESIGN.md (дублируют scripts/design-lib.ts: этот файл — обычный JS, без сборки TS)
-const OK = {
+const OK = LOOK_A ? {
+  radius: [8, 28],
+  fontSize: [15, 16, 20, 24, 40],
+  fontWeight: [400, 500, 600, 650],
+  gap: { 1280: 16, 375: 16 },
+  hero: 36, // заставка «Сегодня» 36–44
+} : {
   radius: [12, 20],
   fontSize: [15, 17, 20, 26, 36, 44],
   fontWeight: [400, 500, 600],
   gap: { 1280: 24, 375: 16 },
+  hero: 38, // заставка «Сегодня» 38–60
 };
 
 function measure() {
@@ -78,7 +87,7 @@ function measure() {
   const edges = {};
   for (const b of blocks) (edges[Math.round(b.getBoundingClientRect().left)] ??= new Set()).add(label(b));
   for (const h of root.querySelectorAll('h1, h2, h3')) {
-    if (!visible(h) || h.closest('.panel, .card, .hero, [class*="sheet"]')) continue; // заголовок внутри листа — у листа свои поля
+    if (!visible(h) || h.closest('.panel, .card, .hero, .today-hello, [class*="sheet"]')) continue; // заголовок внутри листа — у листа свои поля
     const rg = document.createRange(); rg.selectNodeContents(h);
     const x = Math.round(rg.getClientRects()[0]?.left ?? h.getBoundingClientRect().left);
     (edges[x] ??= new Set()).add(`текст ${h.tagName.toLowerCase()} «${h.textContent.trim().slice(0, 20)}»`);
@@ -95,7 +104,7 @@ try {
       ? { viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 }
       : { viewport: { width: 1280, height: 800 } });
     const page = await ctx.newPage();
-    await page.goto(`${BASE}${BASE.includes('?') ? '&' : '?'}demo=1&theme=light`, { waitUntil: 'load' });
+    await page.goto(`${BASE}${BASE.includes('?') ? '&' : '?'}demo=1&theme=light&look=${LOOK_A ? 'a' : 'old'}`, { waitUntil: 'load' });
     await page.waitForSelector('.page', { timeout: 30000 });
     await page.waitForTimeout(2500);
     for (const s of SCREENS) {
@@ -104,7 +113,7 @@ try {
       const m = await page.evaluate(measure);
       const key = `${s.name} ${w}`;
       const offRadius = Object.keys(m.radii).filter((k) => k !== 'круг' && !OK.radius.includes(+k));
-      const offSize = Object.keys(m.sizes).filter((k) => !OK.fontSize.includes(+k) && !(s.name === 'сегодня' && +k >= 38));
+      const offSize = Object.keys(m.sizes).filter((k) => !OK.fontSize.includes(+k) && !(s.name === 'сегодня' && +k >= OK.hero));
       const offWeight = Object.keys(m.weights).filter((k) => !OK.fontWeight.includes(+k));
       result[key] = { ...m, offRadius, offSize, offWeight };
       const n = (o) => Object.keys(o).length;

@@ -25,7 +25,10 @@ import { Hint } from '../ui/Hint';
 import { navigate } from '../router';
 import { AttentionPanel } from './Attention';
 import { useBalance } from './useBalance';
+import { useStickyColumns } from './useStickyColumns';
 import { greeting, kyivHour } from '../ui/greeting';
+import { isLookA } from '../lib/look';
+import { Ledger } from '../ui/Ledger';
 
 type Filter = 'week' | 'month' | 'overdue' | 'burning' | 'soon';
 
@@ -260,19 +263,23 @@ export function Today() {
       </section>
     ),
   };
-  const tailKeys = Object.keys(tail).filter((k) => tail[k]);
+  // Вид A (?look=a): деньги месяца — не в колонке, а зелёным листом рядом с приветствием (DESIGN.md, 25.10)
+  const lookA = isLookA();
+  const tailKeys = Object.keys(tail).filter((k) => tail[k] && !(lookA && k === 'money'));
   const left = useBalance(gridRef, tailKeys, `${filter}:${list.length}:${store.inbox.length}:${store.questions.length}:${todayTasks.length}:${keys.length}:${store.activity.length}:${moreAct}`);
   const leftTail = tailKeys.filter((k) => left.includes(k));
   const rightTail = tailKeys.filter((k) => !left.includes(k));
+  useStickyColumns(gridRef, lookA);
 
-  return (
-    <div ref={scope} className="page today">
-      <section className="hero reveal" aria-labelledby="t-hello">
+  // Приветствие и план дня. В виде A они — один лист «тоном» с разлиновкой, рядом с деньгами месяца.
+  const heroPlan = (
+    <>
+      <section className={lookA ? 'hero' : 'hero reveal'} aria-labelledby="t-hello">
         <p className="eyebrow">{weekday(TODAY)} · {fmtDayMonth(TODAY)} {TODAY.slice(0, 4)}</p>
         <h1 id="t-hello" className="hero__title">{hello},<br /><em className={overdue.length ? 'is-red' : undefined}>{headline}</em></h1>
       </section>
 
-      <section className="plan reveal" aria-labelledby="t-plan">
+      <section className={lookA ? 'plan' : 'plan reveal'} aria-labelledby="t-plan">
         <h2 id="t-plan" className="plan__title">План на сегодня</h2>
         {plan.length ? (
           <ol className="plan__steps">
@@ -288,6 +295,17 @@ export function Today() {
           </ol>
         ) : <p className="plan__done"><Icon name="done" size={20} className="urgency--green" />На сегодня всё сделано: ни просрочек, ни задач, ни вопросов.</p>}
       </section>
+    </>
+  );
+
+  return (
+    <div ref={scope} className="page today">
+      {lookA ? (
+        <div className="today-top">
+          <div className="today-hello reveal"><Ledger />{heroPlan}</div>
+          {tail.money}
+        </div>
+      ) : heroPlan}
 
       <div ref={gridRef} className="today-grid">
         <div className="today-main">

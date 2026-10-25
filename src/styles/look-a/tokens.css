@@ -1,0 +1,190 @@
+/*
+  Токены вида A «Тихий премиум» (DESIGN.md, 25.10.2026; образец — docs/дизайн/борд-бухгалтерия/A/index.html).
+  Включается флажком: <html data-look="a"> ставит public/theme-boot.js по ссылке ?look=a (?look=old — назад).
+  Без флажка ни одно правило отсюда не действует: сайт выглядит как раньше (tokens.css v2).
+  Имена токенов — те же, что в tokens.css: старые экраны под флажком берут палитру, шрифт и радиусы A сами.
+  Цвета — только #RRGGBB: так их читает проверка контраста (scripts/contrast.test.ts, блок «вид A»).
+*/
+
+/* ───────── Светлая ───────── */
+:root[data-look='a'] {
+  color-scheme: light;
+  /* Материал: тёплая бумага, лист светлее, утопленное — «тон» (вторая карточка образца) */
+  --canvas: #F4EFE6;
+  --surface: #FBF8F2;
+  --surface-sunk: #ECE6DA;
+  --line: #E2DACB;
+  --line-strong: #D3C9B7;
+  --field-border: #8C8273;
+  --ink: #26231F;
+  --ink-2: #5A544B;
+  --positive: #2E6B3F;
+  /* Действие, фокус и главная кнопка — один зелёный (в A главная кнопка цветом акцента, а не чернил) */
+  --accent: #0F5C4D;
+  --on-accent: #F6F2EA;
+  --accent-soft: #DCE8E1;
+  --focus: #0F5C4D;
+  --btn: #0F5C4D;
+  --on-btn: #F6F2EA;
+  --mark-sea: #4FD1B0;
+  --mark-wheat: #E3C98E;
+  --wheat: #8A6A2C;
+  --wheat-ink: #6E5320;
+  --wheat-soft: #F0E6D0;
+  /* Статусы — тот же порядок (красный → оранжевый → охра → зелёный → серый), тёплые тона под бумагу */
+  --st-red-bg: #F5DED6;
+  --st-red-ink: #9E3A25;
+  --st-orange-bg: #F6E2CC;
+  --st-orange-ink: #9A4512;
+  --st-yellow-bg: #F2E7C6;
+  --st-yellow-ink: #7A5808;
+  --st-green-bg: #DDE9DC;
+  --st-green-ink: #2A6339;
+  --st-grey-bg: #EAE4D8;
+  --st-grey-ink: #5A544B;
+  --dot-red: #C0462E;
+  --dot-orange: #C2621C;
+  --dot-yellow: #A27A12;
+  --dot-green: #2F8A55;
+  --toast: #26231F;
+  --on-toast: #FBF8F2;
+  --toast-action: #7FD8BF;
+  /* Свечений за листами и зерна в A нет: свет — только за курсором (look.css, --lx / --ly) */
+  --glow-a: rgb(15 92 77 / 0.09);
+  --glow-b: rgb(15 92 77 / 0);
+  --glass: rgb(251 248 242 / 0.84);
+  --edge: rgb(255 255 255 / 0);
+  --grain-opacity: 0;
+  /* Теней в покое нет (DESIGN.md §5): лист лежит ровно. Поднятое и окно — тёплая мягкая тень. */
+  --shadow-1: 0 0 0 0 rgb(0 0 0 / 0);
+  --shadow-2: 0 2px 4px rgb(38 35 31 / 0.04), 0 16px 32px rgb(38 35 31 / 0.08);
+  --shadow-3: 0 4px 10px rgb(38 35 31 / 0.08), 0 40px 90px rgb(38 35 31 / 0.2);
+  --scrim: rgb(38 35 31 / 0.32);
+  /* Шрифт — системный, без засечек; заголовки и числа — тем же семейством, плотнее */
+  --font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --display: var(--font);
+  --font-features: normal;
+  --tracking-tight: 0;
+  /* Размеры: 15 подпись · 16 текст · 20 заголовок панели · 24 заголовок карточки · 40 заголовок экрана, число ·
+     36–44 главный заголовок «Сегодня» */
+  --text-sm: 0.9375rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 2.5rem;
+  --text-3xl: 2.5rem;
+  --text-hero: clamp(2.25rem, 3.4vw, 2.75rem);
+  --leading-body: 1.5;
+  --leading-snug: 1.3;
+  --leading-tight: 1.04;
+  --weight-display: 650;
+  /* Радиусы — два: 8 — кнопка, поле, строка, метка; 28 — карточка, панель, окно */
+  --radius-md: 8px;
+  --radius-xl: 28px;
+  --rail-w: 17.5rem;
+  --ease-a: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ───────── Тёмная: выбрана вручную ───────── */
+:root[data-look='a'][data-theme='dark'] {
+  color-scheme: dark;
+  --canvas: #1C1A17;
+  --surface: #25221E;
+  --surface-sunk: #2E2A25;
+  --line: #36312B;
+  --line-strong: #443E36;
+  --field-border: #8E8574;
+  --ink: #EFE9DE;
+  --ink-2: #B3AB9B;
+  --positive: #8FD6A0;
+  --accent: #4FD1B0;
+  --on-accent: #10201B;
+  --accent-soft: #1F3A33;
+  --focus: #4FD1B0;
+  --btn: #4FD1B0;
+  --on-btn: #10201B;
+  --mark-sea: #0F5C4D;
+  --mark-wheat: #4A3A16;
+  --wheat: #E3B45A;
+  --wheat-ink: #E8C27A;
+  --wheat-soft: #352C1C;
+  --st-red-bg: #3E211B;
+  --st-red-ink: #F2A08B;
+  --st-orange-bg: #3D2818;
+  --st-orange-ink: #F1B27E;
+  --st-yellow-bg: #383017;
+  --st-yellow-ink: #E8CB7A;
+  --st-green-bg: #1D3426;
+  --st-green-ink: #9AD8A8;
+  --st-grey-bg: #2E2A25;
+  --st-grey-ink: #C2BAAA;
+  --dot-red: #EF8A72;
+  --dot-orange: #F0A060;
+  --dot-yellow: #E3B45A;
+  --dot-green: #6CCB8A;
+  --toast: #EFE9DE;
+  --on-toast: #1C1A17;
+  --toast-action: #0F5C4D;
+  --glow-a: rgb(79 209 176 / 0.12);
+  --glow-b: rgb(79 209 176 / 0);
+  --glass: rgb(37 34 30 / 0.84);
+  --edge: rgb(255 255 255 / 0);
+  --grain-opacity: 0;
+  --shadow-1: 0 0 0 0 rgb(0 0 0 / 0);
+  --shadow-2: 0 2px 4px rgb(0 0 0 / 0.3), 0 16px 32px rgb(0 0 0 / 0.36);
+  --shadow-3: 0 4px 12px rgb(0 0 0 / 0.45), 0 48px 110px rgb(0 0 0 / 0.6);
+  --scrim: rgb(0 0 0 / 0.55);
+}
+
+/* ───────── Тёмная по настройке системы (если вручную не выбрана светлая). Совпадает с блоком выше — проверяет тест. ───────── */
+@media (prefers-color-scheme: dark) {
+  :root[data-look='a']:not([data-theme='light']) {
+    color-scheme: dark;
+    --canvas: #1C1A17;
+    --surface: #25221E;
+    --surface-sunk: #2E2A25;
+    --line: #36312B;
+    --line-strong: #443E36;
+    --field-border: #8E8574;
+    --ink: #EFE9DE;
+    --ink-2: #B3AB9B;
+    --positive: #8FD6A0;
+    --accent: #4FD1B0;
+    --on-accent: #10201B;
+    --accent-soft: #1F3A33;
+    --focus: #4FD1B0;
+    --btn: #4FD1B0;
+    --on-btn: #10201B;
+    --mark-sea: #0F5C4D;
+    --mark-wheat: #4A3A16;
+    --wheat: #E3B45A;
+    --wheat-ink: #E8C27A;
+    --wheat-soft: #352C1C;
+    --st-red-bg: #3E211B;
+    --st-red-ink: #F2A08B;
+    --st-orange-bg: #3D2818;
+    --st-orange-ink: #F1B27E;
+    --st-yellow-bg: #383017;
+    --st-yellow-ink: #E8CB7A;
+    --st-green-bg: #1D3426;
+    --st-green-ink: #9AD8A8;
+    --st-grey-bg: #2E2A25;
+    --st-grey-ink: #C2BAAA;
+    --dot-red: #EF8A72;
+    --dot-orange: #F0A060;
+    --dot-yellow: #E3B45A;
+    --dot-green: #6CCB8A;
+    --toast: #EFE9DE;
+    --on-toast: #1C1A17;
+    --toast-action: #0F5C4D;
+    --glow-a: rgb(79 209 176 / 0.12);
+    --glow-b: rgb(79 209 176 / 0);
+    --glass: rgb(37 34 30 / 0.84);
+    --edge: rgb(255 255 255 / 0);
+    --grain-opacity: 0;
+    --shadow-1: 0 0 0 0 rgb(0 0 0 / 0);
+    --shadow-2: 0 2px 4px rgb(0 0 0 / 0.3), 0 16px 32px rgb(0 0 0 / 0.36);
+    --shadow-3: 0 4px 12px rgb(0 0 0 / 0.45), 0 48px 110px rgb(0 0 0 / 0.6);
+    --scrim: rgb(0 0 0 / 0.55);
+  }
+}

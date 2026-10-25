@@ -1,7 +1,12 @@
 // Свет за курсором (как у «Сверки рейсов»): одна подписка на весь документ. Поверхности с классом из SURFACES
 // получают --mx / --my (где мышь) и --fx-on: 1, пока мышь над ними; рисует свет styles/fx.css.
 // Замер — только в обработчике pointermove, запись — в следующем кадре (requestAnimationFrame), без чтения после записи.
-const SURFACES = '.tally, .hero';
+import { isLookA } from '../lib/look';
+
+// Вид A (?look=a): свет и светящийся край — у каждого листа (styles/look-a/look.css), плюс свет за курсором на странице
+// (--lx / --ly / --lo на <html>).
+const LOOK_A = isLookA();
+const SURFACES = LOOK_A ? '.tally, .hero, .panel, .today-hello' : '.tally, .hero';
 
 let current: HTMLElement | null = null;
 let raf = 0;
@@ -16,6 +21,12 @@ function frame() {
     current?.style.setProperty('--fx-on', '0');
     current = el;
   }
+  if (LOOK_A) {
+    const root = document.documentElement.style;
+    root.setProperty('--lx', `${e.clientX}px`);
+    root.setProperty('--ly', `${e.clientY}px`);
+    root.setProperty('--lo', '1');
+  }
   if (!el) return;
   const r = el.getBoundingClientRect();
   el.style.setProperty('--mx', `${e.clientX - r.left}px`);
@@ -29,7 +40,10 @@ if (typeof window !== 'undefined' && window.matchMedia?.('(hover: hover) and (po
     last = e;
     if (!raf) raf = requestAnimationFrame(frame);
   }, { passive: true });
-  document.addEventListener('pointerleave', () => { current?.style.setProperty('--fx-on', '0'); current = null; });
+  document.addEventListener('pointerleave', () => {
+    current?.style.setProperty('--fx-on', '0'); current = null;
+    if (LOOK_A) document.documentElement.style.setProperty('--lo', '0');
+  });
 }
 
 // Прилипшие шапки (таблица «Клиентов», заголовки дней на «Сроках», «Платежах», «Задачах»): прилипла — класс is-stuck,
