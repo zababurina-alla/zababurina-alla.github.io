@@ -233,6 +233,24 @@
   padding: var(--space-4) var(--space-4) calc(var(--space-8) + var(--space-5) + env(safe-area-inset-bottom));
 }
 
+/* ═════════ Помощник (ai.css): «+» в нижней панели — кнопка помощника стоит над ней, а не рядом ═════════ */
+@media (max-width: 1023px) {
+  [data-look='a'] .ai-fab,
+  [data-look='a'] .ai-panel {
+    --ai-right: var(--space-4);
+    --ai-bottom: calc(4rem + var(--space-4) + env(safe-area-inset-bottom));
+  }
+
+  /* Поля внизу: конец страницы выше кнопки (панель 64 + зазор 16 + кнопка 48 + зазор 16), иначе она закрывает последние строки */
+  [data-look='a']:has(.ai-fab) .main {
+    padding-bottom: calc(var(--space-8) * 2 + var(--space-4) + env(safe-area-inset-bottom));
+  }
+}
+
+[data-look='a'] .ai-panel__title {
+  font-weight: var(--weight-display);
+}
+
 /* ═════════ Ноутбук: боковая панель прижата к краю окна сверху, слева и снизу — без зазора и обводки ═════════ */
 @media (min-width: 1024px) {
   [data-look='a'] .shell {
@@ -257,6 +275,11 @@
 
   [data-look='a'] .main {
     padding: var(--space-6) var(--space-6) var(--space-7);
+  }
+
+  /* Кнопка помощника — в углу окна (12 + 48): конец страницы выше неё */
+  [data-look='a']:has(.ai-fab) .main {
+    padding-bottom: var(--space-8);
   }
 }
 

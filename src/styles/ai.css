@@ -1,0 +1,205 @@
+/* Помощник (ai.ask, флаг aiChat): кнопка ✦ и панель с перепиской. Обе — position: fixed, в потоке страницы места не
+   занимают (раньше кнопка стояла блоком после .shell: страница длиннее на 34 px, меню в конце прокрутки уезжало вверх).
+   Телефон: кнопка слева от «+» (вид A: «+» в нижней панели — кнопка над ней), в конце прокрутки не закрывает строки
+   (поля .main), листая вниз — прячется вместе с «+». Ноутбук: в правом нижнем углу. Вид A — look-a/look.css. */
+
+.ai-fab,
+.ai-panel {
+  --ai-size: 3rem;
+  --ai-edge: var(--space-4);
+  --ai-right: calc(var(--space-4) * 2 + 4rem); /* левее «+» (4 rem) */
+  --ai-bottom: calc(4.25rem + var(--space-4) + var(--space-2) + env(safe-area-inset-bottom)); /* над вкладками, по середине «+» */
+}
+
+.ai-fab {
+  position: fixed;
+  right: var(--ai-right);
+  bottom: var(--ai-bottom);
+  z-index: 35;
+  display: grid;
+  place-items: center;
+  width: var(--ai-size);
+  height: var(--ai-size);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--line-strong), var(--shadow-2);
+  transition: transform var(--dur-pop) var(--spring-pop), background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+
+.ai-fab.is-open {
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: var(--shadow-2);
+}
+
+.ai-fab:active {
+  transform: scale(0.92);
+  transition-duration: var(--dur-press);
+}
+
+/* Листают вниз — уходит за нижнюю панель вместе с «+» (Shell, класс fab-away); открытую панель не прячем */
+.fab-away .ai-fab:not(.is-open) {
+  transform: translateY(calc(100% + var(--space-4) + 4.25rem));
+  pointer-events: none;
+  visibility: hidden;
+  transition: transform var(--dur-base) ease, visibility 0s linear var(--dur-base);
+}
+
+/* Записывать нельзя — «+» скрыта, кнопка встаёт в правый угол */
+@media (max-width: 1023px) {
+  :root:has(.fab[aria-disabled='true']) .ai-fab {
+    --ai-right: var(--space-4);
+  }
+}
+
+/* ═════════ Панель ═════════ */
+.ai-panel {
+  position: fixed;
+  right: var(--ai-edge);
+  bottom: calc(var(--ai-bottom) + var(--ai-size) + var(--space-3));
+  left: var(--ai-edge);
+  z-index: 36;
+  display: flex;
+  flex-direction: column;
+  max-height: min(36rem, calc(100dvh - var(--ai-bottom) - var(--ai-size) - var(--space-3) - 3.75rem - var(--space-4)));
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--line), var(--shadow-3);
+  overflow: hidden;
+}
+
+.ai-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-3) var(--space-3) var(--space-5);
+}
+
+.ai-panel__title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-snug);
+  letter-spacing: -0.02em;
+}
+
+.ai-msgs {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 8rem;
+  margin: 0;
+  padding: var(--space-2) var(--space-5) var(--space-4);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+}
+
+.ai-msg {
+  display: grid;
+  gap: var(--space-1);
+  align-self: flex-start;
+  max-width: 85%;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunk);
+  color: var(--ink);
+  line-height: var(--leading-body);
+}
+
+.ai-msg__text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ai-msg--me {
+  align-self: flex-end;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.ai-msg--me .sub {
+  color: inherit;
+  opacity: 0.82;
+}
+
+.ai-msg--refusal {
+  background: color-mix(in srgb, var(--wheat) 16%, transparent);
+}
+
+.ai-msg--err {
+  background: var(--st-red-bg);
+  color: var(--st-red-ink);
+}
+
+/* Подсказка и «Думает…» — не реплики, а строки без подложки */
+.ai-msg--hint,
+.ai-msg--wait {
+  max-width: 100%;
+  padding: 0;
+  background: none;
+}
+
+.ai-msg--wait {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+
+.ai-dots {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: 1.5rem;
+  border-radius: var(--radius-full);
+  background: currentColor;
+  box-shadow: 1rem 0 currentColor, 2rem 0 currentColor;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.ai-form {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  box-shadow: inset 0 1px 0 var(--line);
+}
+
+.ai-form__q {
+  min-height: 0;
+  padding: var(--space-3) var(--space-4);
+  line-height: var(--leading-body);
+  resize: none;
+}
+
+.ai-form .btn {
+  justify-self: end;
+}
+
+/* ═════════ Ноутбук: углом справа, «+» и нижних вкладок нет ═════════ */
+@media (min-width: 1024px) {
+  .ai-fab,
+  .ai-panel {
+    --ai-edge: var(--space-6);
+    --ai-right: var(--space-6);
+    --ai-bottom: var(--space-3);
+  }
+
+  .ai-panel {
+    left: auto;
+    width: calc(var(--win-s) + 8rem);
+    max-height: min(36rem, calc(100dvh - var(--ai-bottom) - var(--ai-size) - var(--space-3) - var(--space-4)));
+  }
+
+  .fab-away .ai-fab:not(.is-open) {
+    transform: none;
+    pointer-events: auto;
+    visibility: visible;
+  }
+}
